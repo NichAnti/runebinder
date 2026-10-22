@@ -70,6 +70,12 @@ Its structure is agreed before any code is written.
 - [ ] 9.2 Polish and docs refresh
 - [ ] 9.3 Decide about a PR
 
+## Follow-ups (not scheduled)
+
+- Fail `bun run check` (and CI) when the Drizzle schema has changes without a committed migration, so CI never generates and applies an unreviewed one.
+- Show an error when sign-out fails instead of doing nothing.
+- Prevent the flash of the light theme on first load (inline script in `index.html`).
+
 ## Inputs needed from the user
 
 - Look and feel (theme, colours, sites you like): by 1.1
