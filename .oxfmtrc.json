@@ -8,7 +8,10 @@
   "sortImports": {
     "ignoreCase": false,
     "customGroups": [
-      { "groupName": "scoped", "elementNamePattern": ["@*", "@*/**"] }
+      {
+        "groupName": "scoped",
+        "elementNamePattern": ["@*", "@*/**"]
+      }
     ],
     "groups": [
       ["builtin", "external"],
@@ -22,6 +25,7 @@
     "node_modules",
     "dist",
     "repos",
+    "migrations",
     "*.tsbuildinfo",
     "pnpm-lock.yaml"
   ]
