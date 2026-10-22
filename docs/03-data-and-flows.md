@@ -129,11 +129,11 @@ A collector number matching more than one blueprint fails the build
 
 **Calls the app makes:**
 
-| Call                    | When                                                             |
-| ----------------------- | ---------------------------------------------------------------- |
-| `GET /info`             | connecting a token and checking a stored one                     |
-| `POST /wishlists`       | sending a wishlist: `game_id` 22, private, one line per printing |
-| `DELETE /wishlists/:id` | after a send, removing the previous wishlist the app made        |
+| Call                    | When                                                                                                                    |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `GET /info`             | connecting a token and checking a stored one                                                                            |
+| `POST /wishlists`       | sending a wishlist: `game_id` 22, private, one line per printing with `blueprint_id`, `collector_number` and `quantity` |
+| `DELETE /wishlists/:id` | after a send, removing the previous wishlist the app made                                                               |
 
 CardTrader has no wishlist update. A send creates the new wishlist first and
 then deletes the previous one this app created (its id is kept per user in
@@ -252,6 +252,5 @@ sequenceDiagram
 
 ## Open questions
 
-1. Whether a `POST /wishlists` line with only `blueprint_id` pins the exact printing. CardTrader documents it as "a shortcut to set the meta_name and the expansion_code", which may match any printing of the card in that set; if so, lines also send `collector_number` (8.2, checked with one recorded call).
-2. Where the Riot API publishes the official deckbuilding rules the deck builder must enforce (Phase 7).
-3. Whether `riftbound-content-v1` includes promo printings and how it marks variants (4.1, with the development key).
+1. Where the Riot API publishes the official deckbuilding rules the deck builder must enforce (Phase 7).
+2. Whether `riftbound-content-v1` includes promo printings and how it marks variants (4.1, with the development key).
