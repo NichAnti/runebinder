@@ -32,6 +32,7 @@ const printing = (
     imageUrl: 'https://example.com/test.png',
     maybeAccessibilityText: Option.none(),
     orientation: 'Portrait',
+    maybeCardTraderBlueprintId: Option.none(),
   })
 
 describe('cardIdFor', () => {

@@ -36,6 +36,7 @@ export const printing = (
   imageUrl: 'https://example.com/test-unit.png',
   maybeAccessibilityText: Option.some('Test Unit artwork'),
   orientation: 'Portrait',
+  maybeCardTraderBlueprintId: Option.none(),
   ...overrides,
 })
 

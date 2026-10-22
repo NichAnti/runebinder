@@ -61,6 +61,11 @@ export const Rarity = Schema.Literals([
 ])
 export type Rarity = typeof Rarity.Type
 
+export const CardTraderBlueprintId = Schema.Int.pipe(
+  Schema.brand('CardTraderBlueprintId'),
+)
+export type CardTraderBlueprintId = typeof CardTraderBlueprintId.Type
+
 export const Orientation = Schema.Literals(['Portrait', 'Landscape'])
 export type Orientation = typeof Orientation.Type
 
@@ -88,6 +93,7 @@ export const Printing = Schema.Struct({
   imageUrl: Schema.String,
   maybeAccessibilityText: Schema.Option(Schema.String),
   orientation: Orientation,
+  maybeCardTraderBlueprintId: Schema.Option(CardTraderBlueprintId),
 })
 export type Printing = typeof Printing.Type
 

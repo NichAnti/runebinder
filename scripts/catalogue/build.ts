@@ -3,8 +3,8 @@ import { Array, Console, Effect, FileSystem, Layer, Schema } from 'effect'
 import { BunRuntime, BunServices } from '@effect/platform-bun'
 
 import { Catalogue } from '../../src/domain'
+import { buildCatalogue } from '../../src/worker/catalogue/build'
 import { RecordedRiotGallery } from '../../src/worker/catalogue/riotGallery/layer'
-import { CatalogueSource } from '../../src/worker/catalogue/source'
 
 const OUTPUT = 'catalogue/catalogue.json'
 
@@ -20,10 +20,9 @@ const reportRejectedRecords = Effect.fn('reportRejectedRecords')(function* (
 })
 
 const build = Effect.gen(function* () {
-  const source = yield* CatalogueSource
   const fs = yield* FileSystem.FileSystem
 
-  const printings = yield* source.printings.pipe(
+  const { catalogue, printingsNotOnCardTrader } = yield* buildCatalogue.pipe(
     Effect.tapError(error =>
       error._tag === 'RejectedRecords'
         ? reportRejectedRecords(error.issues)
@@ -31,14 +30,19 @@ const build = Effect.gen(function* () {
     ),
   )
 
-  const json = yield* encodeCatalogue(
-    Catalogue.Catalogue.make({ source: source.name, printings }),
-  )
+  const json = yield* encodeCatalogue(catalogue)
 
   yield* fs.writeFileString(OUTPUT, `${json}\n`)
   yield* Console.log(
-    `Wrote ${Array.length(printings)} printings from ${source.name} to ${OUTPUT}`,
+    `Wrote ${Array.length(catalogue.printings)} printings from ${catalogue.source} to ${OUTPUT}`,
   )
+  yield* Array.match(printingsNotOnCardTrader, {
+    onEmpty: () => Console.log('Every printing has a CardTrader blueprint'),
+    onNonEmpty: ids =>
+      Console.warn(
+        `${Array.length(ids)} printing(s) are not on CardTrader: ${Array.join(ids, ', ')}`,
+      ),
+  })
 })
 
 build.pipe(

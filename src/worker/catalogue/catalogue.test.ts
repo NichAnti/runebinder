@@ -4,8 +4,8 @@ import { NodeServices } from '@effect/platform-node'
 import { assert, layer } from '@effect/vitest'
 
 import { Catalogue } from '../../domain'
+import { buildCatalogue } from './build'
 import { RecordedRiotGallery } from './riotGallery/layer'
-import { CatalogueSource } from './source'
 
 const CATALOGUE_FILE = 'catalogue/catalogue.json'
 
@@ -15,15 +15,12 @@ layer(RecordedRiotGallery.pipe(Layer.provideMerge(NodeServices.layer)))(
     it.effect('matches the recordings (run bun run catalogue:build)', () =>
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem
-        const source = yield* CatalogueSource
-
         const committed = yield* fs
           .readFileString(CATALOGUE_FILE)
           .pipe(Effect.flatMap(Schema.decodeEffect(Catalogue.CatalogueJson)))
-        const printings = yield* source.printings
+        const { catalogue } = yield* buildCatalogue
 
-        assert.strictEqual(committed.source, source.name)
-        assert.deepStrictEqual(committed.printings, printings)
+        assert.deepStrictEqual(committed, catalogue)
       }),
     )
   },
