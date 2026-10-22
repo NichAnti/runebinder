@@ -33,9 +33,8 @@ const readThemePreference: Effect.Effect<Theme.Preference> = Effect.gen(
   Effect.provide(BrowserKeyValueStore.layerLocalStorage),
 )
 
-const readSystemTheme = Effect.sync(
-  (): Theme.Resolved =>
-    window.matchMedia(DARK_COLOR_SCHEME_QUERY).matches ? 'Dark' : 'Light',
+const readSystemTheme = Effect.sync((): Theme.Resolved =>
+  window.matchMedia(DARK_COLOR_SCHEME_QUERY).matches ? 'Dark' : 'Light',
 )
 
 export const flags: Effect.Effect<Flags> = Effect.all({

@@ -25,6 +25,7 @@
     "@effect/platform-bun": "4.0.0",
     "@effect/platform-node": "4.0.0",
     "@effect/tsgo": "0.50.0",
+    "@effect/vitest": "4.0.0",
     "@foldkit/devtools": "0.169.0",
     "@foldkit/devtools-mcp": "0.25.0",
     "@foldkit/oxlint-plugin": "0.15.3",

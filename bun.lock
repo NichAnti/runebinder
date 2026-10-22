@@ -14,6 +14,7 @@
         "@effect/platform-bun": "4.0.0",
         "@effect/platform-node": "4.0.0",
         "@effect/tsgo": "0.50.0",
+        "@effect/vitest": "4.0.0",
         "@foldkit/devtools": "0.169.0",
         "@foldkit/devtools-mcp": "0.25.0",
         "@foldkit/oxlint-plugin": "0.15.3",
@@ -126,6 +127,8 @@
     "@effect/tsgo-win32-arm64": ["@effect/tsgo-win32-arm64@0.50.0", "", { "os": "win32", "cpu": "arm64" }, "sha512-VK3PTybFLmwKI50FMcNeX1LpPv9m55coKv+PKLj7gkb91YZIUooQ7hQJdSUhiuCTaUU3kikHQpnW7UbN9q4zDw=="],
 
     "@effect/tsgo-win32-x64": ["@effect/tsgo-win32-x64@0.50.0", "", { "os": "win32", "cpu": "x64" }, "sha512-ANbPqHKT/owJ9vIjyOWai+vO0IZAKZd3nN6QlPBBJyHe5BWMjz+MpntNwGxSvvp2PTMb4ZPBLQ2ixh4c9IMOMg=="],
+
+    "@effect/vitest": ["@effect/vitest@4.0.0", "", { "peerDependencies": { "effect": "^4.0.0", "vitest": ">=5.0.0 <6.0.0" } }, "sha512-kGElCPFGtP+CgMCwV/HjJWqtE3zYo6I1+8MSA54l+EI24lPU9p2Efa+TBp1jfkg9j711KKzEqgSAy3VzTsb76Q=="],
 
     "@electric-sql/pglite": ["@electric-sql/pglite@0.3.15", "", {}, "sha512-Cj++n1Mekf9ETfdc16TlDi+cDDQF0W7EcbyRHYOAeZdsAe8M/FJg18itDTSwyHfar2WIezawM9o0EKaRGVKygQ=="],
 

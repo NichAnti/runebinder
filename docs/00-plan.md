@@ -34,7 +34,7 @@ Its structure is agreed before any code is written.
 
 ## Phase 3: Backend foundation and sign-in
 
-- [ ] 3.1 🗣 Worker structure with Effect and Alchemy, first API route, request/response schemas shared with the client
+- [x] 3.1 🗣 Worker structure with Effect and Alchemy, first API route, request/response schemas shared with the client
 - [ ] 3.2 🗣 D1 and migration conventions
 - [ ] 3.3 🗣 Better Auth email and password, sign-up and sign-in pages, session check at startup
 
