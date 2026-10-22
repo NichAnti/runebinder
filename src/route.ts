@@ -19,10 +19,7 @@ export const signInRouter = pipe(
   literal('sign-in'),
   Route.mapTo(AppRoute.SignIn),
 )
-export const catalogueRouter = pipe(
-  Route.root,
-  Route.mapTo(AppRoute.Catalogue),
-)
+export const catalogueRouter = pipe(Route.root, Route.mapTo(AppRoute.Catalogue))
 
 const routeParser = Route.oneOf(signInRouter, catalogueRouter)
 

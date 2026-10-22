@@ -1,16 +1,19 @@
 import { Runtime } from 'foldkit'
 
-import { init } from './main'
+import { Flags, flags, init } from './main'
 import { Message } from './message'
 import { Model } from './model'
+import { subscriptions } from './subscription'
 import { update } from './update'
 import { view } from './view'
 
 const application = Runtime.makeApplication({
   Model,
+  Flags,
   init,
   update,
   view,
+  subscriptions,
   container: document.getElementById('root'),
   routing: {
     onUrlRequest: request => Message.ClickedLink({ request }),
@@ -21,4 +24,4 @@ const application = Runtime.makeApplication({
   },
 })
 
-Runtime.run(application)
+Runtime.run(application, { flags })

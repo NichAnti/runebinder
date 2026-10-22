@@ -7,13 +7,28 @@ import { Message } from './message'
 import { Model } from './model'
 import { LoggedIn, LoggedOut } from './page'
 import { AppRoute } from './route'
-import { RedirectToCatalogue, RedirectToSignIn, update } from './update'
+import {
+  ApplyTheme,
+  RedirectToCatalogue,
+  RedirectToSignIn,
+  SaveThemePreference,
+  update,
+} from './update'
 
 const urlOrThrow = (raw: string) =>
   Option.getOrThrowWith(fromString(raw), () => new Error(`Bad url: ${raw}`))
 
-const loggedOut = Model.make({ auth: LoggedOut.init(AppRoute.SignIn()) })
-const loggedIn = Model.make({ auth: LoggedIn.init(AppRoute.Catalogue()) })
+const loggedOut = Model.make({
+  auth: LoggedOut.init(AppRoute.SignIn()),
+  themePreference: 'System',
+  systemTheme: 'Light',
+})
+
+const loggedIn = Model.make({
+  auth: LoggedIn.init(AppRoute.Catalogue()),
+  themePreference: 'System',
+  systemTheme: 'Light',
+})
 
 describe('ChangedUrl', () => {
   test('a signed-out user on a signed-in route is redirected to sign in', () => {
@@ -49,6 +64,40 @@ describe('ChangedUrl', () => {
           AppRoute.NotFound({ path: '/nope' }),
         )
       }),
+    )
+  })
+})
+
+describe('theme', () => {
+  test('the toggle moves to the next preference, applies and saves it', () => {
+    story(
+      update,
+      given(loggedOut),
+      message(Message.ClickedThemeToggle()),
+      model(next => {
+        expect(next.themePreference).toBe('Light')
+      }),
+      Command.expectHas(
+        ApplyTheme({ theme: 'Light' }),
+        SaveThemePreference({ preference: 'Light' }),
+      ),
+      Command.resolveAll(
+        [ApplyTheme, Message.CompletedApplyTheme()],
+        [SaveThemePreference, Message.CompletedSaveThemePreference()],
+      ),
+    )
+  })
+
+  test('a system theme change is applied while the preference is System', () => {
+    story(
+      update,
+      given(loggedOut),
+      message(Message.ChangedSystemTheme({ theme: 'Dark' })),
+      model(next => {
+        expect(next.systemTheme).toBe('Dark')
+      }),
+      Command.expectHas(ApplyTheme({ theme: 'Dark' })),
+      Command.resolve(ApplyTheme, Message.CompletedApplyTheme()),
     )
   })
 })

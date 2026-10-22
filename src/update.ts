@@ -1,9 +1,14 @@
 import { Effect, Match, Schema } from 'effect'
+import { KeyValueStore } from 'effect/persistence'
 import { Command, type Update } from 'foldkit'
 import { UrlRequest, load, pushUrl, replaceUrl } from 'foldkit/navigation'
 import { modifyFields } from 'foldkit/struct'
 import { toString as urlToString } from 'foldkit/url'
 
+import { BrowserKeyValueStore } from '@effect/platform-browser'
+
+import { THEME_STORAGE_KEY } from './constant'
+import { Theme } from './domain'
 import { Message } from './message'
 import { Model } from './model'
 import {
@@ -46,7 +51,42 @@ export const RedirectToCatalogue = Command.define('RedirectToCatalogue', {
   ),
 })
 
+export const ApplyTheme = Command.define('ApplyTheme', {
+  args: { theme: Theme.Resolved },
+  messages: [Message.CompletedApplyTheme],
+  execute: ({ theme }) =>
+    Effect.sync(() => {
+      document.documentElement.classList.toggle('dark', theme === 'Dark')
+      return Message.CompletedApplyTheme()
+    }),
+})
+
+export const SaveThemePreference = Command.define('SaveThemePreference', {
+  args: { preference: Theme.Preference },
+  messages: [Message.CompletedSaveThemePreference],
+  execute: ({ preference }) =>
+    Effect.gen(function* () {
+      const store = yield* KeyValueStore.KeyValueStore
+      const json = yield* Schema.encodeEffect(Theme.PreferenceJson)(preference)
+      yield* store.set(THEME_STORAGE_KEY, json)
+      return Message.CompletedSaveThemePreference()
+    }).pipe(
+      Effect.catch(() =>
+        Effect.succeed(Message.CompletedSaveThemePreference()),
+      ),
+      Effect.provide(BrowserKeyValueStore.layerLocalStorage),
+    ),
+})
+
 // UPDATE
+
+const resolvedTheme = (model: Model): Theme.Resolved =>
+  Theme.resolve(model.themePreference, model.systemTheme)
+
+export const applyTheme: Update.Step<Model, Message> = model => ({
+  model,
+  commands: [ApplyTheme({ theme: resolvedTheme(model) })],
+})
 
 export const enterRoute = (model: Model, route: AppRoute): UpdateReturn =>
   Match.value(model.auth).pipe(
@@ -89,6 +129,21 @@ export const update = (model: Model, message: Message) =>
         }),
       }),
     ChangedUrl: ({ url }) => enterRoute(model, urlToAppRoute(url)),
+    ClickedThemeToggle: () => {
+      const nextModel = modifyFields(model, { themePreference: Theme.next })
+
+      return {
+        model: nextModel,
+        commands: [
+          ApplyTheme({ theme: resolvedTheme(nextModel) }),
+          SaveThemePreference({ preference: nextModel.themePreference }),
+        ],
+      }
+    },
+    ChangedSystemTheme: ({ theme }) =>
+      applyTheme(modifyFields(model, { systemTheme: () => theme })),
     CompletedNavigateInternal: () => ({ model }),
     CompletedLoadExternal: () => ({ model }),
+    CompletedApplyTheme: () => ({ model }),
+    CompletedSaveThemePreference: () => ({ model }),
   })
