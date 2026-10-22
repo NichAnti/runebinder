@@ -6,15 +6,14 @@ A **printing** is one physical version of a card: normal, alternate art,
 signed, overnumbered, metal. Collections and decks are made of printings.
 A **card** is the game object; printings of the same card share a `card_id`.
 
-| Id           | Example                | Comes from                                                                                 |
-| ------------ | ---------------------- | ------------------------------------------------------------------------------------------ |
-| `PrintingId` | `unl-229*-219`         | Riftcodex `riftbound_id` (the official card code), plus `-metal` for Metal printings       |
-| `CardId`     | `vi-piltover-enforcer` | Slug of the printing name without its variant suffix (`(Alternate Art)`, `(Signature)`, …) |
-| `CardCode`   | `UNL-229*`             | Derived from a `PrintingId` when importing or exporting deck codes; not stored             |
+| Id           | Example                | Comes from                                                                     |
+| ------------ | ---------------------- | ------------------------------------------------------------------------------ |
+| `PrintingId` | `ogn-304-star-298`     | Riot's card id from the Riot API                                               |
+| `CardId`     | `vi-piltover-enforcer` | Slug of the card's name and subtitle                                           |
+| `CardCode`   | `UNL-229*`             | Derived from a `PrintingId` when importing or exporting deck codes; not stored |
 
 `CardCode` is the [Piltover Archive deck code](https://github.com/Piltover-Archive/RiftboundDeckCodes)
-format. It exists only for sets the deck-code library supports, so promo
-printings (`OPP`, `PR`, `JDG`) have none.
+format, derived from a `PrintingId` (`ogn-304-star-298` → `OGN-304*`).
 
 ## Data model (D1)
 
@@ -33,12 +32,9 @@ erDiagram
   printing {
     text id PK "PrintingId"
     text card_id "CardId"
-    text riftcodex_id
-    text riftbound_id
-    text tcgplayer_id
     text set
     int collector_number
-    text variant "Base | AlternateArt | Signature | Overnumbered | Metal"
+    text variant "Base | AlternateArt | Signature | Overnumbered"
     text rarity
     text name
     text type
@@ -97,11 +93,10 @@ A scheduled Backend job (Cloudflare cron), which can also be triggered by hand:
 ```mermaid
 sequenceDiagram
   participant J as Import job
-  participant R as Riftcodex
+  participant R as Riot API
   participant DB as D1
-  J->>R: GET /cards (every page)
-  J->>J: parse each record with the Riftcodex schema
-  J->>J: apply the correction rules
+  J->>R: GET /riftbound/content/v1/contents
+  J->>J: parse every card with the Riot content schema
   J->>J: run the checks
   alt every record parses and every check passes
     J->>DB: replace the printing table in one batch
@@ -110,15 +105,8 @@ sequenceDiagram
   end
 ```
 
-**Correction rules** (pure functions, tested with real Riftcodex records):
-
-- Identical duplicates (equal except Riftcodex's own id and timestamp) become one printing.
-- A name ending in `(Metal)` gives variant `Metal` and `-metal` on the id.
-- A name ending in `(Alternate Art)` whose id has no `a` gives variant `AlternateArt` and adds the `a`.
-
-**Checks:** every id is unique; the variant agrees with the flags and the name
-suffix; set and number agree with `riftbound_id`; every printing has a
-`card_id`. Any failure rejects the whole import (all or nothing).
+**Checks:** every id is unique; set and collector number agree with the id;
+every required field is present; every printing has a `card_id`. Any failure rejects the whole import (all or nothing).
 
 ## Missing cards
 
@@ -221,4 +209,5 @@ sequenceDiagram
 
 1. The body CardTrader expects for `POST /wishlists`: set code and collector number, or its own blueprint ids (Phase 5).
 2. Whether CardTrader's Riftbound expansion codes match `OGN`, `UNL`, …, and how it numbers alternate-art, signed and metal printings (Phase 5).
-3. How deck codes refer to printings that have no `CardCode` (promos) (Phase 7).
+3. Where the Riot API publishes the official deckbuilding rules the deck builder must enforce (Phase 7).
+4. Whether `riftbound-content-v1` includes promo printings and how it marks variants (4.1, with the development key).

@@ -38,10 +38,10 @@ Its structure is agreed before any code is written.
 - [x] 3.2 🗣 D1 and migration conventions (Drizzle, one database)
 - [x] 3.3 🗣 Better Auth email and password, sign-up and sign-in pages, session check at startup
 
-## Phase 4: Card catalogue (Riftcodex)
+## Phase 4: Card catalogue (Riot API)
 
-- [ ] 4.1 🗣 Domain: `PrintingId`, `CardId`, `CardCode`, printing schema, grouping printings into cards; Riftcodex schema and correction rules; pure, with tests
-- [ ] 4.2 🗣 Catalogue import in the Backend: Riftcodex client, checks, all-or-nothing replace of the `printing` table, cron and manual trigger
+- [ ] 4.1 🗣 Domain: `PrintingId`, `CardId`, `CardCode`, printing schema, grouping printings into cards; Riot content schema and checks; pure, with tests
+- [ ] 4.2 🗣 Catalogue import in the Backend: Riot `riftbound-content-v1` client (key as Worker secret), checks, all-or-nothing replace of the `printing` table, cron and manual trigger
 - [ ] 4.3 Catalogue API, catalogue page with search, and a card page
 
 ## Phase 5: CardTrader test
@@ -58,6 +58,7 @@ Its structure is agreed before any code is written.
 
 - [ ] 7.1 🗣 Deck-code library as a dependency, conversion and round-trip tests
 - [ ] 7.2 Migration, API, deck list, deck view, per-printing detail
+- [ ] 7.3 Official deckbuilding rules enforced in the deck builder (required by Riot's policy)
 
 ## Phase 8: Missing cards and wishlist
 
@@ -68,7 +69,9 @@ Its structure is agreed before any code is written.
 
 - [ ] 9.1 Card page "used in decks" section and hover
 - [ ] 9.2 Polish and docs refresh
-- [ ] 9.3 Decide about a PR
+- [ ] 9.3 Riot "Legal Jibber Jabber" notice in the app
+- [ ] 9.4 Register the product on the Riot Developer Portal and apply for a production key
+- [ ] 9.5 Decide about a PR
 
 ## Follow-ups (not scheduled)
 
@@ -79,4 +82,5 @@ Its structure is agreed before any code is written.
 ## Inputs needed from the user
 
 - Look and feel (theme, colours, sites you like): by 1.1
+- Riot development key in a local `.env` (`RIOT_API_KEY`): by 4.2
 - CardTrader token, pasted into the app: in 5.2

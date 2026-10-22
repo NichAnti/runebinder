@@ -46,6 +46,13 @@ Domain vocabulary, deployment steps, local conventions that differ from Foldkit'
 - No `className` from callers. A new look is a new variant.
 - Scene tests drive a fixture app (`<component>.fixture.ts`) and cover behaviour, not appearance.
 
+### Riot Policy
+
+- Card data comes only from Riot's official API (`riftbound-content-v1`), as Riot's [Riftbound policy](https://developer.riotgames.com/policies/riftbound) requires: "Your App may only use Riftbound assets (including cards) provided by the Riot API." No Riftcodex, gallery scraping or other unofficial sources.
+- Show the official English card text unchanged. The deck builder must enforce the official deckbuilding rules.
+- The Riot API key is a Worker secret, never in code or in the browser.
+- No monetization, no win-rate or metagame statistics, no reselling Riot data. The app shows Riot's "Legal Jibber Jabber" notice.
+
 ### Database
 
 - One Cloudflare D1 database, `AppDb`, holds Better Auth's tables and the app's tables, so foreign keys and cascades work across them.
