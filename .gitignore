@@ -32,3 +32,6 @@ Thumbs.db
 
 # Nix / direnv
 .direnv/
+
+# Local caches (Riot API responses)
+.cache/
