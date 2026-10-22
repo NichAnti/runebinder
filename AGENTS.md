@@ -33,7 +33,7 @@ Domain vocabulary, deployment steps, local conventions that differ from Foldkit'
 - Folder layout follows Foldkit's project organization: `page/<name>/` per page, `domain/` for pure Schema + operations, `ui/` for the design system, `service/` for outside-world clients used by Commands, `api/` for the shared HttpApi contract, `worker/` for the Worker. Imports point inward: `domain` ← `api` ← `service`/`worker`; `page` may use `domain`, `ui`, `service`; `worker` never imports client code. Small files with one reason to change. No `utils`/`helpers` grab-bags.
 - Minimal design system in `src/ui/`: design tokens in the Tailwind theme (colour, spacing, type scale, radius) plus a small set of shared components built on `@foldkit/ui`. Pages compose these and never restyle them inline.
 - Tests ship with the code: Story and Scene tests per page, unit tests for the pure domain, property-based tests where a domain function has clear laws (e.g. deck code round-trips).
-- Sensitive values never enter the Model, logs, or the Worker. The CardTrader token is held as `Redacted` and only in the browser.
+- Sensitive values never enter logs or the Worker. They enter the Model only as `Redacted` and only while the user types them (production builds never copy the Model; the dev server's hot reload does, in memory). The CardTrader token is held as `Redacted` and only in the browser.
 
 ### UI Components
 
