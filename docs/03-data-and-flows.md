@@ -92,6 +92,61 @@ are an error); the id parses; set and collector number agree with the id;
 every printing has a `card_id`; every id is unique. Any failure rejects the
 whole build (all or nothing). A test fails when the committed `catalogue.json` no longer matches the recordings.
 
+## CardTrader
+
+Base URL `https://api.cardtrader.com/api/v2`, `Authorization: Bearer <token>`,
+200 requests per 10 seconds across all endpoints (429 above that). The token is
+created in the settings page of the user's CardTrader profile and gives full
+access to their account, including buying.
+
+**Riftbound on CardTrader:** `game_id` 22. Expansions, recorded in
+`catalogue/recordings/cardtrader/`:
+
+| Set   | `expansion_id` |
+| ----- | -------------- |
+| `ogn` | 4166           |
+| `ogs` | 4275           |
+| `sfd` | 4299           |
+| `unl` | 4425           |
+| `ven` | 4521           |
+| `rad` | 4522           |
+
+**Blueprints:** one CardTrader blueprint per printing. The catalogue build maps
+every printing to its blueprint through `fixed_properties.collector_number`
+and stores it as `maybeCardTraderBlueprintId`:
+
+| `PrintingId`       | CardTrader number | Rule                                             |
+| ------------------ | ----------------- | ------------------------------------------------ |
+| `ogn-066-298`      | `066`             | set and set size dropped                         |
+| `ogn-066a-298`     | `066a`            | alternate art keeps `a`                          |
+| `ogn-304-star-298` | `304s`            | `-star` becomes `s`                              |
+| `ven-r04`          | `R04`             | `r`, `sp`, `t` prefixes upper-cased              |
+| `rad-sp1-005`      | `SP1/005`         | CardTrader's `/total` suffix dropped             |
+| double-sided       | `T01 // T02`      | each face matches; a single-faced blueprint wins |
+
+A collector number matching more than one blueprint fails the build
+(`AmbiguousCardTraderBlueprint`). All 1408 printings currently match.
+
+**Calls the app makes:**
+
+| Call                    | When                                                             |
+| ----------------------- | ---------------------------------------------------------------- |
+| `GET /info`             | connecting a token and checking a stored one                     |
+| `POST /wishlists`       | sending a wishlist: `game_id` 22, private, one line per printing |
+| `DELETE /wishlists/:id` | after a send, removing the previous wishlist the app made        |
+
+CardTrader has no wishlist update. A send creates the new wishlist first and
+then deletes the previous one this app created (its id is kept per user in
+D1), so a failed send never leaves the user without one. Edits made on
+CardTrader to that wishlist are replaced, and the user is warned. `/info`
+responses include `shared_secret`; the client drops it when decoding and they
+are never recorded.
+
+**Token:** checked with `GET /info`, then kept in `sessionStorage` or, when
+the user chooses "Remember on this device", `localStorage`. It is held as
+`Redacted` in the SPA, never sent to the Backend, and cleared on disconnect,
+on sign-out, and when CardTrader rejects it.
+
 ## Missing cards
 
 For each printing:
@@ -178,20 +233,25 @@ sequenceDiagram
   participant S as SPA
   participant B as Browser storage
   participant CT as CardTrader API
+  participant W as Backend
   S->>B: read token
   alt no token
     U->>S: paste token, choose tab-only or remember
+    S->>CT: GET /info
     S->>B: store
   end
-  S->>CT: GET /games (find Riftbound id)
-  S->>CT: POST /wishlists (missing lines)
-  CT-->>S: wishlist id
+  S->>CT: POST /wishlists (blueprint ids and quantities)
+  CT-->>S: new wishlist id
+  S->>W: save the new wishlist id (API route decided in 8.2)
+  W-->>S: previous id, if any
+  opt previous wishlist
+    S->>CT: DELETE /wishlists/{previous id}
+  end
   S-->>U: link to the wishlist on CardTrader
 ```
 
 ## Open questions
 
-1. The body CardTrader expects for `POST /wishlists`: set code and collector number, or its own blueprint ids (Phase 5).
-2. Whether CardTrader's Riftbound expansion codes match `OGN`, `UNL`, …, and how it numbers alternate-art, signed and metal printings (Phase 5).
-3. Where the Riot API publishes the official deckbuilding rules the deck builder must enforce (Phase 7).
-4. Whether `riftbound-content-v1` includes promo printings and how it marks variants (4.1, with the development key).
+1. Whether a `POST /wishlists` line with only `blueprint_id` pins the exact printing. CardTrader documents it as "a shortcut to set the meta_name and the expansion_code", which may match any printing of the card in that set; if so, lines also send `collector_number` (8.2, checked with one recorded call).
+2. Where the Riot API publishes the official deckbuilding rules the deck builder must enforce (Phase 7).
+3. Whether `riftbound-content-v1` includes promo printings and how it marks variants (4.1, with the development key).

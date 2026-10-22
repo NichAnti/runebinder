@@ -49,7 +49,7 @@ Its structure is agreed before any code is written.
 - [x] 5.1 Record CardTrader's Riftbound data once (games, expansions, blueprints; about 8 calls, confirmed before running) into `catalogue/recordings/cardtrader/`
 - [x] 5.2 Map printings to CardTrader blueprints at catalogue build time (`blueprint_id` stored in `catalogue.json`; unmatched printings listed by the build). Revisit if CardTrader's data changes often
 - [x] 5.3 🗣 Connect CardTrader page: token in the browser only (tab or remembered), never in the Model or our backend; `CardTraderClient` exposes only read and wishlist calls
-- [ ] 5.4 Update `03-data-and-flows.md` with what we learn
+- [x] 5.4 Update `03-data-and-flows.md` with what we learn
 
 ## Phase 6: Collection
 
