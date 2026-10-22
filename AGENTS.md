@@ -46,6 +46,14 @@ Domain vocabulary, deployment steps, local conventions that differ from Foldkit'
 - No `className` from callers. A new look is a new variant.
 - Scene tests drive a fixture app (`<component>.fixture.ts`) and cover behaviour, not appearance.
 
+### Database
+
+- One Cloudflare D1 database, `AppDb`, holds Better Auth's tables and the app's tables, so foreign keys and cascades work across them.
+- Drizzle is the only way to define and query the database. Tables live in `src/worker/schema/` (Better Auth's tables in `auth.ts`, generated with `npx auth@1.7.5 generate` against `@better-auth/drizzle-adapter/relations-v2`). `Drizzle.Schema` generates migrations into `migrations/` from those tables; commit them and never edit them by hand.
+- `drizzle-orm` and `drizzle-kit` are pinned to exactly the version `alchemy` pins; upgrade them together with `alchemy`.
+- App code queries through the Effect handle (`Drizzle.D1`) inside per-feature repository services (`src/worker/<feature>/repository.ts`). Handlers never query directly.
+- Rows are parsed at the boundary with schemas derived by `drizzle-orm/effect-schema`, overriding columns with branded domain types (`CardCode`, `UserId`, …).
+
 ### Working Rules
 
 - Implement plan steps without asking for approval of each diff. Stop and discuss first only for architectural or design choices (structure, patterns, dependencies, data model, API shape, UX).
