@@ -33,13 +33,13 @@ flowchart LR
 
 ## What lives where
 
-| Data | Where | Reaches our server? |
-|---|---|---|
-| User identity (Discord id, name, avatar) | D1 | yes |
-| Collection, decks, wishlist | D1 | yes |
-| Discord OAuth tokens | not kept (see open questions) | only during sign-in |
-| CardTrader token | user's browser only | **never** |
-| Card catalogue | Riftcodex, cached in browser | no |
+| Data                                     | Where                         | Reaches our server? |
+| ---------------------------------------- | ----------------------------- | ------------------- |
+| User identity (Discord id, name, avatar) | D1                            | yes                 |
+| Collection, decks, wishlist              | D1                            | yes                 |
+| Discord OAuth tokens                     | not kept (see open questions) | only during sign-in |
+| CardTrader token                         | user's browser only           | **never**           |
+| Card catalogue                           | Riftcodex, cached in browser  | no                  |
 
 ## Why
 
