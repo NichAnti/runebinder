@@ -1,5 +1,6 @@
 import {
   Array,
+  Match,
   Number,
   Option,
   Schema,
@@ -8,6 +9,7 @@ import {
   pipe,
 } from 'effect'
 
+import type { FacetName } from './catalogueSearch'
 import {
   CardType,
   Domain,
@@ -296,3 +298,120 @@ export const QueryParams = Schema.Struct({
   power: rangeParam,
   sort: sortParam,
 })
+
+// CHANGES
+
+export const RangeField = Schema.Literals(['energy', 'might', 'power'])
+export type RangeField = typeof RangeField.Type
+
+export const Bound = Schema.Literals(['Min', 'Max'])
+export type Bound = typeof Bound.Type
+
+const withBoundOf = (
+  range: Range,
+  bound: Bound,
+  value: Option.Option<number>,
+): Range =>
+  bound === 'Min'
+    ? { maybeMin: value, maybeMax: range.maybeMax }
+    : { maybeMin: range.maybeMin, maybeMax: value }
+
+export const withBound = (
+  query: Query,
+  field: RangeField,
+  bound: Bound,
+  value: Option.Option<number>,
+): Query =>
+  Match.value(field).pipe(
+    Match.withReturnType<Query>(),
+    Match.when('energy', () => ({
+      ...query,
+      energy: withBoundOf(query.energy, bound, value),
+    })),
+    Match.when('might', () => ({
+      ...query,
+      might: withBoundOf(query.might, bound, value),
+    })),
+    Match.when('power', () => ({
+      ...query,
+      power: withBoundOf(query.power, bound, value),
+    })),
+    Match.exhaustive,
+  )
+
+const toggleDecoded = <A extends string>(
+  schema: Schema.Codec<A, string>,
+  values: ReadonlyArray<A>,
+  value: string,
+): ReadonlyArray<A> =>
+  Option.match(Schema.decodeOption(schema)(value), {
+    onNone: () => values,
+    onSome: decoded => toggle(decoded)(values),
+  })
+
+export const toggleFacet = (
+  query: Query,
+  facet: FacetName,
+  value: string,
+): Query =>
+  Match.value(facet).pipe(
+    Match.withReturnType<Query>(),
+    Match.when('set', () => ({
+      ...query,
+      set: toggleDecoded(SetCode, query.set, value),
+    })),
+    Match.when('type', () => ({
+      ...query,
+      type: toggleDecoded(CardType, query.type, value),
+    })),
+    Match.when('supertype', () => ({
+      ...query,
+      supertype: toggleDecoded(Supertype, query.supertype, value),
+    })),
+    Match.when('domain', () => ({
+      ...query,
+      domain: toggleDecoded(Domain, query.domain, value),
+    })),
+    Match.when('rarity', () => ({
+      ...query,
+      rarity: toggleDecoded(Rarity, query.rarity, value),
+    })),
+    Match.when('variant', () => ({
+      ...query,
+      variant: toggleDecoded(Variant, query.variant, value),
+    })),
+    Match.when('keyword', () => ({
+      ...query,
+      keyword: toggleDecoded(Schema.String, query.keyword, value),
+    })),
+    Match.when('tag', () => ({
+      ...query,
+      tag: toggleDecoded(Schema.String, query.tag, value),
+    })),
+    Match.exhaustive,
+  )
+
+export const selectedValues = (
+  query: Query,
+  facet: FacetName,
+): ReadonlyArray<string> => query[facet]
+
+export const withTerm = (query: Query, text: string): Query => ({
+  ...query,
+  q: pipe(Option.some(String.trim(text)), Option.filter(String.isNonEmpty)),
+})
+
+export const SORT_CHOICES: ReadonlyArray<Sort> = [
+  { field: 'Relevance', direction: 'Descending' },
+  { field: 'Number', direction: 'Ascending' },
+  { field: 'Name', direction: 'Ascending' },
+  { field: 'Name', direction: 'Descending' },
+  { field: 'Energy', direction: 'Ascending' },
+  { field: 'Energy', direction: 'Descending' },
+  { field: 'Might', direction: 'Ascending' },
+  { field: 'Might', direction: 'Descending' },
+  { field: 'Power', direction: 'Ascending' },
+  { field: 'Power', direction: 'Descending' },
+]
+
+export const isSameQuery = Schema.toEquivalence(Query)

@@ -5,12 +5,16 @@ import { type Runtime, Update } from 'foldkit'
 import { BrowserKeyValueStore } from '@effect/platform-browser'
 
 import { DARK_COLOR_SCHEME_QUERY, THEME_STORAGE_KEY } from './constant'
-import { Theme, User } from './domain'
+import { CatalogueQuery, Theme, User } from './domain'
 import { Message } from './message'
 import { Model } from './model'
 import { LoggedIn, LoggedOut } from './page'
 import { AppRoute, urlToAppRoute } from './route'
-import { ApiClient, type AuthClient } from './service'
+import {
+  ApiClient,
+  type AuthClient,
+  type CatalogueIndexService,
+} from './service'
 import { applyTheme, enterRoute } from './update'
 
 // FLAGS
@@ -62,13 +66,14 @@ export const init: Runtime.RoutingApplicationInit<
   Model,
   Message,
   Flags,
-  AuthClient
+  AuthClient | CatalogueIndexService
 > = (flags, url) =>
   Update.combine(
     Model.make({
       auth: Option.match(flags.maybeUser, {
         onNone: () => LoggedOut.init(AppRoute.SignIn()),
-        onSome: user => LoggedIn.init(AppRoute.Catalogue(), user),
+        onSome: user =>
+          LoggedIn.init(AppRoute.Catalogue(CatalogueQuery.empty), user),
       }),
       themePreference: flags.themePreference,
       systemTheme: flags.systemTheme,

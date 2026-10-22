@@ -152,9 +152,12 @@ const SET_RELEASE_ORDER: ReadonlyArray<string> = [
 
 const COLLECTOR_NUMBER_SLOTS = 1000
 
-export const collectionOrder = (printing: Printing): number =>
+export const setReleaseRank = (set: string): number =>
   pipe(
-    Array.findFirstIndex(SET_RELEASE_ORDER, set => set === printing.set),
+    Array.findFirstIndex(SET_RELEASE_ORDER, released => released === set),
     Option.getOrElse(() => Array.length(SET_RELEASE_ORDER)),
-    setIndex => setIndex * COLLECTOR_NUMBER_SLOTS + printing.collectorNumber,
   )
+
+export const collectionOrder = (printing: Printing): number =>
+  setReleaseRank(printing.set) * COLLECTOR_NUMBER_SLOTS +
+  printing.collectorNumber

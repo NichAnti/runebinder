@@ -3,7 +3,7 @@ import { UrlRequest } from 'foldkit/navigation'
 import { Url } from 'foldkit/url'
 
 import { Theme } from './domain'
-import { LoggedOut } from './page'
+import { LoggedIn, LoggedOut } from './page'
 
 export const Message = defineMessageUnion({
   ClickedLink: { request: UrlRequest },
@@ -12,6 +12,7 @@ export const Message = defineMessageUnion({
   ChangedSystemTheme: { theme: Theme.Resolved },
   ClickedSignOut: {},
   GotLoggedOutMessage: { message: LoggedOut.Message },
+  GotLoggedInMessage: { message: LoggedIn.Message },
   SucceededSignOut: {},
   FailedSignOut: {},
   CompletedNavigateInternal: {},

@@ -8,14 +8,24 @@ import { toString as urlToString } from 'foldkit/url'
 import { BrowserKeyValueStore } from '@effect/platform-browser'
 
 import { THEME_STORAGE_KEY } from './constant'
-import { Theme } from './domain'
+import { CatalogueQuery, Theme } from './domain'
 import { Message } from './message'
 import { Model } from './model'
 import { LoggedIn, LoggedOut } from './page'
-import { AppRoute, catalogueRouter, signInRouter, urlToAppRoute } from './route'
-import { AuthClient } from './service'
+import {
+  AppRoute,
+  type LoggedInRoute,
+  catalogueHome,
+  signInRouter,
+  urlToAppRoute,
+} from './route'
+import { AuthClient, type CatalogueIndexService } from './service'
 
-type UpdateReturn = Update.Return<Model, Message, AuthClient>
+type UpdateReturn = Update.Return<
+  Model,
+  Message,
+  AuthClient | CatalogueIndexService
+>
 const withUpdateReturn = Match.withReturnType<UpdateReturn>()
 
 // COMMAND
@@ -43,7 +53,7 @@ export const RedirectToSignIn = Command.define('RedirectToSignIn', {
 
 export const RedirectToCatalogue = Command.define('RedirectToCatalogue', {
   messages: [Message.CompletedNavigateInternal],
-  execute: replaceUrl(catalogueRouter()).pipe(
+  execute: replaceUrl(catalogueHome()).pipe(
     Effect.as(Message.CompletedNavigateInternal()),
   ),
 })
@@ -93,7 +103,8 @@ const foldLoggedOutOutMessage = LoggedOut.OutMessage.match<
     ({ user }) =>
     model => ({
       model: modifyFields(model, {
-        auth: () => LoggedIn.init(AppRoute.Catalogue(), user),
+        auth: () =>
+          LoggedIn.init(AppRoute.Catalogue(CatalogueQuery.empty), user),
       }),
       commands: [RedirectToCatalogue()],
     }),
@@ -112,6 +123,34 @@ const foldLoggedOut = Update.foldChild({
     modifyFields(model, { auth: () => nextLoggedOut }),
   toParentMessage: message => Message.GotLoggedOutMessage({ message }),
   foldOutMessage: foldLoggedOutOutMessage,
+})
+
+const readLoggedIn = (model: Model) =>
+  Match.value(model.auth).pipe(
+    Match.tagsExhaustive({
+      LoggedOut: () => Option.none(),
+      LoggedIn: loggedIn => Option.some(loggedIn),
+    }),
+  )
+
+const writeLoggedIn = (model: Model, nextLoggedIn: LoggedIn.Model): Model =>
+  modifyFields(model, { auth: () => nextLoggedIn })
+
+const toLoggedInMessage = (message: LoggedIn.Message): Message =>
+  Message.GotLoggedInMessage({ message })
+
+const foldLoggedIn = Update.foldChild({
+  update: LoggedIn.update,
+  read: readLoggedIn,
+  write: writeLoggedIn,
+  toParentMessage: toLoggedInMessage,
+})
+
+const foldLoggedInRoute = Update.foldChild({
+  update: LoggedIn.enterRoute,
+  read: readLoggedIn,
+  write: writeLoggedIn,
+  toParentMessage: toLoggedInMessage,
 })
 
 const resolvedTheme = (model: Model): Theme.Resolved =>
@@ -136,14 +175,12 @@ export const enterRoute = (model: Model, route: AppRoute): UpdateReturn =>
           })),
           Match.orElse(() => ({ model, commands: [RedirectToSignIn()] })),
         ),
-      LoggedIn: loggedIn =>
+      LoggedIn: () =>
         Match.value(route).pipe(
           withUpdateReturn,
-          Match.tag('Catalogue', 'NotFound', route => ({
-            model: modifyFields(model, {
-              auth: () => modifyFields(loggedIn, { route: () => route }),
-            }),
-          })),
+          Match.tag('Catalogue', 'Card', 'NotFound', (route: LoggedInRoute) =>
+            foldLoggedInRoute(model, route),
+          ),
           Match.orElse(() => ({ model, commands: [RedirectToCatalogue()] })),
         ),
     }),
@@ -178,6 +215,7 @@ export const update = (model: Model, message: Message) =>
       applyTheme(modifyFields(model, { systemTheme: () => theme })),
     ClickedSignOut: () => ({ model, commands: [SignOut()] }),
     GotLoggedOutMessage: ({ message }) => foldLoggedOut(model, message),
+    GotLoggedInMessage: ({ message }) => foldLoggedIn(model, message),
     SucceededSignOut: () => ({
       model: modifyFields(model, {
         auth: () => LoggedOut.init(AppRoute.SignIn()),

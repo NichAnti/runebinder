@@ -5,7 +5,7 @@ import { APP_NAME } from './constant'
 import { Message } from './message'
 import { Model } from './model'
 import { LoggedIn, LoggedOut } from './page'
-import { AppRoute, catalogueRouter } from './route'
+import { AppRoute, catalogueHome } from './route'
 import { Button, Link } from './ui'
 
 const title = (route: AppRoute): string =>
@@ -13,8 +13,22 @@ const title = (route: AppRoute): string =>
     SignIn: () => `Sign in | ${APP_NAME}`,
     SignUp: () => `Create an account | ${APP_NAME}`,
     Catalogue: () => `Catalogue | ${APP_NAME}`,
+    Card: ({ cardId }) => `${cardId} | ${APP_NAME}`,
     NotFound: () => `Not found | ${APP_NAME}`,
   })
+
+const footerView = (h: HtmlBuilder<Message>): Html =>
+  h.footer(
+    [h.Class('border-t border-border px-4 py-6 text-xs text-fg-muted')],
+    [
+      h.p(
+        [h.Class('mx-auto max-w-7xl')],
+        [
+          `${APP_NAME} was created under Riot Games' "Legal Jibber Jabber" policy using assets owned by Riot Games. Riot Games does not endorse or sponsor this project.`,
+        ],
+      ),
+    ],
+  )
 
 const navView = (loggedIn: LoggedIn.Model, h: HtmlBuilder<Message>): Html =>
   h.nav(
@@ -22,7 +36,7 @@ const navView = (loggedIn: LoggedIn.Model, h: HtmlBuilder<Message>): Html =>
     [
       Link.view(
         {
-          href: catalogueRouter(),
+          href: catalogueHome(),
           content: ['Catalogue'],
           variant: 'Nav',
           isCurrent: loggedIn.route._tag === 'Catalogue',
@@ -88,7 +102,7 @@ const headerView = (model: Model, h: HtmlBuilder<Message>): Html =>
 export const view = (model: Model, h: HtmlBuilder<Message>): Document => ({
   title: title(model.auth.route),
   body: h.div(
-    [h.Class('min-h-screen')],
+    [h.Class('flex min-h-screen flex-col')],
     [
       headerView(model, h),
       Match.value(model.auth).pipe(
@@ -101,9 +115,17 @@ export const view = (model: Model, h: HtmlBuilder<Message>): Document => ({
               toParentMessage: message =>
                 Message.GotLoggedOutMessage({ message }),
             }),
-          LoggedIn: loggedIn => LoggedIn.view(loggedIn, h),
+          LoggedIn: loggedIn =>
+            h.submodel({
+              slotId: 'logged-in',
+              model: loggedIn,
+              view: LoggedIn.view,
+              toParentMessage: message =>
+                Message.GotLoggedInMessage({ message }),
+            }),
         }),
       ),
+      footerView(h),
     ],
   ),
 })

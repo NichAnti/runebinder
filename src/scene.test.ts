@@ -1,6 +1,7 @@
 import { expect, given, role, scene, text } from 'foldkit/scene'
 import { describe, test } from 'vitest'
 
+import { CatalogueQuery } from './domain'
 import { Model } from './model'
 import { LoggedIn, LoggedOut } from './page'
 import { AppRoute, type LoggedInRoute, type LoggedOutRoute } from './route'
@@ -23,6 +24,14 @@ const loggedInAt = (route: LoggedInRoute) =>
   })
 
 describe('shell', () => {
+  test('the footer carries the Riot notice', () => {
+    scene(
+      { update, view },
+      given(loggedOutAt(AppRoute.SignIn())),
+      expect(role('contentinfo')).toContainText('Legal Jibber Jabber'),
+    )
+  })
+
   test('signed out shows the sign-in form without the main nav', () => {
     scene(
       { update, view },
@@ -45,11 +54,11 @@ describe('shell', () => {
     )
   })
 
-  test('signed in shows the catalogue, the current nav link and the user', () => {
+  test('signed in loads the catalogue and shows the nav and the user', () => {
     scene(
       { update, view },
-      given(loggedInAt(AppRoute.Catalogue())),
-      expect(role('heading', { name: 'Catalogue' })).toExist(),
+      given(loggedInAt(AppRoute.Catalogue(CatalogueQuery.empty))),
+      expect(role('status')).toContainText('Loading the catalogue…'),
       expect(role('link', { name: 'Catalogue' })).toHaveAttr(
         'aria-current',
         'page',
@@ -62,7 +71,7 @@ describe('shell', () => {
   test('the theme toggle shows the current preference', () => {
     scene(
       { update, view },
-      given(loggedInAt(AppRoute.Catalogue())),
+      given(loggedInAt(AppRoute.Catalogue(CatalogueQuery.empty))),
       expect(role('button', { name: 'Theme: Dark' })).toExist(),
     )
   })

@@ -3,6 +3,7 @@ import { Command, given, message, model, story } from 'foldkit/story'
 import { fromString } from 'foldkit/url'
 import { describe, expect, test } from 'vitest'
 
+import { CatalogueQuery } from './domain'
 import { Message } from './message'
 import { Model } from './model'
 import { LoggedIn, LoggedOut } from './page'
@@ -28,7 +29,7 @@ const loggedOut = Model.make({
 })
 
 const loggedIn = Model.make({
-  auth: LoggedIn.init(AppRoute.Catalogue(), ada),
+  auth: LoggedIn.init(AppRoute.Catalogue(CatalogueQuery.empty), ada),
   themePreference: 'System',
   systemTheme: 'Light',
 })
@@ -99,7 +100,7 @@ describe('session', () => {
       ),
       model(next => {
         expect(next.auth).toStrictEqual(
-          LoggedIn.init(AppRoute.Catalogue(), ada),
+          LoggedIn.init(AppRoute.Catalogue(CatalogueQuery.empty), ada),
         )
       }),
       Command.expectExact(RedirectToCatalogue),

@@ -1,6 +1,7 @@
 import { Runtime } from 'foldkit'
 
 import { Flags, flags, init } from './main'
+import { managedResources } from './managedResource'
 import { Message } from './message'
 import { Model } from './model'
 import { AuthClient } from './service'
@@ -15,6 +16,7 @@ const application = Runtime.makeApplication({
   update,
   view,
   subscriptions,
+  managedResources,
   resources: AuthClient.layer,
   container: document.getElementById('root'),
   routing: {

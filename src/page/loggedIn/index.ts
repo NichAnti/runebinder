@@ -1,2 +1,5 @@
-export { Model, init } from './model'
+export { managedResources } from './managedResource'
+export { Message } from './message'
+export { CatalogueState, Model, init } from './model'
+export { enterRoute, update } from './update'
 export { view } from './view'

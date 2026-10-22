@@ -42,7 +42,7 @@ Its structure is agreed before any code is written.
 
 - [x] 4.1 🗣 Domain: `PrintingId`, `CardId`, `Printing`, grouping printings into cards; Riot gallery schema, mapping and checks against the committed recording; pure, with tests
 - [x] 4.2 🗣 `CatalogueSource` service with a recorded Riot gallery layer; `bun run catalogue:build` writes the committed `catalogue/catalogue.json`; a test fails when it is out of date
-- [ ] 4.3 🗣 `Catalogue` browser service: loads `catalogue.json` as a hashed static asset, Orama index; catalogue page (search, facet filters with counts, one row per card) and card page
+- [x] 4.3 🗣 `Catalogue` browser service: loads `catalogue.json` as a hashed static asset, Orama index; catalogue page (search, facet filters with counts, one row per card) and card page
 - [ ] 4.4 Further `CatalogueSource` layers: Riftcodex (recorded + live) and the official Riot API (live, once a key has access)
 
 ## Phase 5: CardTrader test
@@ -70,7 +70,7 @@ Its structure is agreed before any code is written.
 
 - [ ] 9.1 Card page "used in decks" section and hover
 - [ ] 9.2 Polish and docs refresh
-- [ ] 9.3 Riot "Legal Jibber Jabber" notice in the app
+- [x] 9.3 Riot "Legal Jibber Jabber" notice in the app (site footer, added in 4.3)
 - [ ] 9.4 Register the product on the Riot Developer Portal and apply for a production key
 - [ ] 9.5 Decide about a PR
 
@@ -79,6 +79,7 @@ Its structure is agreed before any code is written.
 - Fail `bun run check` (and CI) when the Drizzle schema has changes without a committed migration, so CI never generates and applies an unreviewed one.
 - Show an error when sign-out fails instead of doing nothing.
 - Prevent the flash of the light theme on first load (inline script in `index.html`).
+- Split the app bundle (536 KB, 171 KB compressed) so the catalogue's search code (Orama) loads only when needed; Vite warns above 500 KB.
 
 ## Inputs needed from the user
 
