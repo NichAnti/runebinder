@@ -43,13 +43,13 @@ Its structure is agreed before any code is written.
 - [x] 4.1 🗣 Domain: `PrintingId`, `CardId`, `Printing`, grouping printings into cards; Riot gallery schema, mapping and checks against the committed recording; pure, with tests
 - [x] 4.2 🗣 `CatalogueSource` service with a recorded Riot gallery layer; `bun run catalogue:build` writes the committed `catalogue/catalogue.json`; a test fails when it is out of date
 - [x] 4.3 🗣 `Catalogue` browser service: loads `catalogue.json` as a hashed static asset, Orama index; catalogue page (search, facet filters with counts, one row per card) and card page
-- [ ] 4.4 Further `CatalogueSource` layers: Riftcodex (recorded + live) and the official Riot API (live, once a key has access)
 
 ## Phase 5: CardTrader test
 
-- [ ] 5.1 🗣 Token handling: `Redacted`, kept for the tab or remembered on the device, parsed when read back from browser storage
-- [ ] 5.2 Test page: paste token, check set codes and printings, create a test wishlist
-- [ ] 5.3 Update `03-data-and-flows.md` with what we learn; revise the design if needed
+- [ ] 5.1 Record CardTrader's Riftbound data once (games, expansions, blueprints; about 8 calls, confirmed before running) into `catalogue/recordings/cardtrader/`
+- [ ] 5.2 Map printings to CardTrader blueprints at catalogue build time (`blueprint_id` stored in `catalogue.json`; unmatched printings listed by the build). Revisit if CardTrader's data changes often
+- [ ] 5.3 🗣 Connect CardTrader page: token in the browser only (tab or remembered), never in the Model or our backend; `CardTraderClient` exposes only read and wishlist calls
+- [ ] 5.4 Update `03-data-and-flows.md` with what we learn
 
 ## Phase 6: Collection
 
@@ -75,6 +75,8 @@ Its structure is agreed before any code is written.
 - [ ] 9.5 Decide about a PR
 
 ## Follow-ups (not scheduled)
+
+- Further `CatalogueSource` layers: Riftcodex (recorded + live) and the official Riot API (live, once a key has access).
 
 - Fail `bun run check` (and CI) when the Drizzle schema has changes without a committed migration, so CI never generates and applies an unreviewed one.
 - Show an error when sign-out fails instead of doing nothing.
