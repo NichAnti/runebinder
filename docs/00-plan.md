@@ -46,7 +46,7 @@ Its structure is agreed before any code is written.
 
 ## Phase 5: CardTrader test
 
-- [ ] 5.1 Record CardTrader's Riftbound data once (games, expansions, blueprints; about 8 calls, confirmed before running) into `catalogue/recordings/cardtrader/`
+- [x] 5.1 Record CardTrader's Riftbound data once (games, expansions, blueprints; about 8 calls, confirmed before running) into `catalogue/recordings/cardtrader/`
 - [ ] 5.2 Map printings to CardTrader blueprints at catalogue build time (`blueprint_id` stored in `catalogue.json`; unmatched printings listed by the build). Revisit if CardTrader's data changes often
 - [ ] 5.3 🗣 Connect CardTrader page: token in the browser only (tab or remembered), never in the Model or our backend; `CardTraderClient` exposes only read and wishlist calls
 - [ ] 5.4 Update `03-data-and-flows.md` with what we learn
@@ -64,7 +64,7 @@ Its structure is agreed before any code is written.
 ## Phase 8: Missing cards and wishlist
 
 - [ ] 8.1 Missing-cards calculation, pure with tests
-- [ ] 8.2 Wishlist page: manual items, send to CardTrader
+- [ ] 8.2 Wishlist page: manual items, send to CardTrader. Sending creates a new private CardTrader wishlist first, then deletes the previous one this app created (its id is kept per user in D1); the user is warned that edits made on CardTrader to that wishlist are replaced
 
 ## Phase 9: Finishing the MVP
 
