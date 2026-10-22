@@ -1,7 +1,3 @@
-/* Design tokens. The only place colours, radii and shadows are defined.
-   Palette variables are private to this file; components use the semantic
-   utilities generated below (bg-surface, text-fg, border-border, …). */
-
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {

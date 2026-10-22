@@ -35,6 +35,17 @@ Domain vocabulary, deployment steps, local conventions that differ from Foldkit'
 - Tests ship with the code: Story and Scene tests per page, unit tests for the pure domain, property-based tests where a domain function has clear laws (e.g. deck code round-trips).
 - Sensitive values never enter the Model, logs, or the Worker. The CardTrader token is held as `Redacted` and only in the browser.
 
+### UI Components
+
+- Design tokens live only in `src/ui/tokens.css`. Palette variables are private to it; components use the semantic utilities (`bg-surface`, `text-fg`, `border-border`, …). Tailwind's default colours are disabled.
+- One file per component in `src/ui/`, re-exported as a namespace from `src/ui/index.ts`.
+- API: `view(config, h)` with a `ViewConfig` type. Content goes in through named slots (`ReadonlyArray<Html | string>` or `Html`); appearance through `variant` (and `size` when needed).
+- Styles live in a `recipe` in the component file: `base`, `variants`, `defaults`, and `compound` when needed. Multi-part components have one recipe per slot.
+- Every rendered part carries `data-slot`.
+- Behaviour and accessibility come from `@foldkit/ui`. Its `toView` render callback is used inside `src/ui/` and never exposed to pages.
+- No `className` from callers. A new look is a new variant.
+- Scene tests drive a fixture app (`<component>.fixture.ts`) and cover behaviour, not appearance.
+
 ### Working Rules
 
 - Propose every change as an exact diff and wait for explicit approval before editing any file.
