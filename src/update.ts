@@ -1,6 +1,6 @@
-import { Effect, Match, Schema } from 'effect'
+import { Effect, Match, Option, Schema } from 'effect'
 import { KeyValueStore } from 'effect/persistence'
-import { Command, type Update } from 'foldkit'
+import { Command, Update } from 'foldkit'
 import { UrlRequest, load, pushUrl, replaceUrl } from 'foldkit/navigation'
 import { modifyFields } from 'foldkit/struct'
 import { toString as urlToString } from 'foldkit/url'
@@ -11,14 +11,11 @@ import { THEME_STORAGE_KEY } from './constant'
 import { Theme } from './domain'
 import { Message } from './message'
 import { Model } from './model'
-import {
-  type AppRoute,
-  catalogueRouter,
-  signInRouter,
-  urlToAppRoute,
-} from './route'
+import { LoggedIn, LoggedOut } from './page'
+import { AppRoute, catalogueRouter, signInRouter, urlToAppRoute } from './route'
+import { AuthClient } from './service'
 
-type UpdateReturn = Update.Return<Model, Message>
+type UpdateReturn = Update.Return<Model, Message, AuthClient>
 const withUpdateReturn = Match.withReturnType<UpdateReturn>()
 
 // COMMAND
@@ -78,7 +75,44 @@ export const SaveThemePreference = Command.define('SaveThemePreference', {
     ),
 })
 
+export const SignOut = Command.define('SignOut', {
+  messages: [Message.SucceededSignOut, Message.FailedSignOut],
+  execute: Effect.gen(function* () {
+    const auth = yield* AuthClient
+    yield* auth.signOut
+    return Message.SucceededSignOut()
+  }).pipe(Effect.catch(() => Effect.succeed(Message.FailedSignOut()))),
+})
+
 // UPDATE
+
+const foldLoggedOutOutMessage = LoggedOut.OutMessage.match<
+  Update.Step<Model, Message>
+>({
+  SignedIn:
+    ({ user }) =>
+    model => ({
+      model: modifyFields(model, {
+        auth: () => LoggedIn.init(AppRoute.Catalogue(), user),
+      }),
+      commands: [RedirectToCatalogue()],
+    }),
+})
+
+const foldLoggedOut = Update.foldChild({
+  update: LoggedOut.update,
+  read: (model: Model) =>
+    Match.value(model.auth).pipe(
+      Match.tagsExhaustive({
+        LoggedOut: loggedOut => Option.some(loggedOut),
+        LoggedIn: () => Option.none(),
+      }),
+    ),
+  write: (model, nextLoggedOut) =>
+    modifyFields(model, { auth: () => nextLoggedOut }),
+  toParentMessage: message => Message.GotLoggedOutMessage({ message }),
+  foldOutMessage: foldLoggedOutOutMessage,
+})
 
 const resolvedTheme = (model: Model): Theme.Resolved =>
   Theme.resolve(model.themePreference, model.systemTheme)
@@ -95,7 +129,7 @@ export const enterRoute = (model: Model, route: AppRoute): UpdateReturn =>
       LoggedOut: loggedOut =>
         Match.value(route).pipe(
           withUpdateReturn,
-          Match.tag('SignIn', 'NotFound', route => ({
+          Match.tag('SignIn', 'SignUp', 'NotFound', route => ({
             model: modifyFields(model, {
               auth: () => modifyFields(loggedOut, { route: () => route }),
             }),
@@ -142,6 +176,15 @@ export const update = (model: Model, message: Message) =>
     },
     ChangedSystemTheme: ({ theme }) =>
       applyTheme(modifyFields(model, { systemTheme: () => theme })),
+    ClickedSignOut: () => ({ model, commands: [SignOut()] }),
+    GotLoggedOutMessage: ({ message }) => foldLoggedOut(model, message),
+    SucceededSignOut: () => ({
+      model: modifyFields(model, {
+        auth: () => LoggedOut.init(AppRoute.SignIn()),
+      }),
+      commands: [RedirectToSignIn()],
+    }),
+    FailedSignOut: () => ({ model }),
     CompletedNavigateInternal: () => ({ model }),
     CompletedLoadExternal: () => ({ model }),
     CompletedApplyTheme: () => ({ model }),

@@ -5,11 +5,12 @@ import { type Runtime, Update } from 'foldkit'
 import { BrowserKeyValueStore } from '@effect/platform-browser'
 
 import { DARK_COLOR_SCHEME_QUERY, THEME_STORAGE_KEY } from './constant'
-import { Theme } from './domain'
+import { Theme, User } from './domain'
 import { Message } from './message'
 import { Model } from './model'
-import { LoggedOut } from './page'
+import { LoggedIn, LoggedOut } from './page'
 import { AppRoute, urlToAppRoute } from './route'
+import { ApiClient, type AuthClient } from './service'
 import { applyTheme, enterRoute } from './update'
 
 // FLAGS
@@ -17,6 +18,7 @@ import { applyTheme, enterRoute } from './update'
 export const Flags = Schema.Struct({
   themePreference: Theme.Preference,
   systemTheme: Theme.Resolved,
+  maybeUser: Schema.Option(User.User),
 })
 export type Flags = typeof Flags.Type
 
@@ -37,20 +39,37 @@ const readSystemTheme = Effect.sync((): Theme.Resolved =>
   window.matchMedia(DARK_COLOR_SCHEME_QUERY).matches ? 'Dark' : 'Light',
 )
 
+const readCurrentUser: Effect.Effect<Option.Option<User.User>> = Effect.gen(
+  function* () {
+    const api = yield* ApiClient
+    const user = yield* api.account.me()
+    return Option.some(user)
+  },
+).pipe(
+  Effect.catch(() => Effect.succeed(Option.none<User.User>())),
+  Effect.provide(ApiClient.layer),
+)
+
 export const flags: Effect.Effect<Flags> = Effect.all({
   themePreference: readThemePreference,
   systemTheme: readSystemTheme,
+  maybeUser: readCurrentUser,
 })
 
 // INIT
 
-export const init: Runtime.RoutingApplicationInit<Model, Message, Flags> = (
-  flags,
-  url,
-) =>
+export const init: Runtime.RoutingApplicationInit<
+  Model,
+  Message,
+  Flags,
+  AuthClient
+> = (flags, url) =>
   Update.combine(
     Model.make({
-      auth: LoggedOut.init(AppRoute.SignIn()),
+      auth: Option.match(flags.maybeUser, {
+        onNone: () => LoggedOut.init(AppRoute.SignIn()),
+        onSome: user => LoggedIn.init(AppRoute.Catalogue(), user),
+      }),
       themePreference: flags.themePreference,
       systemTheme: flags.systemTheme,
     }),

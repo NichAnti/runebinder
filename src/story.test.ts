@@ -6,12 +6,15 @@ import { describe, expect, test } from 'vitest'
 import { Message } from './message'
 import { Model } from './model'
 import { LoggedIn, LoggedOut } from './page'
+import * as SignIn from './page/loggedOut/page/signIn'
 import { AppRoute } from './route'
+import { ada } from './testing'
 import {
   ApplyTheme,
   RedirectToCatalogue,
   RedirectToSignIn,
   SaveThemePreference,
+  SignOut,
   update,
 } from './update'
 
@@ -25,7 +28,7 @@ const loggedOut = Model.make({
 })
 
 const loggedIn = Model.make({
-  auth: LoggedIn.init(AppRoute.Catalogue()),
+  auth: LoggedIn.init(AppRoute.Catalogue(), ada),
   themePreference: 'System',
   systemTheme: 'Light',
 })
@@ -38,6 +41,20 @@ describe('ChangedUrl', () => {
       message(Message.ChangedUrl({ url: urlOrThrow('http://localhost/') })),
       Command.expectExact(RedirectToSignIn),
       Command.resolve(RedirectToSignIn, Message.CompletedNavigateInternal()),
+    )
+  })
+
+  test('a signed-out user can open the sign-up page', () => {
+    story(
+      update,
+      given(loggedOut),
+      message(
+        Message.ChangedUrl({ url: urlOrThrow('http://localhost/sign-up') }),
+      ),
+      Command.expectNone(),
+      model(next => {
+        expect(next.auth.route).toStrictEqual(AppRoute.SignUp())
+      }),
     )
   })
 
@@ -64,6 +81,44 @@ describe('ChangedUrl', () => {
           AppRoute.NotFound({ path: '/nope' }),
         )
       }),
+    )
+  })
+})
+
+describe('session', () => {
+  test('signing in switches to the signed-in area and opens the catalogue', () => {
+    story(
+      update,
+      given(loggedOut),
+      message(
+        Message.GotLoggedOutMessage({
+          message: LoggedOut.Message.GotSignInMessage({
+            message: SignIn.Message.SucceededSignIn({ user: ada }),
+          }),
+        }),
+      ),
+      model(next => {
+        expect(next.auth).toStrictEqual(
+          LoggedIn.init(AppRoute.Catalogue(), ada),
+        )
+      }),
+      Command.expectExact(RedirectToCatalogue),
+      Command.resolve(RedirectToCatalogue, Message.CompletedNavigateInternal()),
+    )
+  })
+
+  test('signing out returns to the sign-in page', () => {
+    story(
+      update,
+      given(loggedIn),
+      message(Message.ClickedSignOut()),
+      Command.expectExact(SignOut),
+      Command.resolve(SignOut, Message.SucceededSignOut()),
+      model(next => {
+        expect(next.auth).toStrictEqual(LoggedOut.init(AppRoute.SignIn()))
+      }),
+      Command.expectExact(RedirectToSignIn),
+      Command.resolve(RedirectToSignIn, Message.CompletedNavigateInternal()),
     )
   })
 })
