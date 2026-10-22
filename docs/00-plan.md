@@ -28,26 +28,26 @@ Its structure is agreed before any code is written.
 
 ## Phase 2: App shell
 
-- [ ] 2.1 🗣 Routing and page structure (Foldkit auth example)
-- [ ] 2.2 Shell: layout, nav, empty pages
+- [x] 2.1 🗣 Routing and page structure (Foldkit auth example): `LoggedOut | LoggedIn` root Model, the whole app behind sign-in
+- [ ] 2.2 Shell: layout, nav, theme toggle, LoggedOut and LoggedIn shells with placeholder pages
 
-## Phase 3: Card catalogue (Riftcodex)
+## Phase 3: Backend foundation and sign-in
 
-- [ ] 3.1 🗣 Domain: `CardCode` and other branded types, card and printing schemas, grouping printings into cards; pure, with tests
-- [ ] 3.2 🗣 First outside HTTP call: Riftcodex client, responses parsed on arrival, paging, caching
-- [ ] 3.3 Catalogue page with search, and a card page
+- [ ] 3.1 🗣 Worker structure with Effect and Alchemy, first API route, request/response schemas shared with the client
+- [ ] 3.2 🗣 D1 and migration conventions
+- [ ] 3.3 🗣 Better Auth email and password, sign-up and sign-in pages, session check at startup
 
-## Phase 4: CardTrader test
+## Phase 4: Card catalogue (Riftcodex)
 
-- [ ] 4.1 🗣 Token handling: `Redacted`, kept for the tab or remembered on the device, parsed when read back from browser storage
-- [ ] 4.2 Test page: paste token, check set codes and printings, create a test wishlist
-- [ ] 4.3 Update `03-data-and-flows.md` with what we learn; revise the design if needed
+- [ ] 4.1 🗣 Domain: `CardCode` and other branded types, card and printing schemas, grouping printings into cards; pure, with tests
+- [ ] 4.2 🗣 First outside HTTP call: Riftcodex client, responses parsed on arrival, paging, caching
+- [ ] 4.3 Catalogue page with search, and a card page
 
-## Phase 5: Backend foundation
+## Phase 5: CardTrader test
 
-- [ ] 5.1 🗣 Worker structure with Effect and Alchemy, first API route, request/response schemas shared with the client
-- [ ] 5.2 🗣 D1 and migration conventions
-- [ ] 5.3 🗣 Better Auth email and password, sign-up and sign-in pages
+- [ ] 5.1 🗣 Token handling: `Redacted`, kept for the tab or remembered on the device, parsed when read back from browser storage
+- [ ] 5.2 Test page: paste token, check set codes and printings, create a test wishlist
+- [ ] 5.3 Update `03-data-and-flows.md` with what we learn; revise the design if needed
 
 ## Phase 6: Collection
 
@@ -72,4 +72,4 @@ Its structure is agreed before any code is written.
 ## Inputs needed from the user
 
 - Look and feel (theme, colours, sites you like): by 1.1
-- CardTrader token, pasted into the app: in 4.2
+- CardTrader token, pasted into the app: in 5.2
