@@ -1,70 +1,53 @@
+import { Option } from 'effect'
 import { Command, given, message, model, story } from 'foldkit/story'
+import { fromString } from 'foldkit/url'
 import { describe, expect, test } from 'vitest'
 
-import { Message, type Model, update } from './main'
+import { Message } from './message'
+import { Model } from './model'
+import { LoggedIn, LoggedOut } from './page'
+import { AppRoute } from './route'
+import { RedirectToCatalogue, RedirectToSignIn, update } from './update'
 
-const initialModel: Model = { count: 0 }
+const urlOrThrow = (raw: string) =>
+  Option.getOrThrowWith(fromString(raw), () => new Error(`Bad url: ${raw}`))
 
-describe('update', () => {
-  test('ClickedIncrement adds one to the count', () => {
+const loggedOut = Model.make({ auth: LoggedOut.init(AppRoute.SignIn()) })
+const loggedIn = Model.make({ auth: LoggedIn.init(AppRoute.Catalogue()) })
+
+describe('ChangedUrl', () => {
+  test('a signed-out user on a signed-in route is redirected to sign in', () => {
     story(
       update,
-      given(initialModel),
-      message(Message.ClickedIncrement()),
+      given(loggedOut),
+      message(Message.ChangedUrl({ url: urlOrThrow('http://localhost/') })),
+      Command.expectExact(RedirectToSignIn),
+      Command.resolve(RedirectToSignIn, Message.CompletedNavigateInternal()),
+    )
+  })
+
+  test('a signed-in user on the sign-in route is redirected to the catalogue', () => {
+    story(
+      update,
+      given(loggedIn),
+      message(
+        Message.ChangedUrl({ url: urlOrThrow('http://localhost/sign-in') }),
+      ),
+      Command.expectExact(RedirectToCatalogue),
+      Command.resolve(RedirectToCatalogue, Message.CompletedNavigateInternal()),
+    )
+  })
+
+  test('an unknown path becomes NotFound within the current area', () => {
+    story(
+      update,
+      given(loggedIn),
+      message(Message.ChangedUrl({ url: urlOrThrow('http://localhost/nope') })),
       Command.expectNone(),
-      model(model => {
-        expect(model.count).toBe(1)
-      }),
-    )
-  })
-
-  test('ClickedDecrement subtracts one from the count', () => {
-    story(
-      update,
-      given({ count: 5 }),
-      message(Message.ClickedDecrement()),
-      model(model => {
-        expect(model.count).toBe(4)
-      }),
-    )
-  })
-
-  test('ClickedDecrement past zero produces a negative count', () => {
-    story(
-      update,
-      given(initialModel),
-      message(Message.ClickedDecrement()),
-      model(model => {
-        expect(model.count).toBe(-1)
-      }),
-    )
-  })
-
-  test('ClickedReset sets the count back to zero', () => {
-    story(
-      update,
-      given({ count: 99 }),
-      message(Message.ClickedReset()),
-      model(model => {
-        expect(model.count).toBe(0)
-      }),
-    )
-  })
-
-  test('successive Messages accumulate as expected', () => {
-    story(
-      update,
-      given(initialModel),
-      message(Message.ClickedIncrement()),
-      message(Message.ClickedIncrement()),
-      message(Message.ClickedIncrement()),
-      message(Message.ClickedDecrement()),
-      model(model => {
-        expect(model.count).toBe(2)
-      }),
-      message(Message.ClickedReset()),
-      model(model => {
-        expect(model.count).toBe(0)
+      model(next => {
+        expect(next.auth.route).toStrictEqual(
+          AppRoute.NotFound({ path: '/nope' }),
+        )
       }),
     )
   })

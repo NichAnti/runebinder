@@ -1,57 +1,39 @@
-import { click, expect, given, role, scene, text } from 'foldkit/scene'
+import { expect, given, role, scene, text } from 'foldkit/scene'
 import { describe, test } from 'vitest'
 
-import { type Model, update, view } from './main'
+import { Model } from './model'
+import { LoggedIn, LoggedOut } from './page'
+import { AppRoute } from './route'
+import { update } from './update'
+import { view } from './view'
 
-const initialModel: Model = { count: 0 }
-
-describe('view', () => {
-  test('renders the initial count and three buttons', () => {
+describe('shell', () => {
+  test('signed out shows the sign-in page', () => {
     scene(
       { update, view },
-      given(initialModel),
-      expect(text('0')).toExist(),
-      expect(role('button', { name: '+' })).toExist(),
-      expect(role('button', { name: '-' })).toExist(),
-      expect(role('button', { name: 'Reset' })).toExist(),
+      given(Model.make({ auth: LoggedOut.init(AppRoute.SignIn()) })),
+      expect(role('heading', { name: 'Sign in' })).toExist(),
     )
   })
 
-  test('clicking + increments the displayed count', () => {
+  test('signed in shows the catalogue page', () => {
     scene(
       { update, view },
-      given(initialModel),
-      click(role('button', { name: '+' })),
-      expect(text('1')).toExist(),
-      click(role('button', { name: '+' })),
-      expect(text('2')).toExist(),
+      given(Model.make({ auth: LoggedIn.init(AppRoute.Catalogue()) })),
+      expect(role('heading', { name: 'Catalogue' })).toExist(),
     )
   })
 
-  test('clicking - decrements the displayed count', () => {
+  test('not found shows the path and a way back', () => {
     scene(
       { update, view },
-      given({ count: 3 }),
-      click(role('button', { name: '-' })),
-      expect(text('2')).toExist(),
-    )
-  })
-
-  test('clicking - past zero produces a negative count', () => {
-    scene(
-      { update, view },
-      given(initialModel),
-      click(role('button', { name: '-' })),
-      expect(text('-1')).toExist(),
-    )
-  })
-
-  test('Reset returns the count to zero', () => {
-    scene(
-      { update, view },
-      given({ count: 42 }),
-      click(role('button', { name: 'Reset' })),
-      expect(text('0')).toExist(),
+      given(
+        Model.make({
+          auth: LoggedIn.init(AppRoute.NotFound({ path: '/nope' })),
+        }),
+      ),
+      expect(text('Nothing lives at /nope.')).toExist(),
+      expect(role('link', { name: 'Go to catalogue' })).toExist(),
     )
   })
 })

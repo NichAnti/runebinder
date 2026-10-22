@@ -29,7 +29,8 @@ Its structure is agreed before any code is written.
 ## Phase 2: App shell
 
 - [x] 2.1 🗣 Routing and page structure (Foldkit auth example): `LoggedOut | LoggedIn` root Model, the whole app behind sign-in
-- [ ] 2.2 Shell: layout, nav, theme toggle, LoggedOut and LoggedIn shells with placeholder pages
+- [x] 2.2a Shell: layout, LoggedOut and LoggedIn shells with placeholder pages, routing and route guards
+- [ ] 2.2b Theme toggle and nav
 
 ## Phase 3: Backend foundation and sign-in
 
