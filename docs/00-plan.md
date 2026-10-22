@@ -16,7 +16,7 @@ Its structure is agreed before any code is written.
 ## Phase 0: Foundations
 
 - [x] 0.1 Engineering standards and this workflow in `AGENTS.md`
-- [ ] 0.2 Vendor the Foldkit source into `repos/foldkit` (user runs `git subtree add`)
+- [x] 0.2 Vendor the Foldkit source into `repos/foldkit` (user runs `git subtree add`)
 - [ ] 0.3 Study the official examples: Foldkit auth / routing / kanban / website, Effect `ai-docs`, Alchemy D1 and secrets
 - [ ] 0.4 🗣 Project folder layout
 
