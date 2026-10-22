@@ -22,7 +22,7 @@ Its structure is agreed before any code is written.
 
 ## Phase 1: Design system
 
-- [ ] 1.1 🗣 Design tokens in the Tailwind theme: colour, spacing, type, radius
+- [x] 1.1 🗣 Design tokens in the Tailwind theme: colour, spacing, type, radius
 - [ ] 1.2 🗣 First component on `@foldkit/ui`: location, API, tests
 - [ ] 1.3 Further components only when a page needs them
 

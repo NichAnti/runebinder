@@ -1,1 +1,13 @@
 @import 'tailwindcss';
+@import './ui/tokens.css';
+
+@layer base {
+  html {
+    @apply bg-canvas text-fg font-sans;
+    color-scheme: light;
+  }
+
+  html.dark {
+    color-scheme: dark;
+  }
+}
