@@ -38,11 +38,12 @@ Its structure is agreed before any code is written.
 - [x] 3.2 🗣 D1 and migration conventions (Drizzle, one database)
 - [x] 3.3 🗣 Better Auth email and password, sign-up and sign-in pages, session check at startup
 
-## Phase 4: Card catalogue (Riot API)
+## Phase 4: Card catalogue
 
-- [ ] 4.1 🗣 Domain: `PrintingId`, `CardId`, `CardCode`, printing schema, grouping printings into cards; Riot content schema and checks; pure, with tests
-- [ ] 4.2 🗣 Catalogue import in the Backend: Riot `riftbound-content-v1` client (key as Worker secret), checks, all-or-nothing replace of the `printing` table, cron and manual trigger
+- [x] 4.1 🗣 Domain: `PrintingId`, `CardId`, `Printing`, grouping printings into cards; Riot gallery schema, mapping and checks against the committed recording; pure, with tests
+- [ ] 4.2 🗣 `CatalogueSource` service with a recorded Riot gallery layer; `printing` table; `bun run catalogue:build` writes `catalogue/printing.sql`; Alchemy imports it
 - [ ] 4.3 Catalogue API, catalogue page with search, and a card page
+- [ ] 4.4 Further `CatalogueSource` layers: Riftcodex (recorded + live) and the official Riot API (live, once a key has access)
 
 ## Phase 5: CardTrader test
 

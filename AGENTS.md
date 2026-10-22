@@ -25,7 +25,7 @@ Domain vocabulary, deployment steps, local conventions that differ from Foldkit'
 - Sources of truth, in order: installed package source (`node_modules/effect/src` with its `AGENTS.md` and `ai-docs/`, `node_modules/alchemy/src`, `repos/foldkit/`), official examples (Foldkit `examples/`, `alchemy-run/alchemy` examples at the tag matching the pinned version), official docs (foldkit.dev, alchemy.run, effect.website). Name the source a pattern comes from in the proposal.
 - FOLDKIT.md conventions apply everywhere, not just in Foldkit code.
 - Effect end to end, in the client and in the Worker. Errors are typed values, not thrown exceptions. Dependencies are services provided by layers. No `any`, no casts.
-- Parse, don't validate. Every boundary decodes input once with Effect Schema into a domain type: HTTP request and response bodies, D1 rows, Riftcodex and CardTrader responses, routes and query params, browser storage, deck codes. Code past the boundary only accepts parsed types.
+- Parse, don't validate. Every boundary decodes input once with Effect Schema into a domain type: HTTP request and response bodies, D1 rows, card source and CardTrader responses, routes and query params, browser storage, deck codes. Code past the boundary only accepts parsed types.
 - Identifiers are branded types with smart constructors (`CardCode`, `DeckId`, `UserId`), never bare strings.
 - Make illegal states unrepresentable: tagged unions, `Option`, non-empty arrays.
 - Functional core, imperative shell. Domain logic (card codes, printing grouping, missing-card counts, deck code conversion) is pure, has no I/O, and lives in its own modules. Side effects live only in Commands (client) and Effect services (Worker).
@@ -48,7 +48,9 @@ Domain vocabulary, deployment steps, local conventions that differ from Foldkit'
 
 ### Riot Policy
 
-- Card data comes only from Riot's official API (`riftbound-content-v1`), as Riot's [Riftbound policy](https://developer.riotgames.com/policies/riftbound) requires: "Your App may only use Riftbound assets (including cards) provided by the Riot API." No Riftcodex, gallery scraping or other unofficial sources.
+- A public app may use card data only from Riot's official API (`riftbound-content-v1`), as Riot's [Riftbound policy](https://developer.riotgames.com/policies/riftbound) requires: "Your App may only use Riftbound assets (including cards) provided by the Riot API."
+- Until a Riot key has access to that API, card data comes from swappable `CatalogueSource` layers: Riot's gallery feed and Riftcodex, both from responses recorded in `catalogue/recordings/<source>/`. These sources are for development only; switch to the official API before anything public.
+- Make as few calls to any card source as possible: record a response once, commit it, and build from the recording.
 - Show the official English card text unchanged. The deck builder must enforce the official deckbuilding rules.
 - The Riot API key is a Worker secret, never in code or in the browser.
 - No monetization, no win-rate or metagame statistics, no reselling Riot data. The app shows Riot's "Legal Jibber Jabber" notice.

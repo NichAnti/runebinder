@@ -86,27 +86,39 @@ erDiagram
 - `printing` exists from Phase 4; `collection_item`, `deck`, `deck_card` and `wishlist_item` arrive in Phases 6 to 8. Their exact columns are decided then.
 - Deleting a user cascades to everything they own.
 
-## Catalogue import
+## Catalogue build
 
-A scheduled Backend job (Cloudflare cron), which can also be triggered by hand:
+Card data comes from a swappable `CatalogueSource` service:
+
+| Layer        | Data                                                        | Use                                       |
+| ------------ | ----------------------------------------------------------- | ----------------------------------------- |
+| Riot gallery | recorded feed pages in `catalogue/recordings/riot-gallery/` | development, now                          |
+| Riftcodex    | recorded API pages in `catalogue/recordings/riftcodex/`     | development, later (needs conflict rules) |
+| Riot API     | live `riftbound-content-v1` with `RIOT_API_KEY`             | the only source allowed for a public app  |
 
 ```mermaid
 sequenceDiagram
-  participant J as Import job
-  participant R as Riot API
+  participant B as bun run catalogue:build
+  participant S as CatalogueSource
+  participant A as Alchemy (dev / deploy)
   participant DB as D1
-  J->>R: GET /riftbound/content/v1/contents
-  J->>J: parse every card with the Riot content schema
-  J->>J: run the checks
+  B->>S: printings
+  S->>S: read the recording, parse every record strictly, map to Printing
+  S->>S: run the checks
   alt every record parses and every check passes
-    J->>DB: replace the printing table in one batch
+    S-->>B: printings
+    B->>B: write catalogue/printing.sql
   else anything fails
-    J->>J: keep the previous catalogue, report every failing record
+    S-->>B: every failing record
+    B->>B: write nothing; the previous catalogue stays
   end
+  A->>DB: import catalogue/printing.sql when it changed
 ```
 
-**Checks:** every id is unique; set and collector number agree with the id;
-every required field is present; every printing has a `card_id`. Any failure rejects the whole import (all or nothing).
+**Checks:** every record matches the source's schema exactly (unknown fields
+are an error); the id parses; set and collector number agree with the id;
+every printing has a `card_id`; every id is unique. Any failure rejects the
+whole build (all or nothing).
 
 ## Missing cards
 
