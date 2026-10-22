@@ -13,7 +13,9 @@ import { AppRoute, urlToAppRoute } from './route'
 import {
   ApiClient,
   type AuthClient,
+  type CardTraderClient,
   type CatalogueIndexService,
+  type TokenStore,
 } from './service'
 import { applyTheme, enterRoute } from './update'
 
@@ -66,7 +68,7 @@ export const init: Runtime.RoutingApplicationInit<
   Model,
   Message,
   Flags,
-  AuthClient | CatalogueIndexService
+  AuthClient | CardTraderClient | CatalogueIndexService | TokenStore
 > = (flags, url) =>
   Update.combine(
     Model.make({

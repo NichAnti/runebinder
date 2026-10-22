@@ -4,13 +4,22 @@ import { modifyFields } from 'foldkit/struct'
 
 import { CatalogueQuery, Printing } from '../../domain'
 import type { CatalogueRoute, LoggedInRoute } from '../../route'
-import type { CatalogueIndexService } from '../../service'
+import type {
+  CardTraderClient,
+  CatalogueIndexService,
+  TokenStore,
+} from '../../service'
 import { Message } from './message'
 import { CatalogueState, type Model } from './model'
 import * as CardPage from './page/card'
+import * as CardTraderPage from './page/cardTrader'
 import * as CataloguePage from './page/catalogue'
 
-type UpdateReturn = Update.Return<Model, Message, CatalogueIndexService>
+type UpdateReturn = Update.Return<
+  Model,
+  Message,
+  CatalogueIndexService | CardTraderClient | TokenStore
+>
 const withUpdateReturn = Match.withReturnType<UpdateReturn>()
 
 type CataloguePageEntry = Readonly<{
@@ -73,6 +82,28 @@ const foldCardPage = Update.foldChild({
   toParentMessage: toCardPageMessage,
 })
 
+const readCardTraderPage = (model: Model) => Option.some(model.cardTraderPage)
+const writeCardTraderPage = (
+  model: Model,
+  nextCardTraderPage: CardTraderPage.Model,
+): Model => modifyFields(model, { cardTraderPage: () => nextCardTraderPage })
+const toCardTraderPageMessage = (message: CardTraderPage.Message): Message =>
+  Message.GotCardTraderPageMessage({ message })
+
+const enterCardTraderPage = Update.foldChildStep({
+  update: CardTraderPage.enter,
+  read: readCardTraderPage,
+  write: writeCardTraderPage,
+  toParentMessage: toCardTraderPageMessage,
+})
+
+const foldCardTraderPage = Update.foldChild({
+  update: CardTraderPage.update,
+  read: readCardTraderPage,
+  write: writeCardTraderPage,
+  toParentMessage: toCardTraderPageMessage,
+})
+
 // ROUTE
 
 export const enterRoute = (
@@ -91,6 +122,7 @@ export const enterRoute = (
           isIndexReady,
         }),
       Card: ({ cardId }) => foldCardPageEntry(routed, { cardId, isIndexReady }),
+      CardTrader: () => enterCardTraderPage(routed),
       NotFound: () => ({ model: routed }),
     }),
   )
@@ -117,6 +149,9 @@ export const update = (model: Model, message: Message) =>
       ),
 
     GotCardPageMessage: ({ message }) => foldCardPage(model, message),
+
+    GotCardTraderPageMessage: ({ message }) =>
+      foldCardTraderPage(model, message),
 
     AcquiredCatalogueIndex: ({ allValues }) =>
       enterRoute(

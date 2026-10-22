@@ -1,6 +1,7 @@
 export * as Badge from './badge'
 export * as Button from './button'
 export * as CardTile from './cardTile'
+export * as Checkbox from './checkbox'
 export * as Disclosure from './disclosure'
 export * as FilterChip from './filterChip'
 export * as Link from './link'

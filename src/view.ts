@@ -5,7 +5,7 @@ import { APP_NAME } from './constant'
 import { Message } from './message'
 import { Model } from './model'
 import { LoggedIn, LoggedOut } from './page'
-import { AppRoute, catalogueHome } from './route'
+import { AppRoute, cardTraderRouter, catalogueHome } from './route'
 import { Button, Link } from './ui'
 
 const title = (route: AppRoute): string =>
@@ -14,6 +14,7 @@ const title = (route: AppRoute): string =>
     SignUp: () => `Create an account | ${APP_NAME}`,
     Catalogue: () => `Catalogue | ${APP_NAME}`,
     Card: ({ cardId }) => `${cardId} | ${APP_NAME}`,
+    CardTrader: () => `CardTrader | ${APP_NAME}`,
     NotFound: () => `Not found | ${APP_NAME}`,
   })
 
@@ -40,6 +41,15 @@ const navView = (loggedIn: LoggedIn.Model, h: HtmlBuilder<Message>): Html =>
           content: ['Catalogue'],
           variant: 'Nav',
           isCurrent: loggedIn.route._tag === 'Catalogue',
+        },
+        h,
+      ),
+      Link.view(
+        {
+          href: cardTraderRouter(),
+          content: ['CardTrader'],
+          variant: 'Nav',
+          isCurrent: loggedIn.route._tag === 'CardTrader',
         },
         h,
       ),

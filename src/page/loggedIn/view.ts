@@ -9,6 +9,7 @@ import * as NotFound from '../notFound'
 import { Message } from './message'
 import { CatalogueState, type Model } from './model'
 import * as CardPage from './page/card'
+import * as CardTraderPage from './page/cardTrader'
 import * as CataloguePage from './page/catalogue'
 import { queryOf } from './update'
 
@@ -81,6 +82,14 @@ export const view = Submodel.defineView<Model, Message>((model, h) =>
                 }),
               h,
             ),
+          CardTrader: () =>
+            h.submodel({
+              slotId: 'cardtrader-page',
+              model: model.cardTraderPage,
+              view: CardTraderPage.view,
+              toParentMessage: message =>
+                Message.GotCardTraderPageMessage({ message }),
+            }),
           NotFound: ({ path }) =>
             NotFound.view(
               {

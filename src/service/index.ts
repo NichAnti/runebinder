@@ -12,3 +12,13 @@ export {
   loadCatalogueIndex,
 } from './catalogue'
 export * as CatalogueIndex from './catalogueIndex'
+export {
+  AppInfo,
+  CardTraderClient,
+  CardTraderError,
+  CardTraderFailure,
+  CardTraderToken,
+  type StoredToken,
+  TokenStore,
+  parseToken,
+} from './cardTrader'

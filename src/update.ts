@@ -19,12 +19,17 @@ import {
   signInRouter,
   urlToAppRoute,
 } from './route'
-import { AuthClient, type CatalogueIndexService } from './service'
+import {
+  AuthClient,
+  type CardTraderClient,
+  type CatalogueIndexService,
+  TokenStore,
+} from './service'
 
 type UpdateReturn = Update.Return<
   Model,
   Message,
-  AuthClient | CatalogueIndexService
+  AuthClient | CardTraderClient | CatalogueIndexService | TokenStore
 >
 const withUpdateReturn = Match.withReturnType<UpdateReturn>()
 
@@ -89,6 +94,8 @@ export const SignOut = Command.define('SignOut', {
   messages: [Message.SucceededSignOut, Message.FailedSignOut],
   execute: Effect.gen(function* () {
     const auth = yield* AuthClient
+    const tokenStore = yield* TokenStore
+    yield* tokenStore.clear
     yield* auth.signOut
     return Message.SucceededSignOut()
   }).pipe(Effect.catch(() => Effect.succeed(Message.FailedSignOut()))),
@@ -178,8 +185,12 @@ export const enterRoute = (model: Model, route: AppRoute): UpdateReturn =>
       LoggedIn: () =>
         Match.value(route).pipe(
           withUpdateReturn,
-          Match.tag('Catalogue', 'Card', 'NotFound', (route: LoggedInRoute) =>
-            foldLoggedInRoute(model, route),
+          Match.tag(
+            'Catalogue',
+            'Card',
+            'CardTrader',
+            'NotFound',
+            (route: LoggedInRoute) => foldLoggedInRoute(model, route),
           ),
           Match.orElse(() => ({ model, commands: [RedirectToCatalogue()] })),
         ),
