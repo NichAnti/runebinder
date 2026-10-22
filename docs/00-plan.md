@@ -41,8 +41,8 @@ Its structure is agreed before any code is written.
 ## Phase 4: Card catalogue
 
 - [x] 4.1 🗣 Domain: `PrintingId`, `CardId`, `Printing`, grouping printings into cards; Riot gallery schema, mapping and checks against the committed recording; pure, with tests
-- [ ] 4.2 🗣 `CatalogueSource` service with a recorded Riot gallery layer; `printing` table; `bun run catalogue:build` writes `catalogue/printing.sql`; Alchemy imports it
-- [ ] 4.3 Catalogue API, catalogue page with search, and a card page
+- [x] 4.2 🗣 `CatalogueSource` service with a recorded Riot gallery layer; `bun run catalogue:build` writes the committed `catalogue/catalogue.json`; a test fails when it is out of date
+- [ ] 4.3 🗣 `Catalogue` browser service: loads `catalogue.json` as a hashed static asset, Orama index; catalogue page (search, facet filters with counts, one row per card) and card page
 - [ ] 4.4 Further `CatalogueSource` layers: Riftcodex (recorded + live) and the official Riot API (live, once a key has access)
 
 ## Phase 5: CardTrader test
@@ -53,7 +53,7 @@ Its structure is agreed before any code is written.
 
 ## Phase 6: Collection
 
-- [ ] 6.1 Migration, API, page to add owned printings
+- [ ] 6.1 Backend imports `catalogue.json` to check printing ids; migration, API, page to add owned printings
 
 ## Phase 7: Decks
 

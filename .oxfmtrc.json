@@ -27,6 +27,7 @@
     "repos",
     "migrations",
     "catalogue/recordings",
+    "catalogue/catalogue.json",
     "*.tsbuildinfo",
     "pnpm-lock.yaml"
   ]

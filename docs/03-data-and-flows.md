@@ -25,34 +25,7 @@ erDiagram
   user ||--o{ deck : builds
   deck ||--o{ deck_card : contains
   user ||--o{ wishlist_item : wants
-  printing ||--o{ collection_item : "is owned as"
-  printing ||--o{ deck_card : "is used as"
-  printing ||--o{ wishlist_item : "is wanted as"
 
-  printing {
-    text id PK "PrintingId"
-    text card_id "CardId"
-    text set
-    int collector_number
-    text variant "Base | AlternateArt | Signature | Overnumbered"
-    text rarity
-    text name
-    text type
-    text supertype
-    json domains
-    int energy
-    int might
-    int power
-    json tags
-    text text_rich
-    text text_plain
-    text flavour
-    text artist
-    text image_url
-    text accessibility_text
-    text orientation
-    datetime source_updated_on
-  }
   user {
     text id PK
     text name
@@ -83,7 +56,7 @@ erDiagram
 ```
 
 - `user`, `session`, `account` and `verification` are Better Auth's tables (`src/worker/schema/auth.ts`, generated). Only the relevant columns are shown.
-- `printing` exists from Phase 4; `collection_item`, `deck`, `deck_card` and `wishlist_item` arrive in Phases 6 to 8. Their exact columns are decided then.
+- `collection_item`, `deck`, `deck_card` and `wishlist_item` arrive in Phases 6 to 8; their exact columns are decided then. `printing_id` columns hold a `PrintingId` from the catalogue file (not a foreign key); the Backend checks it against the catalogue on every write.
 - Deleting a user cascades to everything they own.
 
 ## Catalogue build
@@ -100,25 +73,24 @@ Card data comes from a swappable `CatalogueSource` service:
 sequenceDiagram
   participant B as bun run catalogue:build
   participant S as CatalogueSource
-  participant A as Alchemy (dev / deploy)
-  participant DB as D1
+  participant A as Vite / Alchemy (dev / deploy)
   B->>S: printings
   S->>S: read the recording, parse every record strictly, map to Printing
   S->>S: run the checks
   alt every record parses and every check passes
     S-->>B: printings
-    B->>B: write catalogue/printing.sql
+    B->>B: write catalogue/catalogue.json (committed)
   else anything fails
     S-->>B: every failing record
     B->>B: write nothing; the previous catalogue stays
   end
-  A->>DB: import catalogue/printing.sql when it changed
+  A->>A: publish catalogue.json as a hashed static asset
 ```
 
 **Checks:** every record matches the source's schema exactly (unknown fields
 are an error); the id parses; set and collector number agree with the id;
 every printing has a `card_id`; every id is unique. Any failure rejects the
-whole build (all or nothing).
+whole build (all or nothing). A test fails when the committed `catalogue.json` no longer matches the recordings.
 
 ## Missing cards
 
