@@ -91,10 +91,11 @@ export const Printing = Schema.Struct({
 })
 export type Printing = typeof Printing.Type
 
-export type Card = Readonly<{
-  id: CardId
-  printings: Array.NonEmptyReadonlyArray<Printing>
-}>
+export const Card = Schema.Struct({
+  id: CardId,
+  printings: Schema.NonEmptyArray(Printing),
+})
+export type Card = typeof Card.Type
 
 const slugify = (text: string): string =>
   pipe(
@@ -138,4 +139,22 @@ export const basePrinting = (card: Card): Printing =>
     card.printings,
     Array.findFirst(printing => printing.variant === 'Base'),
     Option.getOrElse(() => Array.headNonEmpty(card.printings)),
+  )
+
+const SET_RELEASE_ORDER: ReadonlyArray<string> = [
+  'OGN',
+  'OGS',
+  'SFD',
+  'UNL',
+  'VEN',
+  'RAD',
+]
+
+const COLLECTOR_NUMBER_SLOTS = 1000
+
+export const collectionOrder = (printing: Printing): number =>
+  pipe(
+    Array.findFirstIndex(SET_RELEASE_ORDER, set => set === printing.set),
+    Option.getOrElse(() => Array.length(SET_RELEASE_ORDER)),
+    setIndex => setIndex * COLLECTOR_NUMBER_SLOTS + printing.collectorNumber,
   )

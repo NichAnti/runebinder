@@ -1,6 +1,7 @@
 export * as CardText from './cardText'
 export * as Catalogue from './catalogue'
 export * as CatalogueQuery from './catalogueQuery'
+export * as CatalogueSearch from './catalogueSearch'
 export * as Printing from './printing'
 export * as Theme from './theme'
 export * as User from './user'
