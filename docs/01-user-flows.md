@@ -5,9 +5,14 @@ What a player can do in the first version.
 ```mermaid
 flowchart TD
   Start([Open app]) --> SignedIn{Signed in?}
-  SignedIn -- no --> Login[Sign in with Discord]
-  Login --> Home
-  SignedIn -- yes --> Home[Home]
+  SignedIn -- no --> SignIn[Sign in: email + password]
+  SignIn -. no account .-> SignUp[Sign up: display name, email, password]
+  SignUp --> Home
+  SignIn --> Home
+  SignedIn -- yes --> Home[Catalogue]
+  Home --> SignOut[Sign out]
+
+  Home --> CardPage
 
   Home --> Collection[Collection]
   Collection --> AddOwned[Search card, pick printing, set quantity]
@@ -36,7 +41,8 @@ flowchart TD
 
 ## In the MVP
 
-- Sign in with Discord
+- Email and password accounts with a display name; the whole app is behind sign-in
+- Card catalogue: browse and search every printing
 - Collection: owned printings with quantities
 - Decks: create, import and export Piltover Archive deck codes, one line per card with printings in the detail view
 - Missing cards: what all decks need combined, minus what you own
@@ -50,3 +56,5 @@ flowchart TD
 - Prices
 - Foil, language and condition on owned copies
 - Public deck links
+- Discord sign-in and account linking
+- Email verification and password reset

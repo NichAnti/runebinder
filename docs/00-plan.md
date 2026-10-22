@@ -40,9 +40,9 @@ Its structure is agreed before any code is written.
 
 ## Phase 4: Card catalogue (Riftcodex)
 
-- [ ] 4.1 🗣 Domain: `CardCode` and other branded types, card and printing schemas, grouping printings into cards; pure, with tests
-- [ ] 4.2 🗣 First outside HTTP call: Riftcodex client, responses parsed on arrival, paging, caching
-- [ ] 4.3 Catalogue page with search, and a card page
+- [ ] 4.1 🗣 Domain: `PrintingId`, `CardId`, `CardCode`, printing schema, grouping printings into cards; Riftcodex schema and correction rules; pure, with tests
+- [ ] 4.2 🗣 Catalogue import in the Backend: Riftcodex client, checks, all-or-nothing replace of the `printing` table, cron and manual trigger
+- [ ] 4.3 Catalogue API, catalogue page with search, and a card page
 
 ## Phase 5: CardTrader test
 
