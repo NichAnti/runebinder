@@ -5,6 +5,7 @@ import type { Html, HtmlBuilder } from 'foldkit/html'
 import {
   type CatalogueSearch,
   Deck,
+  DeckEdit,
   DeckRules,
   type DeckStructure,
   Missing,
@@ -25,6 +26,7 @@ import {
   QuantityStepper,
   SearchField,
   SegmentedControl,
+  Tabs,
   TextField,
   Toast,
 } from '../../../../ui'
@@ -47,7 +49,14 @@ import {
   quantitiesOf,
 } from './lines'
 import { Message } from './message'
-import { type AddTab, type Layout, type Model, sectionElementId } from './model'
+import {
+  type AddTab,
+  type Layout,
+  type Model,
+  SIDE_PANEL_ID,
+  SideTabs,
+  sectionElementId,
+} from './model'
 import { explain } from './problemText'
 
 export type ViewInputs = Readonly<{
@@ -471,11 +480,17 @@ const zoneView = (
       ...(zone === 'Runes' ? [splitRunesView(context, h)] : []),
       Array.match(linesOf(cards, context.byPrinting), {
         onEmpty: () =>
-          h.p([h.Class('text-sm text-fg-muted')], ['Nothing here yet.']),
+          linesView(context, zone, [], placeholderView(context, zone, h), h),
         onNonEmpty: lines =>
           zone === 'Main'
             ? mainLinesView(context, lines, h)
-            : linesView(context, zone, lines, h),
+            : linesView(
+                context,
+                zone,
+                lines,
+                placeholderView(context, zone, h),
+                h,
+              ),
       }),
     ],
   )
@@ -507,20 +522,80 @@ const splitRunesView = (context: Context, h: HtmlBuilder<Message>): Html =>
       }),
   })
 
+const PLACEHOLDER_TABS: Readonly<Record<Deck.Zone, ReadonlyArray<AddTab>>> = {
+  Main: ['Unit', 'Spell', 'Gear'],
+  Sideboard: ['Unit', 'Spell', 'Gear'],
+  Runes: ['Rune'],
+  Battlefields: ['Battlefield'],
+}
+
+const ZONE_ROOM: Readonly<Record<Deck.Zone, number>> = {
+  Main: DeckRules.CONSTRUCTED_MAIN_DECK_SIZE,
+  Sideboard: DeckRules.MAX_SIDEBOARD,
+  Runes: DeckRules.RUNE_DECK_SIZE,
+  Battlefields: DeckRules.CONSTRUCTED_BATTLEFIELDS,
+}
+
+const hasRoom = (context: Context, zone: Deck.Zone): boolean =>
+  (zone === 'Main'
+    ? Deck.mainDeckSize(context.deck.contents)
+    : Deck.copiesIn(DeckEdit.cardsIn(context.deck.contents, zone))) <
+  ZONE_ROOM[zone]
+
+const placeholderView = (
+  context: Context,
+  zone: Deck.Zone,
+  h: HtmlBuilder<Message>,
+): ReadonlyArray<Html> =>
+  hasRoom(context, zone)
+    ? [
+        h.keyed('li')(
+          `add-${zone}`,
+          [
+            h.Class(
+              context.model.layout === 'Grid'
+                ? 'flex aspect-[744/1039] flex-col items-center justify-center gap-2 rounded-card border border-dashed border-border p-3 text-center text-sm text-fg-muted'
+                : 'flex flex-wrap items-center gap-2 rounded-card border border-dashed border-border p-2 text-sm text-fg-muted',
+            ),
+          ],
+          [
+            h.span([], [`Add to ${SECTION_LABELS[zone]}`]),
+            h.div(
+              [h.Class('flex flex-wrap justify-center gap-1')],
+              Array.map(PLACEHOLDER_TABS[zone], tab =>
+                smallButton(
+                  TAB_LABELS[tab],
+                  Message.SelectedAddTab({ tab }),
+                  h,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ]
+    : []
+
 const linesView = (
   context: Context,
   zone: Deck.Zone,
   lines: ReadonlyArray<Line>,
+  extra: ReadonlyArray<Html>,
   h: HtmlBuilder<Message>,
 ): Html =>
   context.model.layout === 'Grid'
     ? h.ul(
         [h.Class('grid grid-cols-3 gap-3 sm:grid-cols-4 xl:grid-cols-5')],
-        Array.map(lines, line => gridLineView(context, zone, line, h)),
+        [
+          ...Array.map(lines, line => gridLineView(context, zone, line, h)),
+          ...extra,
+        ],
       )
     : h.ul(
         [h.Class('flex flex-col gap-2')],
-        Array.map(lines, line => listLineView(context, zone, line, h)),
+        [
+          ...Array.map(lines, line => listLineView(context, zone, line, h)),
+          ...extra,
+        ],
       )
 
 const GROUP_LABELS: Readonly<Record<TypeGroup, string>> = {
@@ -533,34 +608,18 @@ const GROUP_LABELS: Readonly<Record<TypeGroup, string>> = {
 const curveLabel = (energy: number): string =>
   energy === CURVE_TOP ? `${CURVE_TOP}+` : `${energy}`
 
-const curveView = (
-  context: Context,
-  lines: ReadonlyArray<Line>,
-  h: HtmlBuilder<Message>,
-): Html => {
-  const championLines = linesOf(
-    Array.map(
-      Option.toArray(context.deck.contents.maybeChosenChampion),
-      printingId => ({ printingId, copies: Deck.Copies.make(1) }),
-    ),
-    context.byPrinting,
-  )
-
-  return ColumnChart.view(
+const curveView = (lines: ReadonlyArray<Line>, h: HtmlBuilder<Message>): Html =>
+  ColumnChart.view(
     {
       title: 'Energy curve',
-      columns: Array.map(
-        energyCurveOf([...championLines, ...lines]),
-        (copies, energy) => ({
-          label: curveLabel(energy),
-          value: copies,
-          description: `${curveLabel(energy)} energy: ${copies === 1 ? '1 card' : `${copies} cards`}`,
-        }),
-      ),
+      columns: Array.map(energyCurveOf(lines), (copies, energy) => ({
+        label: curveLabel(energy),
+        value: copies,
+        description: `${curveLabel(energy)} energy: ${copies === 1 ? '1 card' : `${copies} cards`}`,
+      })),
     },
     h,
   )
-}
 
 const mainLinesView = (
   context: Context,
@@ -570,7 +629,6 @@ const mainLinesView = (
   h.div(
     [h.Class('flex flex-col gap-5')],
     [
-      curveView(context, lines, h),
       ...Array.map(groupsOf(lines), ({ group, lines: groupLines }) =>
         h.div(
           [
@@ -591,10 +649,16 @@ const mainLinesView = (
                 ),
               ],
             ),
-            linesView(context, 'Main', groupLines, h),
+            linesView(context, 'Main', groupLines, [], h),
           ],
         ),
       ),
+      ...Array.match(placeholderView(context, 'Main', h), {
+        onEmpty: () => [],
+        onNonEmpty: placeholder => [
+          linesView(context, 'Main', [], placeholder, h),
+        ],
+      }),
     ],
   )
 
@@ -894,7 +958,10 @@ const resultView = (
   )
 }
 
-const addPanelView = (context: Context, h: HtmlBuilder<Message>): Html => {
+const addCardsView = (
+  context: Context,
+  h: HtmlBuilder<Message>,
+): ReadonlyArray<Html> => {
   const { model } = context
   const results =
     model.isOnlyLegal && model.addTab !== 'Legend'
@@ -903,61 +970,184 @@ const addPanelView = (context: Context, h: HtmlBuilder<Message>): Html => {
         )
       : model.searchResults
 
-  return h.aside(
+  return [
+    SegmentedControl.view(
+      {
+        label: 'Card type',
+        choices: Array.map(tabsFor(context), tab => ({
+          value: tab,
+          label: TAB_LABELS[tab],
+        })),
+        selected: model.addTab,
+        onSelect: tab => Message.SelectedAddTab({ tab }),
+      },
+      h,
+    ),
+    SearchField.view(
+      {
+        id: 'deck-add-search',
+        label: `Search ${TAB_LABELS[model.addTab]}`,
+        value: model.searchText,
+        placeholder: `Search ${String.toLowerCase(TAB_LABELS[model.addTab])}…`,
+        onInput: value => Message.UpdatedSearch({ value }),
+      },
+      h,
+    ),
+    Checkbox.view(
+      {
+        id: 'deck-only-legal',
+        label: 'Only cards this legend allows',
+        isChecked: model.isOnlyLegal,
+        onToggle: isChecked => Message.ToggledOnlyLegal({ isChecked }),
+      },
+      h,
+    ),
+    Array.match(results, {
+      onEmpty: () =>
+        h.p([h.Class('text-sm text-fg-muted')], ['No cards found.']),
+      onNonEmpty: nonEmpty =>
+        h.ul(
+          [
+            h.AriaLabel('Cards to add'),
+            h.Class('grid grid-cols-2 gap-3 sm:grid-cols-3'),
+          ],
+          Array.map(nonEmpty, card => resultView(context, card, h)),
+        ),
+    }),
+  ]
+}
+
+// STATS
+
+const mainAndChampionLines = (context: Context): ReadonlyArray<Line> =>
+  linesOf(
     [
-      h.AriaLabel('Add cards'),
-      h.Class(
-        'flex flex-col gap-3 rounded-card border border-border bg-surface p-4 lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto',
+      ...Array.map(
+        Option.toArray(context.deck.contents.maybeChosenChampion),
+        printingId => ({ printingId, copies: Deck.Copies.make(1) }),
       ),
+      ...context.deck.contents.main,
     ],
+    context.byPrinting,
+  )
+
+const statListView = (
+  label: string,
+  entries: ReadonlyArray<readonly [string, number]>,
+  h: HtmlBuilder<Message>,
+): Html =>
+  h.div(
+    [h.Class('flex flex-col gap-1')],
     [
-      h.h2([h.Class('text-base font-semibold')], ['Add cards']),
-      SegmentedControl.view(
-        {
-          label: 'Card type',
-          choices: Array.map(tabsFor(context), tab => ({
-            value: tab,
-            label: TAB_LABELS[tab],
-          })),
-          selected: model.addTab,
-          onSelect: tab => Message.SelectedAddTab({ tab }),
-        },
-        h,
-      ),
-      SearchField.view(
-        {
-          id: 'deck-add-search',
-          label: `Search ${TAB_LABELS[model.addTab]}`,
-          value: model.searchText,
-          placeholder: `Search ${String.toLowerCase(TAB_LABELS[model.addTab])}…`,
-          onInput: value => Message.UpdatedSearch({ value }),
-        },
-        h,
-      ),
-      Checkbox.view(
-        {
-          id: 'deck-only-legal',
-          label: 'Only cards this legend allows',
-          isChecked: model.isOnlyLegal,
-          onToggle: isChecked => Message.ToggledOnlyLegal({ isChecked }),
-        },
-        h,
-      ),
-      Array.match(results, {
-        onEmpty: () =>
-          h.p([h.Class('text-sm text-fg-muted')], ['No cards found.']),
-        onNonEmpty: nonEmpty =>
-          h.ul(
+      h.h3([h.Class('text-xs font-medium text-fg-muted')], [label]),
+      h.dl(
+        [h.AriaLabel(label), h.Class('flex flex-wrap gap-x-5 gap-y-1')],
+        Array.map(entries, ([name, value]) =>
+          h.keyed('div')(
+            name,
+            [h.Class('flex items-baseline gap-1.5')],
             [
-              h.AriaLabel('Cards to add'),
-              h.Class('grid grid-cols-2 gap-3 sm:grid-cols-3'),
+              h.dt([h.Class('text-sm text-fg')], [name]),
+              h.dd(
+                [h.Class('text-sm font-semibold tabular-nums')],
+                [`${value}`],
+              ),
             ],
-            Array.map(nonEmpty, card => resultView(context, card, h)),
           ),
-      }),
+        ),
+      ),
     ],
   )
+
+const domainsOf = (line: Line): ReadonlyArray<Printing.Domain> =>
+  Option.match(line.maybeCard, {
+    onNone: () => [],
+    onSome: card => Printing.basePrinting(card).domains,
+  })
+
+const statsView = (
+  context: Context,
+  h: HtmlBuilder<Message>,
+): ReadonlyArray<Html> => {
+  const lines = mainAndChampionLines(context)
+  const copiesWhere = (predicate: (line: Line) => boolean) =>
+    Number.sumAll(
+      Array.map(Array.filter(lines, predicate), ({ copies }) => copies),
+    )
+
+  return Array.match(lines, {
+    onEmpty: () => [
+      h.p(
+        [h.Class('text-sm text-fg-muted')],
+        ['Add cards to the main deck to see its statistics.'],
+      ),
+      missingView(context, h),
+    ],
+    onNonEmpty: nonEmpty => [
+      curveView(nonEmpty, h),
+      statListView(
+        'Card types',
+        Array.map(
+          groupsOf(nonEmpty),
+          ({ group, lines: groupLines }): readonly [string, number] => [
+            GROUP_LABELS[group],
+            Number.sumAll(Array.map(groupLines, ({ copies }) => copies)),
+          ],
+        ),
+        h,
+      ),
+      statListView(
+        'Domains',
+        Array.filter(
+          Array.map(
+            Printing.Domain.literals,
+            (domain): readonly [string, number] => [
+              domain,
+              copiesWhere(line => Array.contains(domainsOf(line), domain)),
+            ],
+          ),
+          ([, copies]) => copies > 0,
+        ),
+        h,
+      ),
+      missingView(context, h),
+    ],
+  })
 }
+
+// SIDE PANEL
+
+const sidePanelView = (context: Context, h: HtmlBuilder<Message>): Html =>
+  h.aside(
+    [
+      h.Id(SIDE_PANEL_ID),
+      h.AriaLabel('Deck tools'),
+      h.Class(
+        'flex scroll-mt-20 flex-col gap-3 rounded-card border border-border bg-surface p-4 lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto',
+      ),
+    ],
+    [
+      Tabs.view(
+        {
+          bundle: SideTabs,
+          slotId: 'deck-side',
+          model: context.model.sideTabs,
+          toParentMessage: message => Message.GotSideTabsMessage({ message }),
+          ariaLabel: 'Deck tools',
+          tabs: [
+            { value: 'Stats', label: 'Deck stats' },
+            { value: 'Add', label: 'Add cards' },
+          ],
+          selected: context.model.sidePanel,
+          panel: panel =>
+            panel === 'Stats'
+              ? statsView(context, h)
+              : addCardsView(context, h),
+        },
+        h,
+      ),
+    ],
+  )
 
 // HEADER
 
@@ -1138,7 +1328,6 @@ const headerView = (context: Context, h: HtmlBuilder<Message>): Html =>
           ),
         ],
       ),
-      missingView(context, h),
       exportView(context.model, h),
     ],
   )
@@ -1297,7 +1486,7 @@ const deckView = (
               additionalLegendsView(context, h),
             ],
           ),
-          addPanelView(context, h),
+          sidePanelView(context, h),
         ],
       ),
       deleteView(model, removal, h),

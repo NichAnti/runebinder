@@ -10,7 +10,7 @@ import {
   DeckStructure,
   Printing,
 } from '../../../../domain'
-import { Toast } from '../../../../ui'
+import { Tabs, Toast } from '../../../../ui'
 import * as CardPanel from '../../cardPanel'
 import { AddTab, AddTarget, Layout } from './model'
 
@@ -20,6 +20,7 @@ export const Message = defineMessageUnion({
   SelectedAddTab: { tab: AddTab },
   ClickedProgress: { section: DeckRules.Section },
   CompletedScrollToSection: {},
+  CompletedScrollToSidePanel: {},
   ToggledOnlyLegal: { isChecked: Schema.Boolean },
   SelectedLayout: { layout: Layout },
   SucceededSearchCardsToAdd: {
@@ -44,6 +45,7 @@ export const Message = defineMessageUnion({
     step: DeckEdit.Step,
   },
   GotToastMessage: { message: Toast.Notification.Message },
+  GotSideTabsMessage: { message: Tabs.Message },
   SucceededLoadDeckCards: { cards: Schema.Array(Printing.Card) },
   SkippedLoadCatalogue: {},
   GotCardPanelMessage: {

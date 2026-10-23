@@ -10,7 +10,7 @@ import {
   DeckStructure,
   Printing,
 } from '../../../../domain'
-import { Toast } from '../../../../ui'
+import { Tabs, Toast } from '../../../../ui'
 import * as CardPanel from '../../cardPanel'
 
 export const Export = defineTaggedUnion({
@@ -49,6 +49,13 @@ export const TAB_FOR_SECTION: Readonly<Record<DeckRules.Section, AddTab>> = {
 export const sectionElementId = (section: DeckRules.Section): string =>
   `deck-section-${section}`
 
+export const SidePanel = Schema.Literals(['Stats', 'Add'])
+export type SidePanel = typeof SidePanel.Type
+
+export const SideTabs = Tabs.create<SidePanel>()
+
+export const SIDE_PANEL_ID = 'deck-side-panel'
+
 export const Layout = Schema.Literals(['Grid', 'List'])
 export type Layout = typeof Layout.Type
 
@@ -61,6 +68,8 @@ export const Model = Schema.Struct({
   searchResults: Schema.Array(CatalogueSearch.CardSummary),
   isOnlyLegal: Schema.Boolean,
   layout: Layout,
+  sidePanel: SidePanel,
+  sideTabs: Tabs.Model,
   panels: Schema.Record(DeckStructure.Place, CardPanel.Model),
   toast: Toast.Notification.Model,
   isConfirmingDelete: Schema.Boolean,
@@ -87,6 +96,8 @@ export const init = (): Model => ({
   searchResults: [],
   isOnlyLegal: true,
   layout: 'Grid',
+  sidePanel: 'Stats',
+  sideTabs: Tabs.init('deck-side'),
   panels: {
     Legend: CardPanel.init(),
     ChosenChampion: CardPanel.init(),

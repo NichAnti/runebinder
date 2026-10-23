@@ -33,7 +33,7 @@ import {
   CatalogueIndexResource,
   type CatalogueIndexService,
 } from '../../../../service'
-import { Toast } from '../../../../ui'
+import { Tabs, Toast } from '../../../../ui'
 import * as CardPanel from '../../cardPanel'
 import { copyStepOf } from './copies'
 import { cardsByPrinting, nameOf } from './lines'
@@ -43,6 +43,9 @@ import {
   AddTarget,
   Export,
   type Model,
+  SIDE_PANEL_ID,
+  type SidePanel,
+  SideTabs,
   TAB_FOR_SECTION,
   defaultTab,
   init,
@@ -217,6 +220,14 @@ export const ScrollToSection = Command.define('ScrollToSection', {
     }).pipe(Effect.ignore, Effect.as(Message.CompletedScrollToSection())),
 })
 
+export const ScrollToSidePanel = Command.define('ScrollToSidePanel', {
+  messages: [Message.CompletedScrollToSidePanel],
+  execute: Dom.scrollIntoView(`#${SIDE_PANEL_ID}`).pipe(
+    Effect.ignore,
+    Effect.as(Message.CompletedScrollToSidePanel()),
+  ),
+})
+
 // TOAST
 
 const toastFold = {
@@ -239,6 +250,29 @@ const foldToast = Update.foldChild({
 const showToast = Update.foldChild({
   update: Toast.Notification.show,
   ...toastFold,
+})
+
+// SIDE TABS
+
+const foldSideTabsOutMessage = Tabs.OutMessage.match<
+  Update.Step<Model, Message>,
+  Tabs.OutMessage<SidePanel>
+>({
+  Selected:
+    ({ value }) =>
+    stepModel => ({
+      model: modifyFields(stepModel, { sidePanel: () => value }),
+    }),
+})
+
+const foldSideTabs = Update.foldChild({
+  update: SideTabs.update,
+  read: (model: Model) => Option.some(model.sideTabs),
+  write: (model: Model, nextSideTabs: Tabs.Model): Model =>
+    modifyFields(model, { sideTabs: () => nextSideTabs }),
+  toParentMessage: (message: Tabs.Message) =>
+    Message.GotSideTabsMessage({ message }),
+  foldOutMessage: foldSideTabsOutMessage,
 })
 
 // SEARCH
@@ -583,8 +617,12 @@ export const update =
         const nextModel = modifyFields(model, {
           addTab: () => tab,
           searchResults: () => [],
+          sidePanel: () => 'Add',
         })
-        return { model: nextModel, commands: [searchFor(nextModel, maybeDeck)] }
+        return {
+          model: nextModel,
+          commands: [searchFor(nextModel, maybeDeck), ScrollToSidePanel()],
+        }
       },
 
       ClickedProgress: ({ section }) => {
@@ -592,6 +630,7 @@ export const update =
         const nextModel = modifyFields(model, {
           addTab: () => tab,
           searchResults: results => (tab === model.addTab ? results : []),
+          sidePanel: () => 'Add',
         })
 
         return {
@@ -604,6 +643,8 @@ export const update =
       },
 
       CompletedScrollToSection: () => ({ model }),
+
+      CompletedScrollToSidePanel: () => ({ model }),
 
       ToggledOnlyLegal: ({ isChecked }) => ({
         model: modifyFields(model, { isOnlyLegal: () => isChecked }),
@@ -698,6 +739,8 @@ export const update =
         foldCardPanel(panelId, maybeDeck)(model, message),
 
       GotToastMessage: ({ message }) => foldToast(model, message),
+
+      GotSideTabsMessage: ({ message }) => foldSideTabs(model, message),
 
       ClickedStepLine: ({ zone, printingId, step }) =>
         edited(model, maybeDeck, () => [

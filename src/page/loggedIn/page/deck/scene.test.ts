@@ -25,6 +25,7 @@ import { type AddTab, init } from './model'
 import {
   LoadCardToAdd,
   ScrollToSection,
+  ScrollToSidePanel,
   SearchCardsToAdd,
   update,
 } from './update'
@@ -208,6 +209,7 @@ describe('deck page', () => {
   test('a search result steps its copies up to the limit', () => {
     const withResults = modifyFields(loaded, {
       searchResults: () => searchResult.cards,
+      sidePanel: () => 'Add',
     })
     const stepper = role('group', { name: 'In Main deck: Test Unit, Tester' })
 
@@ -248,7 +250,12 @@ describe('deck page', () => {
           collection: CollectionState.init(),
         })(),
       },
-      given(modifyFields(loaded, { searchResults: () => searchResult.cards })),
+      given(
+        modifyFields(loaded, {
+          searchResults: () => searchResult.cards,
+          sidePanel: () => 'Add',
+        }),
+      ),
       click(
         within(
           role('group', { name: 'In Main deck: Test Unit, Tester' }),
@@ -275,7 +282,7 @@ describe('deck page', () => {
       },
     }
     const sideboard = within(
-      role('complementary', { name: 'Add cards' }),
+      role('complementary', { name: 'Deck tools' }),
       role('group', { name: 'In Sideboard: Test Unit, Tester' }),
     )
 
@@ -294,7 +301,12 @@ describe('deck page', () => {
           collection: CollectionState.init(),
         })(),
       },
-      given(modifyFields(loaded, { searchResults: () => searchResult.cards })),
+      given(
+        modifyFields(loaded, {
+          searchResults: () => searchResult.cards,
+          sidePanel: () => 'Add',
+        }),
+      ),
       expect(within(sideboard, role('status'))).toHaveText('0'),
       click(within(sideboard, role('button', { name: 'Add one' }))),
       expectOutMessage(
@@ -313,19 +325,51 @@ describe('deck page', () => {
     )
   })
 
-  test('the main deck is grouped by type under its energy curve', () => {
+  test('the main deck is grouped by type and the stats tab shows its curve', () => {
+    const tools = role('complementary', { name: 'Deck tools' })
+
     scene(
       { update: update(Option.some(deck)), view: sceneView() },
       given(loaded),
+      expect(role('tab', { name: 'Deck stats' })).toHaveAttr(
+        'aria-selected',
+        'true',
+      ),
+      expect(within(tools, role('list', { name: 'Energy curve' }))).toExist(),
       expect(
-        within(mainDeck, role('list', { name: 'Energy curve' })),
-      ).toExist(),
-      expect(
-        within(mainDeck, role('listitem', { name: '3 energy: 3 cards' })),
+        within(tools, role('listitem', { name: '3 energy: 3 cards' })),
       ).toExist(),
       expect(within(mainDeck, role('group', { name: 'Units' }))).toContainText(
         'Test Unit',
       ),
+    )
+  })
+
+  test('a placeholder opens the add tab with that kind of card', () => {
+    scene(
+      { update: update(Option.some(deck)), view: sceneView() },
+      given(loaded),
+      click(
+        within(
+          role('region', { name: 'Battlefields' }),
+          role('button', { name: 'Battlefields' }),
+        ),
+      ),
+      Command.expectExact(SearchCardsToAdd, ScrollToSidePanel),
+      Command.resolve(
+        SearchCardsToAdd,
+        Message.SucceededSearchCardsToAdd({
+          term: '',
+          tab: 'Battlefield',
+          cards: [],
+        }),
+      ),
+      Command.resolve(ScrollToSidePanel, Message.CompletedScrollToSidePanel()),
+      expect(role('tab', { name: 'Add cards' })).toHaveAttr(
+        'aria-selected',
+        'true',
+      ),
+      expect(role('button', { name: 'Battlefields', pressed: true })).toExist(),
     )
   })
 
