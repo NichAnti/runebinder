@@ -86,6 +86,7 @@ A deck is stored part by part, the way the game describes it, not the way a deck
 - The chosen champion is never also a `Main` row. Rules that count it (the main deck's minimum, the copy limit) add it in one place, the deck rules check.
 - The legend and the chosen champion are optional so a deck can be built step by step. The rules check reports what is missing or wrong; it never blocks saving.
 - Importing a code splits `mainDeck` by each card's type in the catalogue. A code that cannot be split, such as one with two starting legends or a champion that is not in its main deck, is rejected with a typed error. Exporting merges the parts back.
+- Deck rules come from Riot's [Rules Hub](https://playriftbound.com/en-us/rules-hub/): the Core Rules (section 103, deck construction) and the Tournament Rules for constructed play (402.1: exactly 40 main deck cards with the chosen champion, 1 legend, 12 runes, 3 battlefields with unique names; 601.1.c: a sideboard of 10 or fewer cards, copy limits counted across main deck and sideboard). Both documents were last updated on 9 October 2026. The rules check (`domain/deckRules.ts`) names the rule behind each problem. Format legality (banned cards) is not checked yet.
 - Deck codes are read and written with [`@piltoverarchive/riftbound-deck-codes`](https://www.npmjs.com/package/@piltoverarchive/riftbound-deck-codes), wrapped once so its exceptions become typed errors.
 
 ## Catalogue build

@@ -24,6 +24,7 @@ import {
 } from './lines'
 import { Message } from './message'
 import type { Model } from './model'
+import { rulesView } from './rulesView'
 
 export type ViewInputs = Readonly<{
   decks: DecksState.Model
@@ -441,6 +442,7 @@ const deckView = (
     [h.Class('flex flex-col gap-8')],
     [
       headerView(model, removal, h),
+      rulesView(contents, byPrinting, h),
       searchView(model, h),
       h.div(
         [h.Class('grid gap-8 lg:grid-cols-2')],

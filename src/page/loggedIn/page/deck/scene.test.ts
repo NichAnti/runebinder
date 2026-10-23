@@ -131,6 +131,19 @@ describe('deck page', () => {
     )
   })
 
+  test('the rules section explains what the deck still needs', () => {
+    scene(
+      { update: update(Option.some(deck)), view: sceneView() },
+      given(loaded),
+      expect(role('region', { name: 'Deck rules' })).toContainText(
+        'Choose a legend.',
+      ),
+      expect(role('region', { name: 'Deck rules' })).toContainText(
+        'Core Rules 103.2',
+      ),
+    )
+  })
+
   test('deleting asks first', () => {
     scene(
       { update: update(Option.some(deck)), view: sceneView() },

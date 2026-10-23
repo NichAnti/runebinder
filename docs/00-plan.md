@@ -66,7 +66,7 @@ Its structure is agreed before any code is written.
 - [x] 7.1 Deck domain (`Deck` with legend, chosen champion, Main / Runes / Battlefields / Sideboard zones and ordered additional legends); `@piltoverarchive/riftbound-deck-codes` pinned at `1.5.0`, wrapped so errors are typed; code import and export with round-trip tests
 - [x] 7.2 `deck`, `deck_card` and `deck_additional_legend` tables and migration; the Backend's printing file carries each printing's card type so it can check zones; deck API
 - [x] 7.3 Deck list, deck view (one line per card, card panel, printing per copy), import and export a code
-- [ ] 7.4 Official deckbuilding rules enforced in the deck builder (required by Riot's policy)
+- [x] 7.4 Official deckbuilding rules enforced in the deck builder (required by Riot's policy)
 
 ## Phase 8: Missing cards and wishlist
 
@@ -88,6 +88,9 @@ Its structure is agreed before any code is written.
 - Fail `bun run check` (and CI) when the Drizzle schema has changes without a committed migration, so CI never generates and applies an unreviewed one.
 - Show an error when sign-out fails instead of doing nothing.
 - Prevent the flash of the light theme on first load (inline script in `index.html`).
+- Check format legality (the Rules Hub's banned cards and battlefields) in the deck rules.
+- Decide, before going public, whether "enforce the official deckbuilding rules" (Riot policy) needs more than reporting problems, for example marking exported or shared decks that break them.
+- Save collection and deck changes immediately when the tab is hidden, so a change made just before closing the tab is not lost.
 - Split the app bundle (536 KB, 171 KB compressed) so the catalogue's search code (Orama) loads only when needed; Vite warns above 500 KB.
 
 ## Inputs needed from the user
