@@ -64,28 +64,36 @@ const asList = modifyFields(loaded, { layout: () => 'List' })
 const mainDeck = role('region', { name: 'Main deck' })
 
 describe('deck page', () => {
-  test('a main deck line can go to the sideboard', () => {
+  test('at the limit, adding to the sideboard moves a copy over', () => {
     scene(
       { update: update(Option.some(deck)), view: sceneView() },
       given(asList),
       expect(mainDeck).toContainText('3× Test Unit, Tester'),
-      click(within(mainDeck, role('button', { name: 'To sideboard' }))),
+      click(
+        within(
+          mainDeck,
+          within(
+            role('group', { name: 'In Sideboard: Test Unit, Tester' }),
+            role('button', { name: 'Add one' }),
+          ),
+        ),
+      ),
       expectOutMessage(
         OutMessage.EditedDeck({
           deckId: deck.id,
           edits: [
+            { _tag: 'StepCopies', zone: 'Main', printingId: base, step: -1 },
             {
-              _tag: 'MoveCard',
-              from: 'Main',
-              to: 'Sideboard',
+              _tag: 'StepCopies',
+              zone: 'Sideboard',
               printingId: base,
+              step: 1,
             },
           ],
         }),
       ),
     )
   })
-
   test('a champion in the main deck can become the chosen champion', () => {
     scene(
       { update: update(Option.some(deck)), view: sceneView() },
@@ -155,27 +163,29 @@ describe('deck page', () => {
     )
   })
 
-  test('a tile in the grid steps its copies', () => {
+  test('a tile in the grid cannot go past the limit but can go down', () => {
+    const counter = within(
+      mainDeck,
+      role('group', { name: 'In Main deck: Test Unit, Tester' }),
+    )
+
     scene(
       { update: update(Option.some(deck)), view: sceneView() },
       given(loaded),
-      click(
-        within(
-          role('group', { name: 'Copies: Test Unit, Tester' }),
-          role('button', { name: 'Add one' }),
-        ),
-      ),
+      expect(
+        within(counter, role('button', { name: 'Add one' })),
+      ).toBeDisabled(),
+      click(within(counter, role('button', { name: 'Remove one' }))),
       expectOutMessage(
         OutMessage.EditedDeck({
           deckId: deck.id,
           edits: [
-            { _tag: 'StepCopies', zone: 'Main', printingId: base, step: 1 },
+            { _tag: 'StepCopies', zone: 'Main', printingId: base, step: -1 },
           ],
         }),
       ),
     )
   })
-
   test('the progress bar shows each part and jumps to it', () => {
     scene(
       { update: update(Option.some(deck)), view: sceneView() },
@@ -220,24 +230,15 @@ describe('deck page', () => {
     )
   })
 
-  test('a search result below the limit adds a copy', () => {
-    const twoCopies: Deck.Deck = {
-      ...deck,
-      contents: {
-        ...deck.contents,
-        main: [{ printingId: base, copies: Deck.Copies.make(2) }],
-      },
-    }
-    const withResults = modifyFields(loaded, {
-      searchResults: () => searchResult.cards,
-    })
+  test('a search result not in the deck yet loads its card and adds it', () => {
+    const emptyDeck: Deck.Deck = { ...deck, contents: Deck.empty }
 
     scene(
       {
-        update: update(Option.some(twoCopies)),
+        update: update(Option.some(emptyDeck)),
         view: withViewInputs(view, {
           decks: DecksState.Model.Ready({
-            decks: [twoCopies],
+            decks: [emptyDeck],
             saves: {},
             nextRevision: 0,
             creation: DecksState.Creation.Idle(),
@@ -247,7 +248,7 @@ describe('deck page', () => {
           collection: CollectionState.init(),
         })(),
       },
-      given(withResults),
+      given(modifyFields(loaded, { searchResults: () => searchResult.cards })),
       click(
         within(
           role('group', { name: 'In Main deck: Test Unit, Tester' }),
@@ -265,7 +266,6 @@ describe('deck page', () => {
       ),
     )
   })
-
   test('a search result adds a copy to the sideboard too, within the limit', () => {
     const twoCopies: Deck.Deck = {
       ...deck,
@@ -274,7 +274,10 @@ describe('deck page', () => {
         main: [{ printingId: base, copies: Deck.Copies.make(2) }],
       },
     }
-    const sideboard = role('group', { name: 'In Sideboard: Test Unit, Tester' })
+    const sideboard = within(
+      role('complementary', { name: 'Add cards' }),
+      role('group', { name: 'In Sideboard: Test Unit, Tester' }),
+    )
 
     scene(
       {
@@ -294,14 +297,6 @@ describe('deck page', () => {
       given(modifyFields(loaded, { searchResults: () => searchResult.cards })),
       expect(within(sideboard, role('status'))).toHaveText('0'),
       click(within(sideboard, role('button', { name: 'Add one' }))),
-      Command.resolve(
-        LoadCardToAdd,
-        Message.SucceededLoadCardToAdd({
-          card: testCard,
-          tab: 'Unit',
-          target: 'Sideboard',
-        }),
-      ),
       expectOutMessage(
         OutMessage.EditedDeck({
           deckId: deck.id,
@@ -352,19 +347,18 @@ describe('deck page', () => {
     )
   })
 
-  test('grid tiles offer the same actions as the list', () => {
+  test('grid tiles offer Make champion and no move buttons', () => {
     scene(
       { update: update(Option.some(deck)), view: sceneView() },
       given(loaded),
       expect(
-        within(mainDeck, role('button', { name: 'To sideboard' })),
-      ).toExist(),
-      expect(
         within(mainDeck, role('button', { name: 'Make champion' })),
       ).toExist(),
+      expect(
+        within(mainDeck, role('button', { name: 'To sideboard' })),
+      ).not.toExist(),
     )
   })
-
   test('deleting asks first', () => {
     scene(
       { update: update(Option.some(deck)), view: sceneView() },

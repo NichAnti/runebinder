@@ -33,6 +33,11 @@ export const Message = defineMessageUnion({
     tab: AddTab,
     target: AddTarget,
   },
+  ClickedStepCopies: {
+    cardId: Printing.CardId,
+    zone: Deck.Zone,
+    step: DeckEdit.Step,
+  },
   ClickedStepLine: {
     zone: Deck.Zone,
     printingId: Printing.PrintingId,
@@ -44,11 +49,6 @@ export const Message = defineMessageUnion({
   GotCardPanelMessage: {
     panelId: DeckStructure.Place,
     message: CardPanel.Message,
-  },
-  ClickedMoveLine: {
-    from: DeckEdit.MovableZone,
-    to: DeckEdit.MovableZone,
-    printingIds: Schema.Array(Printing.PrintingId),
   },
   ClickedMakeChampion: { printingId: Printing.PrintingId },
   ClickedClearLegend: {},

@@ -5,7 +5,6 @@ import type { Html, HtmlBuilder } from 'foldkit/html'
 import {
   type CatalogueSearch,
   Deck,
-  DeckEdit,
   DeckRules,
   type DeckStructure,
   Missing,
@@ -34,6 +33,7 @@ import * as CollectionState from '../../collection'
 import * as DecksState from '../../decks'
 import * as Printings from '../../printings'
 import { problemText } from '../deckList/view'
+import { copiesIn, copyStepOf } from './copies'
 import {
   CURVE_TOP,
   type Line,
@@ -236,74 +236,127 @@ const sectionHeader = (
   )
 }
 
+const ZONE_SHORT_LABELS: Readonly<Record<Deck.Zone, string>> = {
+  Main: 'Main',
+  Sideboard: 'Side',
+  Runes: 'Runes',
+  Battlefields: 'Fields',
+}
+
+const countersView = (
+  context: Context,
+  cardId: Printing.CardId,
+  printingIds: ReadonlyArray<Printing.PrintingId>,
+  maybeLimit: Option.Option<number>,
+  zone: Deck.Zone,
+  label: string,
+  h: HtmlBuilder<Message>,
+): Html => {
+  const { contents } = context.deck
+  const zones: ReadonlyArray<Deck.Zone> =
+    zone === 'Main' || zone === 'Sideboard' ? ['Main', 'Sideboard'] : [zone]
+  const counter = (counted: Deck.Zone) => {
+    const copies = copiesIn(contents, counted, printingIds)
+    const canAdd = Option.isSome(
+      copyStepOf(contents, counted, printingIds, maybeLimit, 1),
+    )
+
+    return h.div(
+      [h.Class('flex items-center gap-2')],
+      [
+        h.span(
+          [h.AriaHidden(true), h.Class('w-10 text-xs text-fg-muted')],
+          [ZONE_SHORT_LABELS[counted]],
+        ),
+        QuantityStepper.view(
+          {
+            label: `In ${SECTION_LABELS[counted]}: ${label}`,
+            quantity: copies,
+            max: canAdd ? copies + 1 : copies,
+            onDecrement: Message.ClickedStepCopies({
+              cardId,
+              zone: counted,
+              step: -1,
+            }),
+            onIncrement: Message.ClickedStepCopies({
+              cardId,
+              zone: counted,
+              step: 1,
+            }),
+          },
+          h,
+        ),
+      ],
+    )
+  }
+
+  return h.div(
+    [h.Class('flex flex-col items-start gap-1')],
+    Array.map(zones, counter),
+  )
+}
+
 const lineStepper = (
+  context: Context,
   zone: Deck.Zone,
   line: Line,
   h: HtmlBuilder<Message>,
-): Html => {
-  const primary = Array.reduce(
-    line.cards,
-    Array.headNonEmpty(line.cards),
-    (most, card) => (card.copies > most.copies ? card : most),
-  )
+): Html =>
+  Option.match(line.maybeCard, {
+    onNone: () => {
+      const primary = Array.reduce(
+        line.cards,
+        Array.headNonEmpty(line.cards),
+        (most, card) => (card.copies > most.copies ? card : most),
+      )
 
-  return QuantityStepper.view(
-    {
-      label: `Copies: ${line.label}`,
-      quantity: line.copies,
-      max: Deck.MAX_COPIES,
-      onDecrement: Message.ClickedStepLine({
-        zone,
-        printingId: primary.printingId,
-        step: -1,
-      }),
-      onIncrement: Message.ClickedStepLine({
-        zone,
-        printingId: primary.printingId,
-        step: 1,
-      }),
+      return QuantityStepper.view(
+        {
+          label: `Copies: ${line.label}`,
+          quantity: line.copies,
+          max: Deck.MAX_COPIES,
+          onDecrement: Message.ClickedStepLine({
+            zone,
+            printingId: primary.printingId,
+            step: -1,
+          }),
+          onIncrement: Message.ClickedStepLine({
+            zone,
+            printingId: primary.printingId,
+            step: 1,
+          }),
+        },
+        h,
+      )
     },
-    h,
-  )
-}
+    onSome: card =>
+      countersView(
+        context,
+        card.id,
+        Array.map(card.printings, ({ id }) => id),
+        DeckRules.copyLimitOf(Printing.basePrinting(card)),
+        zone,
+        line.label,
+        h,
+      ),
+  })
 
 const lineActions = (
   zone: Deck.Zone,
   line: Line,
   h: HtmlBuilder<Message>,
-): ReadonlyArray<Html> => {
-  const printingIds = Array.map(line.cards, ({ printingId }) => printingId)
-
-  return Match.value(zone).pipe(
-    Match.withReturnType<ReadonlyArray<Html>>(),
-    Match.when('Main', () => [
-      ...(Option.exists(line.maybeCard, isChampionUnit)
-        ? [
-            smallButton(
-              'Make champion',
-              Message.ClickedMakeChampion({
-                printingId: Array.headNonEmpty(line.cards).printingId,
-              }),
-              h,
-            ),
-          ]
-        : []),
-      smallButton(
-        'To sideboard',
-        Message.ClickedMoveLine({ from: 'Main', to: 'Sideboard', printingIds }),
-        h,
-      ),
-    ]),
-    Match.when('Sideboard', () => [
-      smallButton(
-        'To main',
-        Message.ClickedMoveLine({ from: 'Sideboard', to: 'Main', printingIds }),
-        h,
-      ),
-    ]),
-    Match.orElse(() => []),
-  )
-}
+): ReadonlyArray<Html> =>
+  zone === 'Main' && Option.exists(line.maybeCard, isChampionUnit)
+    ? [
+        smallButton(
+          'Make champion',
+          Message.ClickedMakeChampion({
+            printingId: Array.headNonEmpty(line.cards).printingId,
+          }),
+          h,
+        ),
+      ]
+    : []
 
 const quantitiesIn = (line: Line): Readonly<Record<string, number>> =>
   Record.fromEntries(
@@ -342,7 +395,7 @@ const gridLineView = (
             h,
           ),
       }),
-      lineStepper(zone, line, h),
+      lineStepper(context, zone, line, h),
       ...Array.match(lineActions(zone, line, h), {
         onEmpty: () => [],
         onNonEmpty: actions => [
@@ -387,7 +440,7 @@ const listLineView = (
           ),
         ],
       ),
-      lineStepper(zone, line, h),
+      lineStepper(context, zone, line, h),
       ...lineActions(zone, line, h),
     ],
   )
@@ -780,138 +833,6 @@ const zoneOfTab = (tab: AddTab): Deck.Zone => {
   }
 }
 
-const cardsOf = (
-  card: CatalogueSearch.CardSummary,
-  zoneCards: ReadonlyArray<Deck.DeckCard>,
-): ReadonlyArray<Deck.DeckCard> =>
-  Array.filter(zoneCards, ({ printingId }) =>
-    Array.contains(card.printingIds, printingId),
-  )
-
-const mostCopiesIn = (
-  card: CatalogueSearch.CardSummary,
-  inZone: ReadonlyArray<Deck.DeckCard>,
-): Printing.PrintingId =>
-  Option.match(
-    Array.reduce(inZone, Option.none<Deck.DeckCard>(), (most, deckCard) =>
-      Option.exists(most, ({ copies }) => copies >= deckCard.copies)
-        ? most
-        : Option.some(deckCard),
-    ),
-    {
-      onNone: () => Array.headNonEmpty(card.printingIds),
-      onSome: ({ printingId }) => printingId,
-    },
-  )
-
-const zoneStepper = (
-  card: CatalogueSearch.CardSummary,
-  zone: Deck.Zone,
-  inZone: ReadonlyArray<Deck.DeckCard>,
-  room: number,
-  label: string,
-  h: HtmlBuilder<Message>,
-): Html => {
-  const copies = Deck.copiesIn(inZone)
-
-  return QuantityStepper.view(
-    {
-      label,
-      quantity: copies,
-      max: copies + Number.max(0, room),
-      onDecrement: Message.ClickedStepLine({
-        zone,
-        printingId: mostCopiesIn(card, inZone),
-        step: -1,
-      }),
-      onIncrement: Message.ClickedAddCard({
-        cardId: card.id,
-        target: zone === 'Sideboard' ? 'Sideboard' : 'Deck',
-      }),
-    },
-    h,
-  )
-}
-
-const resultControls = (
-  context: Context,
-  card: CatalogueSearch.CardSummary,
-  label: string,
-  h: HtmlBuilder<Message>,
-): Html => {
-  const { contents } = context.deck
-  const zone = zoneOfTab(context.model.addTab)
-  const inZone = cardsOf(card, DeckEdit.cardsIn(contents, zone))
-  const limitRoom = (used: number) =>
-    Option.match(card.maybeCopyLimit, {
-      onNone: () => Deck.MAX_COPIES,
-      onSome: limit => limit - used,
-    })
-
-  if (zone !== 'Main') {
-    return zoneStepper(
-      card,
-      zone,
-      inZone,
-      limitRoom(Deck.copiesIn(inZone)),
-      `In ${SECTION_LABELS[zone]}: ${label}`,
-      h,
-    )
-  }
-
-  const inSideboard = cardsOf(card, contents.sideboard)
-  const used =
-    Deck.copiesIn(inZone) +
-    Deck.copiesIn(inSideboard) +
-    (Option.exists(contents.maybeChosenChampion, printingId =>
-      Array.contains(card.printingIds, printingId),
-    )
-      ? 1
-      : 0)
-  const sideboardRoom =
-    DeckRules.MAX_SIDEBOARD - Deck.copiesIn(contents.sideboard)
-
-  return h.div(
-    [h.Class('flex flex-col items-center gap-1')],
-    [
-      h.div(
-        [h.Class('flex items-center gap-2')],
-        [
-          h.span(
-            [h.AriaHidden(true), h.Class('w-8 text-xs text-fg-muted')],
-            ['Main'],
-          ),
-          zoneStepper(
-            card,
-            'Main',
-            inZone,
-            limitRoom(used),
-            `In Main deck: ${label}`,
-            h,
-          ),
-        ],
-      ),
-      h.div(
-        [h.Class('flex items-center gap-2')],
-        [
-          h.span(
-            [h.AriaHidden(true), h.Class('w-8 text-xs text-fg-muted')],
-            ['Side'],
-          ),
-          zoneStepper(
-            card,
-            'Sideboard',
-            inSideboard,
-            Number.min(limitRoom(used), sideboardRoom),
-            `In Sideboard: ${label}`,
-            h,
-          ),
-        ],
-      ),
-    ],
-  )
-}
-
 const resultView = (
   context: Context,
   card: CatalogueSearch.CardSummary,
@@ -960,7 +881,15 @@ const resultView = (
             },
             h,
           )
-        : resultControls(context, card, label, h),
+        : countersView(
+            context,
+            card.id,
+            card.printingIds,
+            card.maybeCopyLimit,
+            zoneOfTab(tab),
+            label,
+            h,
+          ),
     ],
   )
 }

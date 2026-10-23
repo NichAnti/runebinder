@@ -35,6 +35,7 @@ import {
 } from '../../../../service'
 import { Toast } from '../../../../ui'
 import * as CardPanel from '../../cardPanel'
+import { copyStepOf } from './copies'
 import { cardsByPrinting, nameOf } from './lines'
 import { Message, OutMessage } from './message'
 import {
@@ -260,6 +261,30 @@ const legendTagsOf = (
     },
   )
 }
+
+export type CopyInfo = Readonly<{
+  printingIds: ReadonlyArray<Printing.PrintingId>
+  maybeLimit: Option.Option<number>
+}>
+
+export const copyInfoOf = (
+  model: Model,
+  cardId: Printing.CardId,
+): Option.Option<CopyInfo> =>
+  Option.orElse(
+    Option.map(Record.get(model.cards, cardId), card => ({
+      printingIds: Array.map(card.printings, ({ id }) => id),
+      maybeLimit: DeckRules.copyLimitOf(Printing.basePrinting(card)),
+    })),
+    () =>
+      Option.map(
+        Array.findFirst(model.searchResults, ({ id }) => id === cardId),
+        summary => ({
+          printingIds: summary.printingIds,
+          maybeLimit: summary.maybeCopyLimit,
+        }),
+      ),
+  )
 
 const legendOf = (
   model: Model,
@@ -593,6 +618,33 @@ export const update =
           ? { model: modifyFields(model, { searchResults: () => cards }) }
           : { model },
 
+      ClickedStepCopies: ({ cardId, zone, step }) =>
+        Option.match(
+          Option.flatMap(maybeDeck, deck =>
+            Option.flatMap(
+              copyInfoOf(model, cardId),
+              ({ printingIds, maybeLimit }) =>
+                copyStepOf(deck.contents, zone, printingIds, maybeLimit, step),
+            ),
+          ),
+          {
+            onNone: () => ({ model }),
+            onSome: copyStep =>
+              copyStep._tag === 'LoadCard'
+                ? {
+                    model,
+                    commands: [
+                      LoadCardToAdd({
+                        cardId,
+                        tab: model.addTab,
+                        target: zone === 'Sideboard' ? 'Sideboard' : 'Deck',
+                      }),
+                    ],
+                  }
+                : edited(model, maybeDeck, () => copyStep.edits),
+          },
+        ),
+
       ClickedAddCard: ({ cardId, target }) => ({
         model,
         commands: [LoadCardToAdd({ cardId, tab: model.addTab, target })],
@@ -651,16 +703,6 @@ export const update =
         edited(model, maybeDeck, () => [
           { _tag: 'StepCopies', zone, printingId, step },
         ]),
-
-      ClickedMoveLine: ({ from, to, printingIds }) =>
-        edited(model, maybeDeck, () =>
-          Array.map(printingIds, printingId => ({
-            _tag: 'MoveCard',
-            from,
-            to,
-            printingId,
-          })),
-        ),
 
       ClickedMakeChampion: ({ printingId }) =>
         edited(model, maybeDeck, () => [{ _tag: 'MakeChampion', printingId }]),
