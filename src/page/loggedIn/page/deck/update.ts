@@ -26,6 +26,7 @@ import {
   DeckRules,
   type DeckStructure,
   Printing,
+  Runes,
 } from '../../../../domain'
 import {
   CatalogueIndex,
@@ -164,6 +165,36 @@ export const LoadCardToAdd = Command.define('LoadCardToAdd', {
     ),
 })
 
+export const FindRunes = Command.define('FindRunes', {
+  args: { domains: Schema.Array(Printing.Domain) },
+  messages: [Message.SucceededFindRunes, Message.SkippedLoadCatalogue],
+  execute: ({ domains }) =>
+    Effect.gen(function* () {
+      const index = yield* CatalogueIndexResource.get
+      const found = yield* Effect.forEach(domains, domain =>
+        CatalogueIndex.searchCards(
+          index,
+          { ...CatalogueQuery.empty, type: ['Rune'], domain: [domain] },
+          1,
+          [],
+        ),
+      )
+
+      return Message.SucceededFindRunes({
+        cards: Array.getSomes(
+          Array.map(
+            Array.flatMap(found, ({ cards }) => cards),
+            ({ id }) => CatalogueIndex.cardById(index, id),
+          ),
+        ),
+      })
+    }).pipe(
+      Effect.catchTag('ResourceNotAvailable', () =>
+        Effect.succeed(Message.SkippedLoadCatalogue()),
+      ),
+    ),
+})
+
 export const CopyDeckCode = Command.define('CopyDeckCode', {
   args: { code: DeckCode.DeckCode },
   messages: [Message.CompletedCopyDeckCode, Message.FailedCopyDeckCode],
@@ -227,6 +258,46 @@ const legendTagsOf = (
     },
   )
 }
+
+const legendOf = (
+  model: Model,
+  maybeDeck: Option.Option<Deck.Deck>,
+): Option.Option<Printing.Printing> => {
+  const byPrinting = cardsByPrinting(model.cards)
+
+  return Option.flatMap(
+    Option.flatMap(maybeDeck, ({ contents }) => contents.maybeLegend),
+    legendId =>
+      Option.flatMap(Option.fromNullishOr(byPrinting.get(legendId)), card =>
+        Array.findFirst(card.printings, ({ id }) => id === legendId),
+      ),
+  )
+}
+
+const domainFinder = (model: Model) => {
+  const byPrinting = cardsByPrinting(model.cards)
+
+  return (printingId: Printing.PrintingId): Option.Option<Printing.Domain> =>
+    Option.flatMap(Option.fromNullishOr(byPrinting.get(printingId)), card =>
+      Array.head(Printing.basePrinting(card).domains),
+    )
+}
+
+const runeChoicesOf = (
+  legend: Printing.Printing,
+  runeCards: ReadonlyArray<Printing.Card>,
+): ReadonlyArray<Runes.RuneChoice> =>
+  Array.filterMap(legend.domains, domain =>
+    Result.fromOption(
+      Option.map(
+        Array.findFirst(runeCards, card =>
+          Array.contains(Printing.basePrinting(card).domains, domain),
+        ),
+        card => ({ domain, printingId: Printing.basePrinting(card).id }),
+      ),
+      () => domain,
+    ),
+  )
 
 const searchFor = (model: Model, maybeDeck: Option.Option<Deck.Deck>) =>
   SearchCardsToAdd({
@@ -589,6 +660,36 @@ export const update =
         edited(model, maybeDeck, () => [
           { _tag: 'RemoveAdditionalLegend', position },
         ]),
+
+      ClickedSplitRunes: () =>
+        Option.match(legendOf(model, maybeDeck), {
+          onNone: () => ({ model }),
+          onSome: legend => ({
+            model,
+            commands: [FindRunes({ domains: legend.domains })],
+          }),
+        }),
+
+      SucceededFindRunes: ({ cards }) => {
+        const nextModel = modifyFields(model, {
+          cards: existing =>
+            Array.reduce(cards, existing, (known, card) =>
+              Record.set(known, card.id, card),
+            ),
+        })
+
+        return edited(nextModel, maybeDeck, deck =>
+          Option.match(legendOf(nextModel, maybeDeck), {
+            onNone: () => [],
+            onSome: legend =>
+              Runes.splitEvenly(
+                deck.contents.runes,
+                runeChoicesOf(legend, cards),
+                domainFinder(nextModel),
+              ),
+          }),
+        )
+      },
 
       ClickedCopyCode: () =>
         Option.match(maybeDeck, {

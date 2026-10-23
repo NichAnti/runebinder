@@ -10,6 +10,7 @@ import {
   type DeckStructure,
   Missing,
   Printing,
+  Runes,
   Wishlist,
 } from '../../../../domain'
 import { deckWishlistRouter, decksRouter } from '../../../../route'
@@ -386,6 +387,7 @@ const zoneView = (
         ),
         h,
       ),
+      ...(zone === 'Runes' ? [splitRunesView(context, h)] : []),
       Array.match(linesOf(cards, context.byPrinting), {
         onEmpty: () =>
           h.p([h.Class('text-sm text-fg-muted')], ['Nothing here yet.']),
@@ -396,6 +398,33 @@ const zoneView = (
       }),
     ],
   )
+
+const splitRunesView = (context: Context, h: HtmlBuilder<Message>): Html =>
+  Option.match(context.maybeLegend, {
+    onNone: () => h.empty,
+    onSome: legend =>
+      Array.match(legend.domains, {
+        onEmpty: () => h.empty,
+        onNonEmpty: domains =>
+          h.div(
+            [h.Class('flex flex-wrap items-center gap-2')],
+            [
+              smallButton(
+                `Split evenly: ${Array.join(
+                  Array.zipWith(
+                    domains,
+                    Runes.targetsOf(Array.length(domains)),
+                    (domain, target) => `${target} ${domain}`,
+                  ),
+                  ' · ',
+                )}`,
+                Message.ClickedSplitRunes(),
+                h,
+              ),
+            ],
+          ),
+      }),
+  })
 
 const linesView = (
   context: Context,

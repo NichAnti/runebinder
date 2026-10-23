@@ -13,10 +13,10 @@ import { describe, expect, test } from 'vitest'
 import { Toast as HeadlessToast } from '@foldkit/ui'
 
 import { Deck, Printing } from '../../../../domain'
-import { testCard } from '../../../../testing'
+import { printing, testCard } from '../../../../testing'
 import { Message, OutMessage } from './message'
 import { type AddTab, init } from './model'
-import { SearchCardsToAdd, update } from './update'
+import { FindRunes, SearchCardsToAdd, update } from './update'
 
 const base = Printing.PrintingId.make('tst-001-010')
 const deck: Deck.Deck = {
@@ -99,5 +99,72 @@ describe('adding cards', () => {
       }),
     )
     expect(added.model.addTab).toBe('Unit')
+  })
+})
+
+describe('runes', () => {
+  const legend = printing({
+    id: Printing.PrintingId.make('tst-050-010'),
+    cardId: Printing.CardId.make('test-legend'),
+    maybeType: Option.some('Legend'),
+    domains: ['Fury', 'Calm'],
+  })
+  const runeCard = (id: string, domain: Printing.Domain): Printing.Card => ({
+    id: Printing.CardId.make(`${id}-rune`),
+    printings: [
+      printing({
+        id: Printing.PrintingId.make(
+          `tst-${id === 'fury' ? '060' : '061'}-010`,
+        ),
+        cardId: Printing.CardId.make(`${id}-rune`),
+        maybeType: Option.some('Rune'),
+        domains: [domain],
+      }),
+    ],
+  })
+  const fury = runeCard('fury', 'Fury')
+  const calm = runeCard('calm', 'Calm')
+  const withLegend: Deck.Deck = {
+    ...deck,
+    contents: { ...deck.contents, maybeLegend: Option.some(legend.id) },
+  }
+  const loadedLegend = modifyFields(init(), {
+    maybeDeckId: () => Option.some(deck.id),
+    cards: () => ({
+      [legend.cardId]: { id: legend.cardId, printings: [legend] },
+    }),
+  })
+
+  test('splitting finds a rune per legend domain and adds six of each', () => {
+    const asked = update(Option.some(withLegend))(
+      loadedLegend,
+      Message.ClickedSplitRunes(),
+    )
+
+    expect(
+      asked.commands?.map(({ name, args }) => ({ name, args })),
+    ).toStrictEqual([
+      { name: FindRunes.name, args: { domains: ['Fury', 'Calm'] } },
+    ])
+
+    const split = update(Option.some(withLegend))(
+      loadedLegend,
+      Message.SucceededFindRunes({ cards: [fury, calm] }),
+    )
+    const edits =
+      split.outMessage?._tag === 'EditedDeck' ? split.outMessage.edits : []
+
+    expect(Array.length(edits)).toBe(12)
+    expect(
+      Array.length(
+        Array.filter(
+          edits,
+          edit =>
+            edit._tag === 'StepCopies' &&
+            edit.zone === 'Runes' &&
+            edit.printingId === Printing.PrintingId.make('tst-060-010'),
+        ),
+      ),
+    ).toBe(6)
   })
 })

@@ -50,6 +50,8 @@ export const Message = defineMessageUnion({
   ClickedClearLegend: {},
   ClickedClearChampion: {},
   ClickedRemoveAdditionalLegend: { position: Schema.Int },
+  ClickedSplitRunes: {},
+  SucceededFindRunes: { cards: Schema.Array(Printing.Card) },
   ClickedCopyCode: {},
   CompletedCopyDeckCode: { code: DeckCode.DeckCode },
   FailedCopyDeckCode: { code: DeckCode.DeckCode },
