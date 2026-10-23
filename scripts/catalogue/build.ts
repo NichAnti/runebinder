@@ -7,8 +7,10 @@ import { buildCatalogue } from '../../src/worker/catalogue/build'
 import { RecordedRiotGallery } from '../../src/worker/catalogue/riotGallery/layer'
 
 const OUTPUT = 'catalogue/catalogue.json'
+const IDS_OUTPUT = 'catalogue/printingIds.json'
 
 const encodeCatalogue = Schema.encodeEffect(Catalogue.CatalogueJson)
+const encodePrintingIds = Schema.encodeEffect(Catalogue.PrintingIdsJson)
 
 const reportRejectedRecords = Effect.fn('reportRejectedRecords')(function* (
   issues: ReadonlyArray<unknown>,
@@ -31,10 +33,12 @@ const build = Effect.gen(function* () {
   )
 
   const json = yield* encodeCatalogue(catalogue)
+  const idsJson = yield* encodePrintingIds(Catalogue.printingIdsOf(catalogue))
 
   yield* fs.writeFileString(OUTPUT, `${json}\n`)
+  yield* fs.writeFileString(IDS_OUTPUT, `${idsJson}\n`)
   yield* Console.log(
-    `Wrote ${Array.length(catalogue.printings)} printings from ${catalogue.source} to ${OUTPUT}`,
+    `Wrote ${Array.length(catalogue.printings)} printings from ${catalogue.source} to ${OUTPUT} and ${IDS_OUTPUT}`,
   )
   yield* Array.match(printingsNotOnCardTrader, {
     onEmpty: () => Console.log('Every printing has a CardTrader blueprint'),

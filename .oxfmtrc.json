@@ -28,6 +28,7 @@
     "migrations",
     "catalogue/recordings",
     "catalogue/catalogue.json",
+    "catalogue/printingIds.json",
     "*.tsbuildinfo",
     "pnpm-lock.yaml"
   ]

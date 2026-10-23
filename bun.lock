@@ -8,6 +8,7 @@
         "@alchemy.run/better-auth": "2.0.0-beta.83",
         "@better-auth/drizzle-adapter": "1.7.5",
         "@effect/platform-browser": "4.0.0",
+        "@effect/sql-d1": "4.0.0",
         "@foldkit/ui": "0.169.0",
         "@orama/orama": "3.1.18",
         "better-auth": "1.7.5",
@@ -38,6 +39,10 @@
         "vitest": "^5.0.2",
       },
     },
+  },
+  "overrides": {
+    "@effect/sql-d1": "4.0.0",
+    "@effect/sql-sqlite-do": "4.0.0",
   },
   "packages": {
     "@alchemy.run/better-auth": ["@alchemy.run/better-auth@2.0.0-beta.83", "", { "peerDependencies": { "@better-auth/drizzle-adapter": "^1.7.5", "@cloudflare/workers-types": "5.20261002.1", "@distilled.cloud/aws": "1.0.0-rc.15", "@neondatabase/serverless": "^1.0.1", "alchemy": "2.0.0-beta.83", "better-auth": "^1.7.5", "drizzle-orm": "1.0.0-rc.5-ab785fc", "effect": "^4.0.0", "kysely": "^0.29.4", "mysql2": "^3.24.2", "pg": "^8.22.0" }, "optionalPeers": ["@better-auth/drizzle-adapter", "@cloudflare/workers-types", "@distilled.cloud/aws", "@neondatabase/serverless", "drizzle-orm", "kysely", "mysql2", "pg"] }, "sha512-j9odFoZX9qkUiBYPXM9YzEFxqhWRTnvfIFIp/ueJjsNPbH7kSsyBKaZFEa/0KVIjHwAru0wrRLFl8H6iklXUKg=="],
@@ -136,9 +141,9 @@
 
     "@effect/platform-node-shared": ["@effect/platform-node-shared@4.0.0", "", { "dependencies": { "@types/ws": "^8.18.1", "ws": "^8.22.0" }, "peerDependencies": { "effect": "^4.0.0" } }, "sha512-VBXHJU9UXVZPdQGGDRjGXpo+TpOzRwZuMrdKAtIxi1qwcRftmacZ1zTgIrzBa0Z2RA2KVkoOecQUsTlt/nJZhw=="],
 
-    "@effect/sql-d1": ["@effect/sql-d1@4.0.5", "", { "dependencies": { "@cloudflare/workers-types": "^5.20261010.1" }, "peerDependencies": { "effect": "^4.0.5" } }, "sha512-ERArvCS/qOHx52yKFePc8v5qs0y18Ld+Ha6Xkkm/I1R+zTf+flfWpsuxlxkPKlwQCqB9K+yfU6Kw1gshKGRCPQ=="],
+    "@effect/sql-d1": ["@effect/sql-d1@4.0.0", "", { "dependencies": { "@cloudflare/workers-types": "^5.20260926.1" }, "peerDependencies": { "effect": "^4.0.0" } }, "sha512-pmkzncZCGD6CLyvc89keEBU85h+gHVCu/LKQnThd+ruYSUbG0R9jYA+lnk3R8Djp0wQW6SbsbmHQuhopIYyo3Q=="],
 
-    "@effect/sql-sqlite-do": ["@effect/sql-sqlite-do@4.0.5", "", { "peerDependencies": { "effect": "^4.0.5" } }, "sha512-TGlU65ZJJMa81I7EoicQXxhRsJDxDPz6A/PNOPzMYRgmCdLs6EsTTXIkKZ+8apb7pl2o0OKVcrT6i6mGlluyLg=="],
+    "@effect/sql-sqlite-do": ["@effect/sql-sqlite-do@4.0.0", "", { "peerDependencies": { "effect": "^4.0.0" } }, "sha512-XkRZmQOPblzwjmAJ0RWSOiLlTsKkf1EigZsxUNuIuk4uZ/pnufSqvDpXubCwv8iyRTbOLFMmM+EyOEH5V5XqAw=="],
 
     "@effect/tsgo": ["@effect/tsgo@0.50.0", "", { "optionalDependencies": { "@effect/tsgo-darwin-arm64": "0.50.0", "@effect/tsgo-darwin-x64": "0.50.0", "@effect/tsgo-linux-arm": "0.50.0", "@effect/tsgo-linux-arm64": "0.50.0", "@effect/tsgo-linux-x64": "0.50.0", "@effect/tsgo-win32-arm64": "0.50.0", "@effect/tsgo-win32-x64": "0.50.0" }, "bin": { "effect-tsgo": "dist/effect-tsgo.cjs" } }, "sha512-BCRwWFBVfQGhFPXmLlNCbYhohTPoIzCL+0iSrDkSpSN2TRtGbbxCB1Mi4oBPr1jRk5VgMB0jOFEvXmPt3SqCDg=="],
 

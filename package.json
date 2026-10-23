@@ -20,6 +20,7 @@
     "@alchemy.run/better-auth": "2.0.0-beta.83",
     "@better-auth/drizzle-adapter": "1.7.5",
     "@effect/platform-browser": "4.0.0",
+    "@effect/sql-d1": "4.0.0",
     "@foldkit/ui": "0.169.0",
     "@orama/orama": "3.1.18",
     "better-auth": "1.7.5",
@@ -51,5 +52,9 @@
   },
   "simple-git-hooks": {
     "pre-push": "bun run check"
+  },
+  "overrides": {
+    "@effect/sql-d1": "4.0.0",
+    "@effect/sql-sqlite-do": "4.0.0"
   }
 }

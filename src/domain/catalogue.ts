@@ -1,6 +1,6 @@
-import { Schema } from 'effect'
+import { Array, Order, Schema } from 'effect'
 
-import { Printing } from './printing'
+import { Printing, PrintingId } from './printing'
 
 export const Source = Schema.Literals(['RiotGallery'])
 export type Source = typeof Source.Type
@@ -14,3 +14,14 @@ export type Catalogue = typeof Catalogue.Type
 export const CatalogueJson = Schema.fromJsonString(
   Schema.toCodecJson(Catalogue),
 )
+
+export const PrintingIds = Schema.Array(PrintingId)
+export type PrintingIds = typeof PrintingIds.Type
+
+export const PrintingIdsJson = Schema.fromJsonString(PrintingIds)
+
+export const printingIdsOf = (catalogue: Catalogue): PrintingIds =>
+  Array.sort(
+    Array.map(catalogue.printings, ({ id }) => id),
+    Order.String,
+  )
