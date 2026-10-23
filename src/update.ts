@@ -193,6 +193,7 @@ export const enterRoute = (model: Model, route: AppRoute): UpdateReturn =>
             'Collection',
             'Decks',
             'Deck',
+            'Wishlist',
             'NotFound',
             (route: LoggedInRoute) => foldLoggedInRoute(model, route),
           ),

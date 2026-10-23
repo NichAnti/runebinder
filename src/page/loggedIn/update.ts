@@ -3,7 +3,7 @@ import { Command, Update } from 'foldkit'
 import { pushUrl, replaceUrl } from 'foldkit/navigation'
 import { modifyFields } from 'foldkit/struct'
 
-import { Deck, Printing } from '../../domain'
+import { Deck, Missing, Printing } from '../../domain'
 import {
   type CatalogueRoute,
   type CollectionRoute,
@@ -26,6 +26,8 @@ import * as CardTraderPage from './page/cardTrader'
 import * as CataloguePage from './page/catalogue'
 import * as DeckPage from './page/deck'
 import * as DeckListPage from './page/deckList'
+import * as WishlistPage from './page/wishlist'
+import * as WishlistState from './wishlist'
 
 type Requirements =
   | ApiClient
@@ -302,6 +304,96 @@ const enterDeckPage =
       ...deckPageSlot,
     })(stepModel)
 
+// WISHLIST
+
+const wishlistFold = {
+  read: (model: Model) => Option.some(model.wishlist),
+  write: (model: Model, nextWishlist: WishlistState.Model): Model =>
+    modifyFields(model, { wishlist: () => nextWishlist }),
+  toParentMessage: (message: WishlistState.Message) =>
+    Message.GotWishlistMessage({ message }),
+}
+
+const foldWishlist = Update.foldChild({
+  update: WishlistState.update,
+  ...wishlistFold,
+})
+const ensureWishlist = Update.foldChildStep({
+  update: WishlistState.ensureLoaded,
+  ...wishlistFold,
+})
+const retryWishlist = Update.foldChildStep({
+  update: WishlistState.retry,
+  ...wishlistFold,
+})
+const stepWishlist = Update.foldChild({
+  update: WishlistState.step,
+  ...wishlistFold,
+})
+const sendWishlist = Update.foldChild({
+  update: WishlistState.send,
+  ...wishlistFold,
+})
+
+export const wishlistContextOf = (
+  model: Model,
+): Option.Option<WishlistPage.Context> =>
+  model.decks._tag === 'Ready' &&
+  model.collection._tag === 'Ready' &&
+  model.wishlist._tag === 'Ready'
+    ? Option.some({
+        needs: Missing.needs(model.decks.decks, model.collection.owned),
+        added: model.wishlist.added,
+      })
+    : Option.none()
+
+const foldWishlistPageOutMessage = WishlistPage.OutMessage.match<
+  Update.Step<Model, Message, Requirements>
+>({
+  SteppedAdded: stepped => stepWishlist(stepped),
+  RequestedSend: request => sendWishlist(request),
+  RequestedRetry: () => stepModel =>
+    Update.combine<Model, Message, Requirements>(stepModel, [
+      retryDecks,
+      refreshCollection,
+      retryWishlist,
+    ]),
+})
+
+const wishlistPageSlot = {
+  read: (model: Model) => Option.some(model.wishlistPage),
+  write: (model: Model, nextPage: WishlistPage.Model): Model =>
+    modifyFields(model, { wishlistPage: () => nextPage }),
+  toParentMessage: (message: WishlistPage.Message) =>
+    Message.GotWishlistPageMessage({ message }),
+}
+
+const foldWishlistPage = (context: WishlistPage.Context) =>
+  Update.foldChild({
+    update: WishlistPage.update(context),
+    ...wishlistPageSlot,
+    foldOutMessage: foldWishlistPageOutMessage,
+  })
+
+const enterWishlistPage: Update.Step<
+  Model,
+  Message,
+  CatalogueIndexService
+> = stepModel =>
+  Option.match(wishlistContextOf(stepModel), {
+    onNone: () => ({ model: stepModel }),
+    onSome: context =>
+      Update.foldChildStep({
+        update: (page: WishlistPage.Model) =>
+          WishlistPage.enter(
+            page,
+            context,
+            stepModel.catalogue._tag === 'Ready',
+          ),
+        ...wishlistPageSlot,
+      })(stepModel),
+  })
+
 // ROUTE
 
 export const enterRoute = (
@@ -348,6 +440,13 @@ export const enterRoute = (
           ensureDecks,
           enterDeckPage(deckId),
         ]),
+      Wishlist: () =>
+        Update.combine<Model, Message, Requirements>(routed, [
+          ensureDecks,
+          ensureCollection,
+          ensureWishlist,
+          enterWishlistPage,
+        ]),
       NotFound: () => ({ model: routed }),
     }),
   )
@@ -356,10 +455,11 @@ export const enterRoute = (
 // UPDATE
 
 const isWaitingForDecks = (route: LoggedInRoute): boolean =>
-  route._tag === 'Deck'
+  route._tag === 'Deck' || route._tag === 'Wishlist'
 
 const isWaitingForCollection = (route: LoggedInRoute): boolean =>
   route._tag === 'Collection' ||
+  route._tag === 'Wishlist' ||
   (route._tag === 'Catalogue' && route.ownership !== 'All')
 
 const attemptOf = (state: CatalogueState): number =>
@@ -454,6 +554,21 @@ export const update = (model: Model, message: Message) =>
         ),
         Match.orElse(() => ({ model })),
       ),
+
+    GotWishlistMessage: ({ message }) =>
+      message._tag === 'SucceededLoadWishlist' &&
+      model.route._tag === 'Wishlist'
+        ? Update.combine<Model, Message, Requirements>(model, [
+            foldWishlist(message),
+            stepModel => enterRoute(stepModel, stepModel.route),
+          ])
+        : foldWishlist(model, message),
+
+    GotWishlistPageMessage: ({ message }) =>
+      Option.match(wishlistContextOf(model), {
+        onNone: () => ({ model }),
+        onSome: context => foldWishlistPage(context)(model, message),
+      }),
 
     CompletedOpenDeck: () => ({ model }),
 

@@ -1,4 +1,4 @@
-import { Match } from 'effect'
+import { Match, Option } from 'effect'
 import { Submodel } from 'foldkit'
 import type { Html, HtmlBuilder } from 'foldkit/html'
 
@@ -15,7 +15,8 @@ import * as CataloguePage from './page/catalogue'
 import * as CollectionPage from './page/collection'
 import * as DeckPage from './page/deck'
 import * as DeckListPage from './page/deckList'
-import { contextOf } from './update'
+import * as WishlistPage from './page/wishlist'
+import { contextOf, wishlistContextOf } from './update'
 
 const catalogueGate = (
   model: Model,
@@ -157,6 +158,31 @@ export const view = Submodel.defineView<Model, Message>((model, h) =>
                   viewInputs: { decks: model.decks, deckId },
                   toParentMessage: message =>
                     Message.GotDeckPageMessage({ message }),
+                }),
+              h,
+            ),
+          Wishlist: () =>
+            catalogueGate(
+              model,
+              () =>
+                h.submodel({
+                  slotId: 'wishlist-page',
+                  model: model.wishlistPage,
+                  view: WishlistPage.view,
+                  viewInputs: {
+                    isReady: Option.isSome(wishlistContextOf(model)),
+                    hasFailed:
+                      model.decks._tag === 'Failed' ||
+                      model.collection._tag === 'Failed' ||
+                      model.wishlist._tag === 'Failed',
+                    context: Option.getOrElse(wishlistContextOf(model), () => ({
+                      needs: [],
+                      added: {},
+                    })),
+                    wishlist: model.wishlist,
+                  },
+                  toParentMessage: message =>
+                    Message.GotWishlistPageMessage({ message }),
                 }),
               h,
             ),

@@ -9,6 +9,8 @@ import * as CardTraderPage from './page/cardTrader'
 import * as CataloguePage from './page/catalogue'
 import * as DeckPage from './page/deck'
 import * as DeckListPage from './page/deckList'
+import * as WishlistPage from './page/wishlist'
+import * as WishlistState from './wishlist'
 
 export const Message = defineMessageUnion({
   GotCataloguePageMessage: { message: CataloguePage.Message },
@@ -27,6 +29,8 @@ export const Message = defineMessageUnion({
   GotDecksMessage: { message: DecksState.Message },
   GotDeckListPageMessage: { message: DeckListPage.Message },
   GotDeckPageMessage: { message: DeckPage.Message },
+  GotWishlistMessage: { message: WishlistState.Message },
+  GotWishlistPageMessage: { message: WishlistPage.Message },
   CompletedOpenDeck: {},
   CompletedReturnToDecks: {},
 })

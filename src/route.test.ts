@@ -31,6 +31,10 @@ describe('routes', () => {
     expect(routeOf('/decks/not-a-deck')._tag).toBe('NotFound')
   })
 
+  test('/wishlist is the wishlist page', () => {
+    expect(routeOf('/wishlist')).toStrictEqual(AppRoute.Wishlist())
+  })
+
   test('/cardtrader is the CardTrader page', () => {
     expect(routeOf('/cardtrader')).toStrictEqual(AppRoute.CardTrader())
   })

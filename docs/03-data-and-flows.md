@@ -165,6 +165,16 @@ A collector number matching more than one blueprint fails the build
 | `POST /wishlists`       | sending a wishlist: `game_id` 22, private, one line per printing with `blueprint_id`, `collector_number` and `quantity` |
 | `DELETE /wishlists/:id` | after a send, removing the previous wishlist the app made                                                               |
 
+Two recorded calls (`catalogue/recordings/cardtrader/wishlist-*.json`) show that a
+Riftbound wishlist keeps only the card (`meta_name`) and the set
+(`expansion_code`): `collector_number` comes back `null` whether it is sent
+with `blueprint_id` or without it. So the app sends one line per card and set,
+with the missing copies of its printings added up, and the Wishlist page links
+each exact printing to its CardTrader page
+(`https://www.cardtrader.com/cards/{blueprint_id}`). Adding exact printings to
+the CardTrader cart (`/marketplace/products`, `/cart/add`) is a possible later
+option; the app never calls `/cart/purchase`.
+
 CardTrader has no wishlist update. A send creates the new wishlist first and
 then deletes the previous one this app created (its id is kept per user in
 D1), so a failed send never leaves the user without one. Edits made on

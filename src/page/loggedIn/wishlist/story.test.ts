@@ -1,0 +1,86 @@
+import { Option } from 'effect'
+import { Command, given, message, model, story } from 'foldkit/story'
+import { describe, expect, test } from 'vitest'
+
+import { Collection, Printing, Wishlist } from '../../../domain'
+import { Message } from './message'
+import { Model, Sending } from './model'
+import { SaveItem, SendWishlist, send, step, update } from './update'
+
+const vi = Printing.PrintingId.make('ogn-066-298')
+const ready = Model.Ready({
+  added: {},
+  maybeSentWishlistId: Option.none(),
+  saves: {},
+  nextRevision: 0,
+  sending: Sending.Idle(),
+})
+const wishlistId = Wishlist.CardTraderWishlistId.make(3572164)
+
+describe('wishlist', () => {
+  test('a card added by hand is saved after a pause', () => {
+    const stepped = step(step(ready, { printingId: vi, step: 1 }).model, {
+      printingId: vi,
+      step: 1,
+    })
+
+    story(
+      update,
+      given(stepped.model),
+      message(Message.ElapsedSaveItemDelay({ printingId: vi, revision: 0 })),
+      Command.expectNone(),
+      message(Message.ElapsedSaveItemDelay({ printingId: vi, revision: 1 })),
+      Command.expectExact(SaveItem),
+      Command.resolve(
+        SaveItem,
+        Message.SucceededSaveItem({ printingId: vi, revision: 1 }),
+      ),
+      model(next => {
+        expect(next._tag === 'Ready' && next.added).toStrictEqual({
+          [vi]: Collection.OwnedQuantity.make(2),
+        })
+      }),
+    )
+  })
+
+  test('sending shows the new CardTrader wishlist', () => {
+    const sending = send(ready, {
+      name: 'Riftbound decks',
+      lines: [
+        {
+          blueprintId: Printing.CardTraderBlueprintId.make(345245),
+          quantity: 2,
+        },
+      ],
+    })
+
+    expect(sending.commands?.map(({ name }) => name)).toStrictEqual([
+      SendWishlist.name,
+    ])
+    story(
+      update,
+      given(sending.model),
+      message(
+        Message.SucceededSendWishlist({ wishlistId, isPreviousDeleted: true }),
+      ),
+      model(next => {
+        expect(next._tag === 'Ready' && next.sending).toStrictEqual(
+          Sending.Sent({ wishlistId, isPreviousDeleted: true }),
+        )
+      }),
+    )
+  })
+
+  test('sending without a connected token says so', () => {
+    story(
+      update,
+      given(ready),
+      message(Message.FailedSendWishlist({ reason: 'NotConnected' })),
+      model(next => {
+        expect(next._tag === 'Ready' && next.sending).toStrictEqual(
+          Sending.Failed({ reason: 'NotConnected' }),
+        )
+      }),
+    )
+  })
+})

@@ -16,6 +16,7 @@ export const AppRoute = defineRouteUnion({
   Collection: CatalogueQuery.Query.fields,
   Decks: {},
   Deck: { deckId: Deck.DeckId },
+  Wishlist: {},
   NotFound: { path: Schema.String },
 })
 export type AppRoute = typeof AppRoute.Type
@@ -34,6 +35,7 @@ export const LoggedInRoute = AppRoute.subset([
   'Collection',
   'Decks',
   'Deck',
+  'Wishlist',
   'NotFound',
 ])
 export type LoggedInRoute = typeof LoggedInRoute.Type
@@ -65,6 +67,10 @@ export const signUpRouter = pipe(
 export const cardTraderRouter = pipe(
   literal('cardtrader'),
   Route.mapTo(AppRoute.CardTrader),
+)
+export const wishlistRouter = pipe(
+  literal('wishlist'),
+  Route.mapTo(AppRoute.Wishlist),
 )
 export const decksRouter = pipe(literal('decks'), Route.mapTo(AppRoute.Decks))
 export const deckRouter = pipe(
@@ -99,6 +105,7 @@ const routeParser = Route.oneOf(
   collectionRouter,
   deckRouter,
   decksRouter,
+  wishlistRouter,
   catalogueRouter,
 )
 

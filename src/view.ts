@@ -12,6 +12,7 @@ import {
   catalogueHome,
   collectionRouter,
   decksRouter,
+  wishlistRouter,
 } from './route'
 import { Button, Link } from './ui'
 
@@ -25,6 +26,7 @@ const title = (route: AppRoute): string =>
     Collection: () => `Collection | ${APP_NAME}`,
     Decks: () => `Decks | ${APP_NAME}`,
     Deck: () => `Deck | ${APP_NAME}`,
+    Wishlist: () => `Wishlist | ${APP_NAME}`,
     NotFound: () => `Not found | ${APP_NAME}`,
   })
 
@@ -70,6 +72,15 @@ const navView = (loggedIn: LoggedIn.Model, h: HtmlBuilder<Message>): Html =>
           variant: 'Nav',
           isCurrent:
             loggedIn.route._tag === 'Decks' || loggedIn.route._tag === 'Deck',
+        },
+        h,
+      ),
+      Link.view(
+        {
+          href: wishlistRouter(),
+          content: ['Wishlist'],
+          variant: 'Nav',
+          isCurrent: loggedIn.route._tag === 'Wishlist',
         },
         h,
       ),

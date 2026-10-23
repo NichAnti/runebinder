@@ -71,7 +71,7 @@ Its structure is agreed before any code is written.
 ## Phase 8: Missing cards and wishlist
 
 - [x] 8.1 Missing-cards calculation, pure with tests: the most copies any one deck uses, per exact printing, minus what is owned
-- [ ] 8.2 Wishlist page: manual items, send to CardTrader. Sending creates a new private CardTrader wishlist first, then deletes the previous one this app created (its id is kept per user in D1); the user is warned that edits made on CardTrader to that wishlist are replaced. Each line sends `blueprint_id` and `collector_number`, because CardTrader documents `blueprint_id` alone as setting only the card name and expansion, which might not pin the exact printing
+- [x] 8.2 Wishlist page: what decks miss plus cards added by hand, per exact printing; Send to CardTrader creates a private wishlist with one line per card and set (CardTrader does not keep the version), records it in D1 and deletes the previous one; each printing links to its exact CardTrader page
 
 ## Phase 9: Finishing the MVP
 
@@ -90,6 +90,7 @@ Its structure is agreed before any code is written.
 - Prevent the flash of the light theme on first load (inline script in `index.html`).
 - Check format legality (the Rules Hub's banned cards and battlefields) in the deck rules.
 - Decide, before going public, whether "enforce the official deckbuilding rules" (Riot policy) needs more than reporting problems, for example marking exported or shared decks that break them.
+- Optionally add exact printings to the CardTrader cart (marketplace listings + `/cart/add`), since wishlists cannot keep the version.
 - Save collection and deck changes immediately when the tab is hidden, so a change made just before closing the tab is not lost.
 - Split the app bundle (536 KB, 171 KB compressed) so the catalogue's search code (Orama) loads only when needed; Vite warns above 500 KB.
 

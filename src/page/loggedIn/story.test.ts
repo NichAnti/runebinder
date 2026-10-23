@@ -15,6 +15,7 @@ import * as CataloguePage from './page/catalogue'
 import * as DeckPage from './page/deck'
 import * as DeckListPage from './page/deckList'
 import { OpenDeck, enterRoute, update } from './update'
+import * as WishlistState from './wishlist'
 
 const onCatalogue = init(AppRoute.Catalogue(CatalogueQuery.empty), ada)
 
@@ -327,5 +328,20 @@ describe('decks', () => {
         ).toStrictEqual(Option.some('Vi tempo'))
       }),
     )
+  })
+})
+
+describe('wishlist', () => {
+  test('opening the wishlist loads decks, collection and wishlist once', () => {
+    const entered = enterRoute(
+      init(AppRoute.Wishlist(), ada),
+      AppRoute.Wishlist(),
+    )
+
+    expect(entered.commands?.map(({ name }) => name)).toStrictEqual([
+      DecksState.LoadDecks.name,
+      CollectionState.LoadCollection.name,
+      WishlistState.LoadWishlist.name,
+    ])
   })
 })
