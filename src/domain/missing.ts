@@ -1,4 +1,4 @@
-import { Array, Number, Option, Order, Record, pipe } from 'effect'
+import { Array, Number, Option, Order, Record, Result, pipe } from 'effect'
 
 import { type Owned, quantityOf } from './collection'
 import type { Deck, DeckContents } from './deck'
@@ -86,3 +86,20 @@ export const needs = (
 export const missingOnly = (
   allNeeds: ReadonlyArray<Need>,
 ): ReadonlyArray<Need> => Array.filter(allNeeds, ({ missing }) => missing > 0)
+
+export type DeckUse = Readonly<{ deck: Deck; copies: number }>
+
+export const decksUsing = (
+  decks: ReadonlyArray<Deck>,
+  printingIds: ReadonlyArray<PrintingId>,
+): ReadonlyArray<DeckUse> =>
+  Array.filterMap(decks, deck => {
+    const used = copiesUsedBy(deck.contents)
+    const copies = Number.sumAll(
+      Array.map(printingIds, printingId =>
+        Option.getOrElse(Record.get(used, printingId), () => 0),
+      ),
+    )
+
+    return copies > 0 ? Result.succeed({ deck, copies }) : Result.failVoid
+  })

@@ -3,7 +3,7 @@ import { describe, expect, test } from 'vitest'
 
 import { OwnedQuantity } from './collection'
 import { Copies, type Deck, DeckId, DeckName, empty } from './deck'
-import { copiesUsedBy, missingOnly, needs } from './missing'
+import { copiesUsedBy, decksUsing, missingOnly, needs } from './missing'
 import { PrintingId } from './printing'
 
 const vi = PrintingId.make('ogn-066-298')
@@ -53,6 +53,18 @@ describe('missing cards', () => {
       ),
     ).toStrictEqual([
       { printingId: viAlternate, needed: 1, owned: 0, missing: 1 },
+    ])
+  })
+})
+
+describe('decks using a card', () => {
+  test('counts every printing of the card in each deck that uses it', () => {
+    expect(decksUsing([first, second], [vi, viAlternate])).toStrictEqual([
+      { deck: first, copies: 3 },
+      { deck: second, copies: 3 },
+    ])
+    expect(decksUsing([first, second], [legend])).toStrictEqual([
+      { deck: first, copies: 1 },
     ])
   })
 })

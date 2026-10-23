@@ -140,6 +140,7 @@ export const view = Submodel.defineView<Model, Message>((model, h) =>
                     route: cardRoute,
                     collection: model.collection,
                     wishlist: model.wishlist,
+                    decks: model.decks,
                   },
                   toParentMessage: message =>
                     Message.GotCardPageMessage({ message }),

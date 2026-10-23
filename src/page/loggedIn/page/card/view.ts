@@ -2,10 +2,16 @@ import { Array, Option, pipe } from 'effect'
 import { Submodel } from 'foldkit'
 import type { Html, HtmlBuilder } from 'foldkit/html'
 
-import { Collection, Printing } from '../../../../domain'
-import { type CardRoute, cardRouter, catalogueHome } from '../../../../route'
+import { Collection, Missing, Printing } from '../../../../domain'
+import {
+  type CardRoute,
+  cardRouter,
+  catalogueHome,
+  deckRouter,
+} from '../../../../route'
 import { Badge, Button, Link, Notice } from '../../../../ui'
 import * as CollectionState from '../../collection'
+import * as DecksState from '../../decks'
 import * as Printings from '../../printings'
 import * as WishlistState from '../../wishlist'
 import { Message } from './message'
@@ -16,6 +22,7 @@ export type ViewInputs = Readonly<{
   route: CardRoute
   collection: CollectionState.Model
   wishlist: WishlistState.Model
+  decks: DecksState.Model
 }>
 
 const selectedPrinting = (
@@ -160,9 +167,63 @@ const wishlistView = (
     },
   })
 
+const usedInView = (
+  card: Printing.Card,
+  decks: DecksState.Model,
+  h: HtmlBuilder<Message>,
+): Html =>
+  DecksState.Model.match(decks, {
+    NotLoaded: () => h.empty,
+    Loading: () => h.empty,
+    Failed: () => h.empty,
+    Ready: ({ decks: all }) =>
+      h.section(
+        [h.AriaLabel('Used in decks'), h.Class('flex flex-col gap-2')],
+        [
+          h.h2([h.Class('text-sm font-medium')], ['Used in decks']),
+          Array.match(
+            Missing.decksUsing(
+              all,
+              Array.map(card.printings, ({ id }) => id),
+            ),
+            {
+              onEmpty: () =>
+                h.p(
+                  [h.Class('text-sm text-fg-muted')],
+                  ['None of your decks.'],
+                ),
+              onNonEmpty: uses =>
+                h.ul(
+                  [h.Class('flex flex-col gap-1')],
+                  Array.map(uses, ({ deck, copies }) =>
+                    h.keyed('li')(
+                      deck.id,
+                      [h.Class('flex items-center gap-2 text-sm')],
+                      [
+                        Link.view(
+                          {
+                            href: deckRouter({ deckId: deck.id }),
+                            content: [deck.name],
+                          },
+                          h,
+                        ),
+                        h.span(
+                          [h.Class('text-fg-muted tabular-nums')],
+                          [`×${copies}`],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            },
+          ),
+        ],
+      ),
+  })
+
 const foundView = (
   card: Printing.Card,
-  { route, collection, wishlist }: ViewInputs,
+  { route, collection, wishlist, decks }: ViewInputs,
   h: HtmlBuilder<Message>,
 ): Html => {
   const printing = selectedPrinting(card, route.printing)
@@ -188,7 +249,11 @@ const foundView = (
           ]),
           h.div(
             [h.Class('flex flex-col gap-6')],
-            [detailsView(printing, h), wishlistView(printing, wishlist, h)],
+            [
+              detailsView(printing, h),
+              wishlistView(printing, wishlist, h),
+              usedInView(card, decks, h),
+            ],
           ),
         ],
       ),

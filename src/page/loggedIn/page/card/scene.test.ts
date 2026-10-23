@@ -13,10 +13,11 @@ import {
 } from 'foldkit/scene'
 import { describe, test } from 'vitest'
 
-import { Collection, Printing } from '../../../../domain'
+import { Collection, Deck, Printing } from '../../../../domain'
 import { AppRoute } from '../../../../route'
 import { testCard } from '../../../../testing'
 import * as CollectionState from '../../collection'
+import * as DecksState from '../../decks'
 import * as WishlistState from '../../wishlist'
 import { OutMessage } from './message'
 import { CardState } from './model'
@@ -48,6 +49,7 @@ describe('card page', () => {
         update,
         view: withViewInputs(view, {
           wishlist: WishlistState.init(),
+          decks: DecksState.init(),
           collection,
           route: routeFor(Option.none()),
         })(),
@@ -70,6 +72,7 @@ describe('card page', () => {
         update,
         view: withViewInputs(view, {
           wishlist: WishlistState.init(),
+          decks: DecksState.init(),
           collection,
           route: routeFor(Option.some('tst-001a-010')),
         })(),
@@ -92,6 +95,7 @@ describe('card page', () => {
         update,
         view: withViewInputs(view, {
           wishlist: WishlistState.init(),
+          decks: DecksState.init(),
           collection: ready,
           route: routeFor(Option.none()),
         })(),
@@ -125,6 +129,7 @@ describe('card page', () => {
         update,
         view: withViewInputs(view, {
           wishlist: WishlistState.init(),
+          decks: DecksState.init(),
           collection,
           route: routeFor(Option.none()),
         })(),
@@ -145,6 +150,7 @@ describe('card page', () => {
         update,
         view: withViewInputs(view, {
           wishlist: WishlistState.init(),
+          decks: DecksState.init(),
           collection: CollectionState.Model.Failed(),
           route: routeFor(Option.none()),
         })(),
@@ -156,12 +162,53 @@ describe('card page', () => {
     )
   })
 
+  test('lists the decks that use the card', () => {
+    const deck: Deck.Deck = {
+      id: Deck.DeckId.make('7b0f2a7e-2a9c-4c6e-9d2b-6a6f1c9d2e11'),
+      name: Deck.DeckName.make('Vi aggro'),
+      contents: {
+        ...Deck.empty,
+        main: [
+          {
+            printingId: Printing.PrintingId.make('tst-001a-010'),
+            copies: Deck.Copies.make(2),
+          },
+        ],
+      },
+    }
+
+    scene(
+      {
+        update,
+        view: withViewInputs(view, {
+          wishlist: WishlistState.init(),
+          decks: DecksState.Model.Ready({
+            decks: [deck],
+            saves: {},
+            nextRevision: 0,
+            creation: DecksState.Creation.Idle(),
+            removals: {},
+          }),
+          collection,
+          route: routeFor(Option.none()),
+        })(),
+      },
+      given(found),
+      expect(role('region', { name: 'Used in decks' })).toContainText('×2'),
+      expect(role('link', { name: 'Vi aggro' })).toHaveAttr(
+        'href',
+        `/decks/${deck.id}`,
+      ),
+    )
+  })
+
   test('an unknown card says so', () => {
     scene(
       {
         update,
         view: withViewInputs(view, {
           wishlist: WishlistState.init(),
+          decks: DecksState.init(),
           collection,
           route: routeFor(Option.none()),
         })(),

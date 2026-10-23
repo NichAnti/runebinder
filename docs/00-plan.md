@@ -75,7 +75,7 @@ Its structure is agreed before any code is written.
 
 ## Phase 9: Finishing the MVP
 
-- [ ] 9.1 Card page "used in decks" section and hover
+- [x] 9.1 Card page "used in decks" section and hover
 - [ ] 9.2 Polish and docs refresh
 - [x] 9.3 Riot "Legal Jibber Jabber" notice in the app (site footer, added in 4.3)
 - [ ] 9.4 Register the product on the Riot Developer Portal and apply for a production key

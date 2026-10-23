@@ -487,6 +487,7 @@ export const enterRoute = (
           foldCardPageEntry({ cardId, isIndexReady }),
           ensureCollection,
           ensureWishlist,
+          ensureDecks,
         ]),
       CardTrader: () => enterCardTraderPage(routed),
       Decks: () => ensureDecks(routed),
