@@ -33,8 +33,8 @@ erDiagram
   }
   collection_item {
     text user_id PK, FK
-    text printing_id PK, FK
-    int quantity
+    text printing_id PK "PrintingId, checked against printingIds.json"
+    int quantity "1 to 999; 0 deletes the row"
   }
   deck {
     text id PK
@@ -56,7 +56,7 @@ erDiagram
 ```
 
 - `user`, `session`, `account` and `verification` are Better Auth's tables (`src/worker/schema/auth.ts`, generated). Only the relevant columns are shown.
-- `collection_item`, `deck`, `deck_card` and `wishlist_item` arrive in Phases 6 to 8; their exact columns are decided then. `printing_id` columns hold a `PrintingId` from the catalogue file (not a foreign key); the Backend checks it against the catalogue on every write.
+- `collection_item`, `deck`, `deck_card` and `wishlist_item` arrive in Phases 6 to 8; their exact columns are decided then. `printing_id` columns hold a `PrintingId` from the catalogue file (not a foreign key); the Backend checks it on every write against `catalogue/printingIds.json`, a list of every `PrintingId` that `catalogue:build` writes next to `catalogue.json`.
 - Deleting a user cascades to everything they own.
 
 ## Catalogue build
@@ -204,11 +204,22 @@ sequenceDiagram
   participant S as SPA (ApiClient)
   participant W as Backend
   participant DB as D1
-  U->>S: pick printing, set quantity
+  opt first screen that shows owned amounts this visit, or Refresh
+    S->>W: GET /api/collection
+    W->>DB: select the user's rows
+    W-->>S: [{printingId, quantity}]
+  end
+  U->>S: − / + on a printing (card page or card panel)
+  S->>S: update the screen at once
+  Note over S: wait until the printing has had no change for a short pause
   S->>W: PUT /api/collection/{printingId} {quantity}
-  W->>DB: upsert (0 deletes)
+  W->>W: printingId in printingIds.json?
+  W->>DB: upsert, or delete when quantity is 0
   W-->>S: ok
 ```
+
+The collection is loaded once per visit and changed locally; every save sets an
+absolute quantity, so a retried request does no harm.
 
 ### Import a deck code (Phase 7)
 

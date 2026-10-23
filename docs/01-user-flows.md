@@ -14,8 +14,10 @@ flowchart TD
 
   Home --> CardPage
 
-  Home --> Collection[Collection]
-  Collection --> AddOwned[Search card, pick printing, set quantity]
+  Home --> Collection[Collection: summary per set, owned cards]
+  Home -. hover or tap a card .-> CardPanel[Card panel: every printing, owned amount, − / +]
+  Collection -. hover or tap a card .-> CardPanel
+  CardPanel --> CardPage
 
   Home --> Decks[Decks]
   Decks --> NewDeck[Create deck]
@@ -28,7 +30,7 @@ flowchart TD
 
   Home --> CardPage[Card page]
   DeckView -. hover .-> CardPage
-  CardPage --> CardInfo[Printings owned + decks using this card]
+  CardPage --> CardInfo[Every printing with owned amount and − / +, decks using this card]
 
   Home --> Wishlist[Wishlist]
   Wishlist --> WishlistContent[Missing from decks + cards added by hand]
@@ -43,7 +45,8 @@ flowchart TD
 
 - Email and password accounts with a display name; the whole app is behind sign-in
 - Card catalogue: browse and search every printing
-- Collection: owned printings with quantities
+- Collection: owned printings with quantities, changed from the card page or the card panel (hover or tap any card); a collection page with a summary per set
+- The catalogue, the collection and decks show one entry per card; every printing of a card is in its panel and page
 - Decks: create, import and export Piltover Archive deck codes, one line per card with printings in the detail view
 - Missing cards: what all decks need combined, minus what you own
 - Card page and hover: owned printings and the decks that use the card
