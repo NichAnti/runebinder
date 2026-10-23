@@ -70,7 +70,7 @@ Its structure is agreed before any code is written.
 
 ## Phase 8: Missing cards and wishlist
 
-- [ ] 8.1 Missing-cards calculation, pure with tests
+- [x] 8.1 Missing-cards calculation, pure with tests: the most copies any one deck uses, per exact printing, minus what is owned
 - [ ] 8.2 Wishlist page: manual items, send to CardTrader. Sending creates a new private CardTrader wishlist first, then deletes the previous one this app created (its id is kept per user in D1); the user is warned that edits made on CardTrader to that wishlist are replaced. Each line sends `blueprint_id` and `collector_number`, because CardTrader documents `blueprint_id` alone as setting only the card name and expansion, which might not pin the exact printing
 
 ## Phase 9: Finishing the MVP

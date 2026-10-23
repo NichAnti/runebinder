@@ -179,16 +179,19 @@ on sign-out, and when CardTrader rejects it.
 
 ## Missing cards
 
-For each printing:
+For each printing (the exact version a deck uses):
 
 ```
-needed  = sum of deck_card.count across all of the user's decks
-missing = max(0, needed - collection_item.quantity)
-wishlist line = missing + wishlist_item.quantity
+uses in a deck = legend + chosen champion + main + runes + battlefields + sideboard + additional legends
+needed         = the most copies any one deck uses
+missing        = max(0, needed - collection_item.quantity)
+wishlist line  = missing + wishlist_item.quantity (added by hand)
 ```
 
-The deck view groups lines by `card_id` for display; each line stays a
-specific printing.
+Cards move between decks, so two decks that each use 3 copies need 3, not 6.
+Owning a different printing of the same card does not cover a missing one,
+because a deck's printings are chosen on purpose. The calculation is
+`domain/missing.ts`.
 
 ## Flows
 
