@@ -23,6 +23,7 @@
     "@effect/sql-d1": "4.0.0",
     "@foldkit/ui": "0.169.0",
     "@orama/orama": "3.1.18",
+    "@piltoverarchive/riftbound-deck-codes": "1.5.0",
     "better-auth": "1.7.5",
     "drizzle-orm": "1.0.0-rc.5-ab785fc",
     "effect": "4.0.0",

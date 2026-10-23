@@ -11,6 +11,7 @@
         "@effect/sql-d1": "4.0.0",
         "@foldkit/ui": "0.169.0",
         "@orama/orama": "3.1.18",
+        "@piltoverarchive/riftbound-deck-codes": "1.5.0",
         "better-auth": "1.7.5",
         "drizzle-orm": "1.0.0-rc.5-ab785fc",
         "effect": "4.0.0",
@@ -470,6 +471,8 @@
     "@oxlint/binding-win32-x64-msvc": ["@oxlint/binding-win32-x64-msvc@1.85.0", "", { "os": "win32", "cpu": "x64" }, "sha512-pBebIPUpKKhWrhSMWhy8TdAZBewiXnfxmaAGxhzxM1068GagqFaTwgKlU6e+UyJ2sPR+VoHouhXuGJkQjsrDvA=="],
 
     "@oxlint/plugins": ["@oxlint/plugins@1.89.0", "", {}, "sha512-TJBBNl4KIxbxrSk7gsqlz6iM1kxidfyTizEzfWqXvijF2Ou8/Da58GvjemBVmCmaUamwRij+JwsVc0kpBFuqfg=="],
+
+    "@piltoverarchive/riftbound-deck-codes": ["@piltoverarchive/riftbound-deck-codes@1.5.0", "", {}, "sha512-vgW7X/ybQSavKKTCATm8lTbD6D3RZV3nzqQDoNW7TRGR27qv+QEqr5pYnoGVcD7DbenSdTHs55KPb8caFDBQcg=="],
 
     "@prisma/debug": ["@prisma/debug@7.2.0", "", {}, "sha512-YSGTiSlBAVJPzX4ONZmMotL+ozJwQjRmZweQNIq/ER0tQJKJynNkRB3kyvt37eOfsbMCXk3gnLF6J9OJ4QWftw=="],
 
