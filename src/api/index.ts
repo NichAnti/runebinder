@@ -9,3 +9,4 @@ export {
   Unauthorized,
 } from './authentication'
 export { Health, System } from './system'
+export { ReplacedWishlist, SentWishlist, Wishlist } from './wishlist'
