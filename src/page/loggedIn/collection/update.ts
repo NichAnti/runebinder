@@ -102,6 +102,25 @@ export const change = (model: Model, { printingId, quantity }: Change) =>
     commands: [WaitToSave({ printingId, revision: ready.nextRevision })],
   }))
 
+export const Step = Schema.Literals([-1, 1])
+export type Step = typeof Step.Type
+
+export type Stepped = Readonly<{
+  printingId: Printing.PrintingId
+  step: Step
+}>
+
+export const step = (model: Model, { printingId, step }: Stepped) =>
+  whenReady(model, ready =>
+    change(ready, {
+      printingId,
+      quantity: Collection.adjust(
+        Collection.quantityOf(ready.owned, printingId),
+        step,
+      ),
+    }),
+  )
+
 // UPDATE
 
 const isCurrent = (

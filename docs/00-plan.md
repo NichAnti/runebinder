@@ -56,7 +56,7 @@ Its structure is agreed before any code is written.
 - [x] 6.1 Pin `@effect/sql-d1` to `4.0.0` (direct dependency and `overrides`); `catalogue:build` also writes `catalogue/printingIds.json`, which the Backend imports to check printing ids, with a test that both files agree
 - [x] 6.2 `collection_item` table and migration; `GET /api/collection` and `PUT /api/collection/{printingId}` (`0` removes; unknown printings rejected); `CollectionRepository` over `Drizzle.D1`
 - [x] 6.3 Client collection: loaded the first time a screen shows owned amounts, kept for the visit, reloaded only on Refresh or after an error; changes update the screen at once and save one idempotent request per printing after a short pause; `QuantityStepper` component
-- [ ] 6.4 Card page: owned amount per printing with − / +
+- [x] 6.4 Card page: owned amount per printing with − / +
 - [ ] 6.5 Card panel: hovering (pointer) or tapping a card tile opens a panel with every printing of the card, owned amounts and − / +, and a link to the card page; it stays open while the pointer is on the tile or the panel and closes on leave or Esc
 - [ ] 6.6 Catalogue: "Owned n" on each card (all printings combined) and an All / Owned / Not owned filter
 - [ ] 6.7 Collection page `/collection`: summary (copies, printings owned per set out of the set's total), the owned cards with the catalogue's search and filters, Refresh

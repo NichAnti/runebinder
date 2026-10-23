@@ -83,7 +83,10 @@ export const view = Submodel.defineView<Model, Message>((model, h) =>
                   slotId: 'card-page',
                   model: model.cardPage,
                   view: CardPage.view,
-                  viewInputs: { route: cardRoute },
+                  viewInputs: {
+                    route: cardRoute,
+                    collection: model.collection,
+                  },
                   toParentMessage: message =>
                     Message.GotCardPageMessage({ message }),
                 }),

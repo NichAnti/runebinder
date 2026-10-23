@@ -1,14 +1,17 @@
+import { Option } from 'effect'
 import { Command, given, message, model, story } from 'foldkit/story'
 import { modifyFields } from 'foldkit/struct'
 import { describe, expect, test } from 'vitest'
 
-import { CatalogueQuery } from '../../domain'
+import { CatalogueQuery, Printing } from '../../domain'
 import { AppRoute } from '../../route'
-import { ada, allValues } from '../../testing'
+import { ada, allValues, testCard } from '../../testing'
+import * as CollectionState from './collection'
 import { Message } from './message'
 import { CatalogueState, init } from './model'
+import * as CardPage from './page/card'
 import * as CataloguePage from './page/catalogue'
-import { update } from './update'
+import { enterRoute, update } from './update'
 
 const onCatalogue = init(AppRoute.Catalogue(CatalogueQuery.empty), ada)
 
@@ -60,6 +63,70 @@ describe('catalogue loading', () => {
       ),
       message(Message.ReleasedCatalogueIndex()),
       Command.expectNone(),
+    )
+  })
+})
+
+describe('collection on the card page', () => {
+  const onCard = modifyFields(
+    init(AppRoute.Card({ cardId: testCard.id, printing: Option.none() }), ada),
+    { catalogue: () => CatalogueState.Ready({ attempt: 0, allValues }) },
+  )
+  const printingId = Printing.PrintingId.make('tst-001-010')
+
+  test('opening a card loads the collection once', () => {
+    const entered = enterRoute(
+      onCard,
+      AppRoute.Card({ cardId: testCard.id, printing: Option.none() }),
+    )
+
+    expect(entered.model.collection).toStrictEqual(
+      CollectionState.Model.Loading(),
+    )
+    expect(entered.commands?.map(({ name }) => name)).toContain(
+      CollectionState.LoadCollection.name,
+    )
+  })
+
+  test('a step on the card page becomes a pending save', () => {
+    story(
+      update,
+      given(
+        modifyFields(onCard, {
+          collection: () =>
+            CollectionState.Model.Ready({
+              owned: {},
+              saves: {},
+              nextRevision: 0,
+              refresh: CollectionState.Refresh.Idle(),
+            }),
+        }),
+      ),
+      message(
+        Message.GotCardPageMessage({
+          message: CardPage.Message.ClickedStepQuantity({
+            printingId,
+            step: 1,
+          }),
+        }),
+      ),
+      model(next => {
+        expect(
+          next.collection._tag === 'Ready' && next.collection.owned[printingId],
+        ).toBe(1)
+      }),
+      Command.expectExact(CollectionState.WaitToSave),
+      Command.resolve(
+        CollectionState.WaitToSave,
+        CollectionState.Message.ElapsedSaveDelay({ printingId, revision: 0 }),
+      ),
+      Command.resolve(
+        CollectionState.SaveQuantity,
+        CollectionState.Message.SucceededSaveQuantity({
+          printingId,
+          revision: 0,
+        }),
+      ),
     )
   })
 })

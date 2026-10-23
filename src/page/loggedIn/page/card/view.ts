@@ -5,18 +5,15 @@ import type { Html, HtmlBuilder } from 'foldkit/html'
 import { Printing } from '../../../../domain'
 import { type CardRoute, cardRouter, catalogueHome } from '../../../../route'
 import { Badge, Link, Notice } from '../../../../ui'
-import type { Message } from './message'
+import * as CollectionState from '../../collection'
+import { Message } from './message'
 import { CardState, type Model } from './model'
 import * as TextView from './textView'
 
-export type ViewInputs = Readonly<{ route: CardRoute }>
-
-const VARIANT_LABELS: Readonly<Record<Printing.Variant, string>> = {
-  Base: 'Standard',
-  AlternateArt: 'Alternate art',
-  Signature: 'Signature',
-  Overnumbered: 'Overnumbered',
-}
+export type ViewInputs = Readonly<{
+  route: CardRoute
+  collection: CollectionState.Model
+}>
 
 const selectedPrinting = (
   card: Printing.Card,
@@ -126,47 +123,10 @@ const detailsView = <M>(printing: Printing.Printing, h: HtmlBuilder<M>): Html =>
     ],
   )
 
-const printingsView = <M>(
+const foundView = (
   card: Printing.Card,
-  selected: Printing.Printing,
-  h: HtmlBuilder<M>,
-): Html =>
-  h.nav(
-    [h.AriaLabel('Printings'), h.Class('flex flex-col gap-2')],
-    [
-      h.h2([h.Class('text-sm font-medium')], ['Printings']),
-      h.ul(
-        [h.Class('flex flex-wrap gap-2')],
-        Array.map(card.printings, printing =>
-          h.keyed('li')(
-            printing.id,
-            [],
-            [
-              Link.view(
-                {
-                  href: cardRouter({
-                    cardId: card.id,
-                    printing: Option.some(printing.id),
-                  }),
-                  content: [
-                    `${VARIANT_LABELS[printing.variant]} · ${printing.publicCode} · ${printing.rarity}`,
-                  ],
-                  variant: 'Nav',
-                  isCurrent: printing.id === selected.id,
-                },
-                h,
-              ),
-            ],
-          ),
-        ),
-      ),
-    ],
-  )
-
-const foundView = <M>(
-  card: Printing.Card,
-  route: CardRoute,
-  h: HtmlBuilder<M>,
+  { route, collection }: ViewInputs,
+  h: HtmlBuilder<Message>,
 ): Html => {
   const printing = selectedPrinting(card, route.printing)
 
@@ -192,13 +152,25 @@ const foundView = <M>(
           detailsView(printing, h),
         ],
       ),
-      printingsView(card, printing, h),
+      CollectionState.printingsView(
+        {
+          card,
+          collection,
+          selected: printing.id,
+          hrefFor: ({ id }) =>
+            cardRouter({ cardId: card.id, printing: Option.some(id) }),
+          onStep: (printingId, step) =>
+            Message.ClickedStepQuantity({ printingId, step }),
+          onRetry: Message.ClickedRetryCollection(),
+        },
+        h,
+      ),
     ],
   )
 }
 
 export const view = Submodel.defineView<Model, Message, ViewInputs>(
-  (model, { route }, h) =>
+  (model, viewInputs, h) =>
     CardState.match(model.state, {
       Waiting: () =>
         Notice.view(
@@ -219,6 +191,6 @@ export const view = Submodel.defineView<Model, Message, ViewInputs>(
           },
           h,
         ),
-      Found: ({ card }) => foundView(card, route, h),
+      Found: ({ card }) => foundView(card, viewInputs, h),
     }),
 )

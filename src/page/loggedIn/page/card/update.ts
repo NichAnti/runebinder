@@ -8,7 +8,7 @@ import {
   CatalogueIndexResource,
   type CatalogueIndexService,
 } from '../../../../service'
-import { Message } from './message'
+import { Message, OutMessage } from './message'
 import { CardState, type Model } from './model'
 
 type UpdateReturn = Update.Return<Model, Message, CatalogueIndexService>
@@ -60,8 +60,18 @@ export const enter = (
 
 // UPDATE
 
-export const update = (model: Model, message: Message): UpdateReturn =>
-  Message.match<UpdateReturn>(message, {
+type UpdateReturnWithOutMessage = Update.ReturnWithOutMessage<
+  Model,
+  Message,
+  OutMessage,
+  CatalogueIndexService
+>
+
+export const update = (
+  model: Model,
+  message: Message,
+): UpdateReturnWithOutMessage =>
+  Message.match<UpdateReturnWithOutMessage>(message, {
     SucceededLoadCard: ({ cardId, maybeCard }) => ({
       model: modifyFields(model, {
         state: () =>
@@ -72,4 +82,12 @@ export const update = (model: Model, message: Message): UpdateReturn =>
       }),
     }),
     SkippedLoadCard: () => ({ model }),
+    ClickedStepQuantity: ({ printingId, step }) => ({
+      model,
+      outMessage: OutMessage.SteppedQuantity({ printingId, step }),
+    }),
+    ClickedRetryCollection: () => ({
+      model,
+      outMessage: OutMessage.RequestedCollectionRetry(),
+    }),
   })

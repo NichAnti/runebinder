@@ -77,11 +77,19 @@ const foldCardPageEntry = Update.foldChild({
   toParentMessage: toCardPageMessage,
 })
 
+const foldCardPageOutMessage = CardPage.OutMessage.match<
+  Update.Step<Model, Message, ApiClient>
+>({
+  SteppedQuantity: stepped => stepQuantity(stepped),
+  RequestedCollectionRetry: () => refreshCollection,
+})
+
 const foldCardPage = Update.foldChild({
   update: CardPage.update,
   read: readCardPage,
   write: writeCardPage,
   toParentMessage: toCardPageMessage,
+  foldOutMessage: foldCardPageOutMessage,
 })
 
 const readCardTraderPage = (model: Model) => Option.some(model.cardTraderPage)
@@ -121,15 +129,22 @@ const foldCollection = Update.foldChild({
   toParentMessage: toCollectionMessage,
 })
 
-export const ensureCollection = Update.foldChildStep({
+const ensureCollection = Update.foldChildStep({
   update: CollectionState.ensureLoaded,
   read: readCollection,
   write: writeCollection,
   toParentMessage: toCollectionMessage,
 })
 
-export const changeQuantity = Update.foldChild({
-  update: CollectionState.change,
+const stepQuantity = Update.foldChild({
+  update: CollectionState.step,
+  read: readCollection,
+  write: writeCollection,
+  toParentMessage: toCollectionMessage,
+})
+
+const refreshCollection = Update.foldChildStep({
+  update: CollectionState.refresh,
   read: readCollection,
   write: writeCollection,
   toParentMessage: toCollectionMessage,
@@ -152,7 +167,11 @@ export const enterRoute = (
           query: queryOf(catalogueRoute),
           isIndexReady,
         }),
-      Card: ({ cardId }) => foldCardPageEntry(routed, { cardId, isIndexReady }),
+      Card: ({ cardId }) =>
+        Update.combine<Model, Message, ApiClient | CatalogueIndexService>(
+          routed,
+          [foldCardPageEntry({ cardId, isIndexReady }), ensureCollection],
+        ),
       CardTrader: () => enterCardTraderPage(routed),
       NotFound: () => ({ model: routed }),
     }),
