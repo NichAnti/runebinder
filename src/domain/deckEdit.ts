@@ -181,10 +181,16 @@ export const applyEdit = (
       }),
       ClearChampion: () => championBackToMain(contents),
       ClearLegend: () => ({ ...contents, maybeLegend: Option.none() }),
-      AddAdditionalLegend: ({ printingId }) => ({
-        ...contents,
-        additionalLegends: Array.append(contents.additionalLegends, printingId),
-      }),
+      AddAdditionalLegend: ({ printingId }) =>
+        Array.contains(contents.additionalLegends, printingId)
+          ? contents
+          : {
+              ...contents,
+              additionalLegends: Array.append(
+                contents.additionalLegends,
+                printingId,
+              ),
+            },
       RemoveAdditionalLegend: ({ position }) => ({
         ...contents,
         additionalLegends: Array.remove(contents.additionalLegends, position),

@@ -19,7 +19,7 @@ import { testCard } from '../../../../testing'
 import * as CardPanel from '../../cardPanel'
 import * as DecksState from '../../decks'
 import { OutMessage } from './message'
-import { init } from './model'
+import { type AddTab, init } from './model'
 import { update } from './update'
 import { view } from './view'
 
@@ -47,14 +47,16 @@ const sceneView = withViewInputs(view, { decks, deckId: deck.id })
 const loaded = modifyFields(init(), {
   maybeDeckId: () => Option.some(deck.id),
   cards: () => ({ [testCard.id]: testCard }),
+  addTab: (): AddTab => 'Unit',
 })
+const asList = modifyFields(loaded, { layout: () => 'List' })
 const mainDeck = role('region', { name: 'Main deck' })
 
 describe('deck page', () => {
   test('a main deck line can go to the sideboard', () => {
     scene(
       { update: update(Option.some(deck)), view: sceneView() },
-      given(loaded),
+      given(asList),
       expect(mainDeck).toContainText('3× Test Unit, Tester'),
       click(within(mainDeck, role('button', { name: 'To sideboard' }))),
       expectOutMessage(
@@ -76,7 +78,7 @@ describe('deck page', () => {
   test('a champion in the main deck can become the chosen champion', () => {
     scene(
       { update: update(Option.some(deck)), view: sceneView() },
-      given(loaded),
+      given(asList),
       click(within(mainDeck, role('button', { name: 'Make champion' }))),
       expectOutMessage(
         OutMessage.EditedDeck({
@@ -90,7 +92,7 @@ describe('deck page', () => {
   test('a line opens every printing with its copies in the deck', () => {
     scene(
       { update: update(Option.some(deck)), view: sceneView() },
-      given(loaded),
+      given(asList),
       click(within(mainDeck, role('button', { name: 'Test Unit, Tester' }))),
       Command.resolve(
         CardPanel.LoadPanelCard,
@@ -131,15 +133,34 @@ describe('deck page', () => {
     )
   })
 
-  test('the rules section explains what the deck still needs', () => {
+  test('each section says what it still needs', () => {
     scene(
       { update: update(Option.some(deck)), view: sceneView() },
       given(loaded),
-      expect(role('region', { name: 'Deck rules' })).toContainText(
+      expect(role('region', { name: 'Legend' })).toContainText(
         'Choose a legend.',
       ),
-      expect(role('region', { name: 'Deck rules' })).toContainText(
-        'Core Rules 103.2',
+      expect(mainDeck).toContainText('3/40 ⚠'),
+    )
+  })
+
+  test('a tile in the grid steps its copies', () => {
+    scene(
+      { update: update(Option.some(deck)), view: sceneView() },
+      given(loaded),
+      click(
+        within(
+          role('group', { name: 'Copies: Test Unit, Tester' }),
+          role('button', { name: 'Add one' }),
+        ),
+      ),
+      expectOutMessage(
+        OutMessage.EditedDeck({
+          deckId: deck.id,
+          edits: [
+            { _tag: 'StepCopies', zone: 'Main', printingId: base, step: 1 },
+          ],
+        }),
       ),
     )
   })

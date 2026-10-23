@@ -1,9 +1,6 @@
-import { Array, Match, Option } from 'effect'
-import type { Html, HtmlBuilder } from 'foldkit/html'
+import { Match } from 'effect'
 
-import { type Deck, DeckRules, type Printing } from '../../../../domain'
-import { Notice } from '../../../../ui'
-import { nameOf } from './lines'
+import { DeckRules, type Printing } from '../../../../domain'
 
 const PART_LABELS: Readonly<Record<DeckRules.RulePart, string>> = {
   ChosenChampion: 'chosen champion',
@@ -94,63 +91,3 @@ export const explain = (
       }),
     }),
   )
-
-export const rulesView = <Message>(
-  contents: Deck.DeckContents,
-  byPrinting: ReadonlyMap<string, Printing.Card>,
-  h: HtmlBuilder<Message>,
-): Html => {
-  const find = (printingId: Printing.PrintingId) =>
-    Option.flatMap(Option.fromNullishOr(byPrinting.get(printingId)), card =>
-      Array.findFirst(card.printings, ({ id }) => id === printingId),
-    )
-  const nameFor = (cardId: Printing.CardId) =>
-    Option.match(
-      Array.findFirst(
-        Array.fromIterable(byPrinting.values()),
-        card => card.id === cardId,
-      ),
-      { onNone: () => cardId, onSome: nameOf },
-    )
-  const result = DeckRules.check(contents, find)
-
-  return h.section(
-    [h.AriaLabel('Deck rules'), h.Class('flex flex-col gap-2')],
-    [
-      h.h2([h.Class('text-base font-semibold')], ['Deck rules']),
-      result._tag === 'MissingCards'
-        ? h.p(
-            [h.Role('status'), h.Class('text-sm text-fg-muted')],
-            ['Checking the rules…'],
-          )
-        : Array.match(result.problems, {
-            onEmpty: () =>
-              Notice.view(
-                {
-                  title: 'This deck follows the official deckbuilding rules',
-                  description: [
-                    'Checked against the Core Rules and the Tournament Rules for constructed play.',
-                  ],
-                },
-                h,
-              ),
-            onNonEmpty: problems =>
-              h.ul(
-                [h.Class('flex flex-col gap-2')],
-                Array.map(problems, problem => {
-                  const { text, reference } = explain(problem, nameFor)
-
-                  return h.keyed('li')(
-                    JSON.stringify(problem),
-                    [h.Class('flex flex-col text-sm')],
-                    [
-                      h.span([h.Class('text-fg')], [text]),
-                      h.span([h.Class('text-xs text-fg-muted')], [reference]),
-                    ],
-                  )
-                }),
-              ),
-          }),
-    ],
-  )
-}

@@ -2,6 +2,7 @@ import {
   Array,
   Effect,
   HashSet,
+  Match,
   Option,
   Record,
   Result,
@@ -21,7 +22,7 @@ import {
   CatalogueQuery,
   Deck,
   DeckCode,
-  type DeckEdit,
+  DeckEdit,
   type DeckStructure,
   Printing,
 } from '../../../../domain'
@@ -30,9 +31,11 @@ import {
   CatalogueIndexResource,
   type CatalogueIndexService,
 } from '../../../../service'
+import { Toast } from '../../../../ui'
 import * as CardPanel from '../../cardPanel'
+import { cardsByPrinting, nameOf } from './lines'
 import { Message, OutMessage } from './message'
-import { Export, type Model, init } from './model'
+import { AddTab, Export, type Model, defaultTab, init } from './model'
 
 type UpdateReturn = Update.ReturnWithOutMessage<
   Model,
@@ -40,10 +43,16 @@ type UpdateReturn = Update.ReturnWithOutMessage<
   OutMessage,
   CatalogueIndexService
 >
-
 type EnterReturn = Update.Return<Model, Message, CatalogueIndexService>
 
-const SEARCH_LIMIT = 8
+const RESULTS_LIMIT = 60
+
+const ZONE_LABELS: Readonly<Record<Deck.Zone, string>> = {
+  Main: 'the main deck',
+  Runes: 'the rune deck',
+  Battlefields: 'the battlefields',
+  Sideboard: 'the sideboard',
+}
 
 const nameRules = makeRules({
   required: 'Give the deck a name',
@@ -77,19 +86,48 @@ export const LoadDeckCards = Command.define('LoadDeckCards', {
     ),
 })
 
+const queryFor = (
+  tab: AddTab,
+  term: string,
+  legendTags: ReadonlyArray<string>,
+): CatalogueQuery.Query => {
+  const searched = CatalogueQuery.withTerm(CatalogueQuery.empty, term)
+
+  return Match.value(tab).pipe(
+    Match.withReturnType<CatalogueQuery.Query>(),
+    Match.when('Legend', () => ({ ...searched, type: ['Legend'] })),
+    Match.when('AdditionalLegend', () => ({ ...searched, type: ['Legend'] })),
+    Match.when('Champion', () => ({
+      ...searched,
+      type: ['Unit'],
+      supertype: ['Champion'],
+      tag: legendTags,
+    })),
+    Match.orElse(type => ({ ...searched, type: [type] })),
+  )
+}
+
 export const SearchCardsToAdd = Command.define('SearchCardsToAdd', {
-  args: { term: Schema.String },
+  args: {
+    term: Schema.String,
+    tab: AddTab,
+    legendTags: Schema.Array(Schema.String),
+  },
   messages: [Message.SucceededSearchCardsToAdd, Message.SkippedLoadCatalogue],
-  execute: ({ term }) =>
+  execute: ({ term, tab, legendTags }) =>
     Effect.gen(function* () {
       const index = yield* CatalogueIndexResource.get
       const result = yield* CatalogueIndex.searchCards(
         index,
-        CatalogueQuery.withTerm(CatalogueQuery.empty, term),
-        SEARCH_LIMIT,
+        queryFor(tab, term, legendTags),
+        RESULTS_LIMIT,
         [],
       )
-      return Message.SucceededSearchCardsToAdd({ term, cards: result.cards })
+      return Message.SucceededSearchCardsToAdd({
+        term,
+        tab,
+        cards: result.cards,
+      })
     }).pipe(
       Effect.catchTag('ResourceNotAvailable', () =>
         Effect.succeed(Message.SkippedLoadCatalogue()),
@@ -98,15 +136,17 @@ export const SearchCardsToAdd = Command.define('SearchCardsToAdd', {
 })
 
 export const LoadCardToAdd = Command.define('LoadCardToAdd', {
-  args: { cardId: Printing.CardId, isAdditionalLegend: Schema.Boolean },
+  args: {
+    cardId: Printing.CardId,
+    tab: AddTab,
+  },
   messages: [Message.SucceededLoadCardToAdd, Message.SkippedLoadCatalogue],
-  execute: ({ cardId, isAdditionalLegend }) =>
+  execute: ({ cardId, tab }) =>
     Effect.gen(function* () {
       const index = yield* CatalogueIndexResource.get
       return Option.match(CatalogueIndex.cardById(index, cardId), {
         onNone: () => Message.SkippedLoadCatalogue(),
-        onSome: card =>
-          Message.SucceededLoadCardToAdd({ card, isAdditionalLegend }),
+        onSome: card => Message.SucceededLoadCardToAdd({ card, tab }),
       })
     }).pipe(
       Effect.catchTag('ResourceNotAvailable', () =>
@@ -124,6 +164,58 @@ export const CopyDeckCode = Command.define('CopyDeckCode', {
       Effect.catch(() => Effect.succeed(Message.FailedCopyDeckCode({ code }))),
     ),
 })
+
+// TOAST
+
+const toastFold = {
+  read: (model: Model) => Option.some(model.toast),
+  write: (model: Model, nextToast: Toast.Model): Model =>
+    modifyFields(model, { toast: () => nextToast }),
+  toParentMessage: (message: Toast.Message) =>
+    Message.GotToastMessage({ message }),
+  foldOutMessage: Toast.Notification.OutMessage.match<
+    Update.Step<Model, Message>
+  >({
+    DismissedToast: () => stepModel => ({ model: stepModel }),
+  }),
+}
+
+const foldToast = Update.foldChild({
+  update: Toast.Notification.update,
+  ...toastFold,
+})
+const showToast = Update.foldChild({
+  update: Toast.Notification.show,
+  ...toastFold,
+})
+
+// SEARCH
+
+const legendTagsOf = (
+  model: Model,
+  maybeDeck: Option.Option<Deck.Deck>,
+): ReadonlyArray<string> => {
+  const byPrinting = cardsByPrinting(model.cards)
+
+  return Option.match(
+    Option.flatMap(maybeDeck, ({ contents }) => contents.maybeLegend),
+    {
+      onNone: () => [],
+      onSome: legendId =>
+        Option.match(Option.fromNullishOr(byPrinting.get(legendId)), {
+          onNone: () => [],
+          onSome: card => Printing.basePrinting(card).tags,
+        }),
+    },
+  )
+}
+
+const searchFor = (model: Model, maybeDeck: Option.Option<Deck.Deck>) =>
+  SearchCardsToAdd({
+    term: String.trim(model.searchText),
+    tab: model.addTab,
+    legendTags: legendTagsOf(model, maybeDeck),
+  })
 
 // ROUTE
 
@@ -162,6 +254,7 @@ export const enter = (
         : modifyFields(init(), {
             maybeDeckId: () => Option.some(deck.id),
             name: () => NotValidated({ value: deck.name }),
+            addTab: () => defaultTab(deck.contents),
           })
       const known = knownPrintings(nextModel)
       const missing = Array.filter(
@@ -169,16 +262,21 @@ export const enter = (
         printingId => !HashSet.has(known, printingId),
       )
 
-      return isIndexReady && Array.isReadonlyArrayNonEmpty(missing)
+      return isIndexReady
         ? {
             model: nextModel,
-            commands: [LoadDeckCards({ printingIds: missing })],
+            commands: [
+              searchFor(nextModel, maybeDeck),
+              ...(Array.isReadonlyArrayNonEmpty(missing)
+                ? [LoadDeckCards({ printingIds: missing })]
+                : []),
+            ],
           }
         : { model: nextModel }
     },
   })
 
-// UPDATE
+// EDITS
 
 const zoneOf = (place: DeckStructure.Place): Option.Option<Deck.Zone> =>
   place === 'Main' ||
@@ -203,7 +301,7 @@ const stepEdits = (
           : [{ _tag: 'ClearLegend' }]
       } else if (place === 'ChosenChampion') {
         return step === 1
-          ? [{ _tag: 'MakeChampion', printingId }]
+          ? [{ _tag: 'SetChampion', printingId }]
           : [{ _tag: 'ClearChampion' }]
       } else if (step === 1) {
         return [{ _tag: 'AddAdditionalLegend', printingId }]
@@ -241,6 +339,64 @@ const edited = (
       }),
   })
 
+const editFor = (tab: AddTab, card: Printing.Card): DeckEdit.DeckEdit => {
+  const base = Printing.basePrinting(card)
+
+  return Match.value(tab).pipe(
+    Match.withReturnType<DeckEdit.DeckEdit>(),
+    Match.when('Legend', () => ({
+      _tag: 'AddCard',
+      printingId: base.id,
+      maybeType: Option.some('Legend'),
+    })),
+    Match.when('AdditionalLegend', () => ({
+      _tag: 'AddAdditionalLegend',
+      printingId: base.id,
+    })),
+    Match.when('Champion', () => ({
+      _tag: 'SetChampion',
+      printingId: base.id,
+    })),
+    Match.orElse(() => ({
+      _tag: 'AddCard',
+      printingId: base.id,
+      maybeType: base.maybeType,
+    })),
+  )
+}
+
+const addedText = (tab: AddTab, card: Printing.Card): string => {
+  const name = nameOf(card)
+
+  return Match.value(tab).pipe(
+    Match.withReturnType<string>(),
+    Match.when('Legend', () => `${name} is the legend.`),
+    Match.when('Champion', () => `${name} is the chosen champion.`),
+    Match.when(
+      'AdditionalLegend',
+      () => `Added ${name} as an additional legend.`,
+    ),
+    Match.orElse(
+      () =>
+        `Added ${name} to ${ZONE_LABELS[DeckEdit.zoneForType(Printing.basePrinting(card).maybeType)]}.`,
+    ),
+  )
+}
+
+const tabAfter = (tab: AddTab, maybeDeck: Option.Option<Deck.Deck>): AddTab => {
+  const hasChampion = Option.exists(maybeDeck, ({ contents }) =>
+    Option.isSome(contents.maybeChosenChampion),
+  )
+
+  if (tab === 'Legend') {
+    return hasChampion ? 'Unit' : 'Champion'
+  } else if (tab === 'Champion') {
+    return 'Unit'
+  } else {
+    return tab
+  }
+}
+
 const foldCardPanel = (
   place: DeckStructure.Place,
   maybeDeck: Option.Option<Deck.Deck>,
@@ -269,6 +425,8 @@ const foldCardPanel = (
     }),
   })
 
+// UPDATE
+
 export const update =
   (maybeDeck: Option.Option<Deck.Deck>) => (model: Model, message: Message) =>
     Message.match<UpdateReturn>(message, {
@@ -285,60 +443,87 @@ export const update =
       },
 
       UpdatedSearch: ({ value }) => {
-        const term = String.trim(value)
-        const nextModel: Model = modifyFields(model, {
-          searchText: () => value,
-          searchResults: results => (String.isEmpty(term) ? [] : results),
-        })
-
-        return String.isEmpty(term)
-          ? { model: nextModel }
-          : { model: nextModel, commands: [SearchCardsToAdd({ term })] }
+        const nextModel = modifyFields(model, { searchText: () => value })
+        return { model: nextModel, commands: [searchFor(nextModel, maybeDeck)] }
       },
 
-      SucceededSearchCardsToAdd: ({ term, cards }) =>
-        term === String.trim(model.searchText)
+      SelectedAddTab: ({ tab }) => {
+        const nextModel = modifyFields(model, {
+          addTab: () => tab,
+          searchResults: () => [],
+        })
+        return { model: nextModel, commands: [searchFor(nextModel, maybeDeck)] }
+      },
+
+      ToggledOnlyLegal: ({ isChecked }) => ({
+        model: modifyFields(model, { isOnlyLegal: () => isChecked }),
+      }),
+
+      SelectedLayout: ({ layout }) => ({
+        model: modifyFields(model, { layout: () => layout }),
+      }),
+
+      SucceededSearchCardsToAdd: ({ term, tab, cards }) =>
+        term === String.trim(model.searchText) && tab === model.addTab
           ? { model: modifyFields(model, { searchResults: () => cards }) }
           : { model },
 
-      ClickedAddCard: ({ cardId, isAdditionalLegend }) => ({
+      ClickedAddCard: ({ cardId }) => ({
         model,
-        commands: [LoadCardToAdd({ cardId, isAdditionalLegend })],
+        commands: [LoadCardToAdd({ cardId, tab: model.addTab })],
       }),
 
-      SucceededLoadCardToAdd: ({ card, isAdditionalLegend }) => {
-        const base = Printing.basePrinting(card)
+      SucceededLoadCardToAdd: ({ card, tab }) => {
+        const nextTab = tabAfter(tab, maybeDeck)
+        const stored: Model = modifyFields(model, {
+          cards: cards => Record.set(cards, card.id, card),
+          addTab: () => nextTab,
+          searchResults: results => (nextTab === tab ? results : []),
+        })
+        const toastShow = showToast(stored, {
+          variant: 'Success',
+          payload: { text: addedText(tab, card) },
+        })
+        const edit = edited(toastShow.model, maybeDeck, () => [
+          editFor(tab, card),
+        ])
 
-        return edited(
-          modifyFields(model, {
-            cards: cards => Record.set(cards, card.id, card),
-          }),
-          maybeDeck,
-          () => [
-            isAdditionalLegend
-              ? { _tag: 'AddAdditionalLegend', printingId: base.id }
-              : {
-                  _tag: 'AddCard',
-                  printingId: base.id,
-                  maybeType: base.maybeType,
-                },
+        return {
+          model: edit.model,
+          commands: [
+            ...(toastShow.commands ?? []),
+            ...(nextTab === tab ? [] : [searchFor(edit.model, maybeDeck)]),
           ],
-        )
+          ...(edit.outMessage === undefined
+            ? {}
+            : { outMessage: edit.outMessage }),
+        }
       },
 
-      SucceededLoadDeckCards: ({ cards }) => ({
-        model: modifyFields(model, {
+      SucceededLoadDeckCards: ({ cards }) => {
+        const nextModel = modifyFields(model, {
           cards: existing =>
             Array.reduce(cards, existing, (known, card) =>
               Record.set(known, card.id, card),
             ),
-        }),
-      }),
+        })
+
+        return nextModel.addTab === 'Champion'
+          ? { model: nextModel, commands: [searchFor(nextModel, maybeDeck)] }
+          : { model: nextModel }
+      },
 
       SkippedLoadCatalogue: () => ({ model }),
 
       GotCardPanelMessage: ({ panelId, message }) =>
         foldCardPanel(panelId, maybeDeck)(model, message),
+
+      GotToastMessage: ({ message }) => foldToast(model, message),
+
+      ClickedStepLine: ({ zone, printingId, step }) =>
+        edited(model, maybeDeck, () => [
+          { _tag: 'StepCopies', zone, printingId, step },
+        ]),
 
       ClickedMoveLine: ({ from, to, printingIds }) =>
         edited(model, maybeDeck, () =>

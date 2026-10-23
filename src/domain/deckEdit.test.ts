@@ -93,6 +93,19 @@ describe('deck edits', () => {
     expect(copiesOf(set, 'Main', vi)).toBe(2)
   })
 
+  test('an additional legend is added once', () => {
+    const once = applyEdit(empty, {
+      _tag: 'AddAdditionalLegend',
+      printingId: legend,
+    })
+    const twice = applyEdit(once, {
+      _tag: 'AddAdditionalLegend',
+      printingId: legend,
+    })
+
+    expect(twice.additionalLegends).toStrictEqual([legend])
+  })
+
   test('clearing the champion returns its copy to the main deck', () => {
     const cleared = applyEdit(
       applyEdit(withMain(1), { _tag: 'MakeChampion', printingId: vi }),
