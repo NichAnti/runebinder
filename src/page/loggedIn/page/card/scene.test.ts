@@ -6,6 +6,7 @@ import {
   given,
   role,
   scene,
+  selector,
   text,
   withViewInputs,
   within,
@@ -111,6 +112,25 @@ describe('card page', () => {
           step: 1,
         }),
       ),
+    )
+  })
+
+  test('every printing is listed with its own image', () => {
+    scene(
+      {
+        update,
+        view: withViewInputs(view, {
+          collection,
+          route: routeFor(Option.none()),
+        })(),
+      },
+      given(found),
+      expect(
+        within(role('link', { name: /Alternate art/ }), selector('img')),
+      ).toHaveAttr('src', 'https://example.com/test-unit-alt.png'),
+      expect(
+        within(role('link', { name: /Standard/ }), selector('img')),
+      ).toHaveAttr('src', 'https://example.com/test-unit.png'),
     )
   })
 

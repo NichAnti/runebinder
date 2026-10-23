@@ -20,6 +20,7 @@ export type PrintingsConfig<Message> = Readonly<{
   hrefFor: (printing: Printing.Printing) => string
   onStep: (printingId: Printing.PrintingId, step: Step) => Message
   onRetry: Message
+  isShowingImages: boolean
 }>
 
 const labelOf = (printing: Printing.Printing): string =>
@@ -99,12 +100,29 @@ export const printingsView = <Message>(
             [h.Class('flex items-center justify-between gap-3')],
             [
               Link.view(
-                {
-                  href: config.hrefFor(printing),
-                  content: [labelOf(printing)],
-                  variant: 'Nav',
-                  isCurrent: printing.id === config.selected,
-                },
+                config.isShowingImages
+                  ? {
+                      href: config.hrefFor(printing),
+                      content: [
+                        h.img([
+                          h.Src(printing.imageUrl),
+                          h.Alt(''),
+                          h.Loading('lazy'),
+                          h.Class(
+                            `w-14 rounded-control bg-surface-raised ${printing.orientation === 'Landscape' ? 'aspect-[1039/744]' : 'aspect-[744/1039]'}`,
+                          ),
+                        ]),
+                        labelOf(printing),
+                      ],
+                      variant: 'Media',
+                      isCurrent: printing.id === config.selected,
+                    }
+                  : {
+                      href: config.hrefFor(printing),
+                      content: [labelOf(printing)],
+                      variant: 'Nav',
+                      isCurrent: printing.id === config.selected,
+                    },
                 h,
               ),
               ownedView(printing, config, h),

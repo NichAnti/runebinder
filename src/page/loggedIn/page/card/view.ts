@@ -162,6 +162,7 @@ const foundView = (
           onStep: (printingId, step) =>
             Message.ClickedStepQuantity({ printingId, step }),
           onRetry: Message.ClickedRetryCollection(),
+          isShowingImages: true,
         },
         h,
       ),

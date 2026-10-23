@@ -1,6 +1,6 @@
 import type { Html, HtmlBuilder } from 'foldkit/html'
 
-export type Variant = 'Inline' | 'Nav'
+export type Variant = 'Inline' | 'Nav' | 'Media'
 
 export type ViewConfig = Readonly<{
   href: string
@@ -14,6 +14,8 @@ const recipe = {
   variants: {
     Inline: 'text-fg underline underline-offset-2 hover:text-accent',
     Nav: 'px-2 py-1 text-sm font-medium text-fg-muted hover:text-fg aria-[current=page]:font-semibold aria-[current=page]:text-fg',
+    Media:
+      'flex items-center gap-3 p-1 text-sm font-medium text-fg-muted hover:bg-surface-raised hover:text-fg aria-[current=page]:bg-surface-raised aria-[current=page]:font-semibold aria-[current=page]:text-fg',
   } satisfies Record<Variant, string>,
   defaults: { variant: 'Inline' } satisfies Readonly<{ variant: Variant }>,
 }
