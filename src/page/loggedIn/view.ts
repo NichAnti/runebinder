@@ -6,6 +6,7 @@ import { CatalogueSearch } from '../../domain'
 import { catalogueHome } from '../../route'
 import { Button, Notice } from '../../ui'
 import * as NotFound from '../notFound'
+import * as CollectionState from './collection'
 import { Message } from './message'
 import { CatalogueState, type Model } from './model'
 import * as CardPage from './page/card'
@@ -52,6 +53,12 @@ export const view = Submodel.defineView<Model, Message>((model, h) =>
   h.main(
     [h.Class('mx-auto flex w-full max-w-7xl flex-col px-4 py-8')],
     [
+      h.submodel({
+        slotId: 'collection-status',
+        model: model.collection,
+        view: CollectionState.view,
+        toParentMessage: message => Message.GotCollectionMessage({ message }),
+      }),
       Match.value(model.route).pipe(
         Match.tagsExhaustive({
           Catalogue: catalogueRoute =>

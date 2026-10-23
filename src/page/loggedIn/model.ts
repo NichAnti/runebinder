@@ -3,6 +3,7 @@ import { defineTaggedUnion, taggedStruct } from 'foldkit/schema'
 
 import { CatalogueQuery, CatalogueSearch, User } from '../../domain'
 import { LoggedInRoute } from '../../route'
+import * as CollectionState from './collection'
 import * as CardPage from './page/card'
 import * as CardTraderPage from './page/cardTrader'
 import * as CataloguePage from './page/catalogue'
@@ -18,6 +19,7 @@ export const Model = taggedStruct('LoggedIn', {
   route: LoggedInRoute,
   user: User.User,
   catalogue: CatalogueState,
+  collection: CollectionState.Model,
   cataloguePage: CataloguePage.Model,
   cardPage: CardPage.Model,
   cardTraderPage: CardTraderPage.Model,
@@ -29,6 +31,7 @@ export const init = (route: LoggedInRoute, user: User.User): Model =>
     route,
     user,
     catalogue: CatalogueState.Loading({ attempt: 0 }),
+    collection: CollectionState.init(),
     cataloguePage: CataloguePage.init(
       route._tag === 'Catalogue' ? route : CatalogueQuery.empty,
     ),

@@ -1,7 +1,22 @@
 import { Option, Schema } from 'effect'
 import { describe, expect, test } from 'vitest'
 
-import { MAX_QUANTITY, OwnedQuantity, Quantity, toOwned } from './collection'
+import {
+  MAX_QUANTITY,
+  NONE,
+  OwnedQuantity,
+  Quantity,
+  adjust,
+  fromItems,
+  quantityOf,
+  toOwned,
+  totalOf,
+  withQuantity,
+} from './collection'
+import { PrintingId } from './printing'
+
+const vi = PrintingId.make('ogn-066-298')
+const viAlternateArt = PrintingId.make('ogn-066a-298')
 
 describe('quantities', () => {
   test('a quantity is a whole number from 0 to the maximum', () => {
@@ -14,10 +29,36 @@ describe('quantities', () => {
     expect(Option.isNone(decode(1.5))).toBe(true)
   })
 
+  test('adjusting stays within the bounds', () => {
+    expect(adjust(NONE, 1)).toBe(1)
+    expect(adjust(NONE, -1)).toBe(0)
+    expect(adjust(Quantity.make(MAX_QUANTITY), 1)).toBe(MAX_QUANTITY)
+  })
+
   test('zero is not an owned quantity', () => {
-    expect(toOwned(Quantity.make(0))).toStrictEqual(Option.none())
+    expect(toOwned(NONE)).toStrictEqual(Option.none())
     expect(toOwned(Quantity.make(3))).toStrictEqual(
       Option.some(OwnedQuantity.make(3)),
     )
+  })
+})
+
+describe('owned printings', () => {
+  const owned = fromItems([{ printingId: vi, quantity: OwnedQuantity.make(2) }])
+
+  test('a printing that is not owned has quantity zero', () => {
+    expect(quantityOf(owned, viAlternateArt)).toBe(NONE)
+    expect(quantityOf(owned, vi)).toBe(2)
+  })
+
+  test('setting zero removes the printing', () => {
+    expect(withQuantity(owned, vi, NONE)).toStrictEqual({})
+    expect(withQuantity(owned, viAlternateArt, Quantity.make(1))).toStrictEqual(
+      { [vi]: 2, [viAlternateArt]: 1 },
+    )
+  })
+
+  test('the total adds every listed printing', () => {
+    expect(totalOf(owned, [vi, viAlternateArt])).toBe(2)
   })
 })

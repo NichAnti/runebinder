@@ -1,4 +1,4 @@
-import { Option, Schema } from 'effect'
+import { Array, Number, Option, Record, Schema, pipe } from 'effect'
 
 import { PrintingId } from './printing'
 
@@ -20,5 +20,42 @@ export const CollectionItem = Schema.Struct({
 })
 export type CollectionItem = typeof CollectionItem.Type
 
+export const Owned = Schema.Record(PrintingId, OwnedQuantity)
+export type Owned = typeof Owned.Type
+
+export const NONE = Quantity.make(0)
+
 export const toOwned = (quantity: Quantity): Option.Option<OwnedQuantity> =>
   Schema.decodeOption(OwnedQuantity)(quantity)
+
+export const fromItems = (items: ReadonlyArray<CollectionItem>): Owned =>
+  Record.fromEntries(
+    Array.map(items, ({ printingId, quantity }) => [printingId, quantity]),
+  )
+
+export const quantityOf = (owned: Owned, printingId: PrintingId): Quantity =>
+  pipe(
+    Record.get(owned, printingId),
+    Option.match({ onNone: () => NONE, onSome: Quantity.make }),
+  )
+
+export const withQuantity = (
+  owned: Owned,
+  printingId: PrintingId,
+  quantity: Quantity,
+): Owned =>
+  Option.match(toOwned(quantity), {
+    onNone: () => Record.remove(owned, printingId),
+    onSome: ownedQuantity => Record.set(owned, printingId, ownedQuantity),
+  })
+
+export const totalOf = (
+  owned: Owned,
+  printingIds: ReadonlyArray<PrintingId>,
+): number => Number.sumAll(Array.map(printingIds, id => quantityOf(owned, id)))
+
+export const adjust = (quantity: Quantity, step: -1 | 1): Quantity =>
+  Option.getOrElse(
+    Schema.decodeOption(Quantity)(quantity + step),
+    () => quantity,
+  )

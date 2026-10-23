@@ -5,10 +5,12 @@ import { modifyFields } from 'foldkit/struct'
 import { CatalogueQuery, Printing } from '../../domain'
 import type { CatalogueRoute, LoggedInRoute } from '../../route'
 import type {
+  ApiClient,
   CardTraderClient,
   CatalogueIndexService,
   TokenStore,
 } from '../../service'
+import * as CollectionState from './collection'
 import { Message } from './message'
 import { CatalogueState, type Model } from './model'
 import * as CardPage from './page/card'
@@ -18,7 +20,7 @@ import * as CataloguePage from './page/catalogue'
 type UpdateReturn = Update.Return<
   Model,
   Message,
-  CatalogueIndexService | CardTraderClient | TokenStore
+  ApiClient | CatalogueIndexService | CardTraderClient | TokenStore
 >
 const withUpdateReturn = Match.withReturnType<UpdateReturn>()
 
@@ -104,6 +106,35 @@ const foldCardTraderPage = Update.foldChild({
   toParentMessage: toCardTraderPageMessage,
 })
 
+const readCollection = (model: Model) => Option.some(model.collection)
+const writeCollection = (
+  model: Model,
+  nextCollection: CollectionState.Model,
+): Model => modifyFields(model, { collection: () => nextCollection })
+const toCollectionMessage = (message: CollectionState.Message): Message =>
+  Message.GotCollectionMessage({ message })
+
+const foldCollection = Update.foldChild({
+  update: CollectionState.update,
+  read: readCollection,
+  write: writeCollection,
+  toParentMessage: toCollectionMessage,
+})
+
+export const ensureCollection = Update.foldChildStep({
+  update: CollectionState.ensureLoaded,
+  read: readCollection,
+  write: writeCollection,
+  toParentMessage: toCollectionMessage,
+})
+
+export const changeQuantity = Update.foldChild({
+  update: CollectionState.change,
+  read: readCollection,
+  write: writeCollection,
+  toParentMessage: toCollectionMessage,
+})
+
 // ROUTE
 
 export const enterRoute = (
@@ -170,6 +201,8 @@ export const update = (model: Model, message: Message) =>
           CatalogueState.Failed({ attempt: attemptOf(catalogue) }),
       }),
     }),
+
+    GotCollectionMessage: ({ message }) => foldCollection(model, message),
 
     ClickedRetryCatalogue: () => ({
       model: modifyFields(model, {

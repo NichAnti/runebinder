@@ -68,7 +68,7 @@ export const init: Runtime.RoutingApplicationInit<
   Model,
   Message,
   Flags,
-  AuthClient | CardTraderClient | CatalogueIndexService | TokenStore
+  ApiClient | AuthClient | CardTraderClient | CatalogueIndexService | TokenStore
 > = (flags, url) =>
   Update.combine(
     Model.make({

@@ -20,6 +20,7 @@ import {
   urlToAppRoute,
 } from './route'
 import {
+  type ApiClient,
   AuthClient,
   type CardTraderClient,
   type CatalogueIndexService,
@@ -29,7 +30,7 @@ import {
 type UpdateReturn = Update.Return<
   Model,
   Message,
-  AuthClient | CardTraderClient | CatalogueIndexService | TokenStore
+  ApiClient | AuthClient | CardTraderClient | CatalogueIndexService | TokenStore
 >
 const withUpdateReturn = Match.withReturnType<UpdateReturn>()
 
