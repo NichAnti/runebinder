@@ -90,4 +90,8 @@ export const update = (
       model,
       outMessage: OutMessage.RequestedCollectionRetry(),
     }),
+    ClickedAddToWishlist: ({ printingId }) => ({
+      model,
+      outMessage: OutMessage.AddedToWishlist({ printingId }),
+    }),
   })

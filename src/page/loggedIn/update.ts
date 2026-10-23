@@ -1,9 +1,9 @@
-import { Effect, Match, Option } from 'effect'
+import { Array, Effect, Match, Option } from 'effect'
 import { Command, Update } from 'foldkit'
 import { pushUrl, replaceUrl } from 'foldkit/navigation'
 import { modifyFields } from 'foldkit/struct'
 
-import { Deck, Missing, Printing } from '../../domain'
+import { Collection, Deck, Printing } from '../../domain'
 import {
   type CatalogueRoute,
   type CollectionRoute,
@@ -119,10 +119,11 @@ const foldCardPageEntry = Update.foldChild({
 })
 
 const foldCardPageOutMessage = CardPage.OutMessage.match<
-  Update.Step<Model, Message, ApiClient>
+  Update.Step<Model, Message, Requirements>
 >({
   SteppedQuantity: stepped => stepQuantity(stepped),
   RequestedCollectionRetry: () => refreshCollection,
+  AddedToWishlist: ({ printingId }) => stepWishlist({ printingId, step: 1 }),
 })
 
 const foldCardPage = Update.foldChild({
@@ -269,9 +270,11 @@ const foldDeckListPage = Update.foldChild({
 })
 
 const foldDeckPageOutMessage = DeckPage.OutMessage.match<
-  Update.Step<Model, Message, ApiClient>
+  Update.Step<Model, Message, Requirements>
 >({
   EditedDeck: edits => editDeck(edits),
+  RequestedSendMissing: ({ deckId, deckName, lines }) =>
+    sendWishlist({ target: { _tag: 'Deck', deckId, deckName }, lines }),
   RequestedRemoveDeck: ({ deckId }) => removeDeck(deckId),
   RequestedRetryLoadDecks: () => retryDecks,
 })
@@ -342,16 +345,67 @@ export const wishlistContextOf = (
   model.collection._tag === 'Ready' &&
   model.wishlist._tag === 'Ready'
     ? Option.some({
-        needs: Missing.needs(model.decks.decks, model.collection.owned),
+        decks: model.decks.decks,
+        owned: model.collection.owned,
         added: model.wishlist.added,
       })
     : Option.none()
+
+const changeQuantity = Update.foldChild({
+  update: CollectionState.change,
+  read: readCollection,
+  write: writeCollection,
+  toParentMessage: toCollectionMessage,
+})
+
+const setWishlistAdded = Update.foldChild({
+  update: WishlistState.setAdded,
+  ...wishlistFold,
+})
+
+const recordPurchase =
+  (
+    purchase: WishlistPage.Purchase,
+  ): Update.Step<Model, Message, Requirements> =>
+  stepModel => {
+    const owned = Option.getOrElse(
+      CollectionState.maybeOwned(stepModel.collection),
+      (): Collection.Owned => ({}),
+    )
+    const added = Option.getOrElse(
+      WishlistState.maybeAdded(stepModel.wishlist),
+      (): Collection.Owned => ({}),
+    )
+
+    return Update.combine<Model, Message, Requirements>(stepModel, [
+      changeQuantity({
+        printingId: purchase.bought,
+        quantity: Collection.clampQuantity(
+          Collection.quantityOf(owned, purchase.bought) + purchase.copies,
+        ),
+      }),
+      ...(purchase.isCustom
+        ? [
+            setWishlistAdded({
+              printingId: purchase.wanted,
+              quantity: Collection.clampQuantity(
+                Collection.quantityOf(added, purchase.wanted) - purchase.copies,
+              ),
+            }),
+          ]
+        : []),
+    ])
+  }
 
 const foldWishlistPageOutMessage = WishlistPage.OutMessage.match<
   Update.Step<Model, Message, Requirements>
 >({
   SteppedAdded: stepped => stepWishlist(stepped),
   RequestedSend: request => sendWishlist(request),
+  MarkedBought: ({ purchases }) =>
+    Update.combine<Model, Message, Requirements>(
+      Array.map(purchases, recordPurchase),
+    ),
   RequestedRetry: () => stepModel =>
     Update.combine<Model, Message, Requirements>(stepModel, [
       retryDecks,
@@ -429,15 +483,18 @@ export const enterRoute = (
           ],
         ),
       Card: ({ cardId }) =>
-        Update.combine<Model, Message, ApiClient | CatalogueIndexService>(
-          routed,
-          [foldCardPageEntry({ cardId, isIndexReady }), ensureCollection],
-        ),
+        Update.combine<Model, Message, Requirements>(routed, [
+          foldCardPageEntry({ cardId, isIndexReady }),
+          ensureCollection,
+          ensureWishlist,
+        ]),
       CardTrader: () => enterCardTraderPage(routed),
       Decks: () => ensureDecks(routed),
       Deck: ({ deckId }) =>
         Update.combine<Model, Message, Requirements>(routed, [
           ensureDecks,
+          ensureCollection,
+          ensureWishlist,
           enterDeckPage(deckId),
         ]),
       Wishlist: () =>

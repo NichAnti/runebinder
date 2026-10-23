@@ -1,7 +1,7 @@
 import { Schema } from 'effect'
 import { defineTaggedUnion } from 'foldkit/schema'
 
-import { Collection, Printing, Wishlist } from '../../../domain'
+import { Collection, Deck, Printing, Wishlist } from '../../../domain'
 
 export const Save = defineTaggedUnion({
   Waiting: { revision: Schema.Int },
@@ -29,6 +29,22 @@ export const Sending = defineTaggedUnion({
 })
 export type Sending = typeof Sending.Type
 
+export const SendTarget = Schema.Union([
+  Schema.TaggedStruct('Custom', {}),
+  Schema.TaggedStruct('Deck', { deckId: Deck.DeckId, deckName: Schema.String }),
+])
+export type SendTarget = typeof SendTarget.Type
+
+export const CUSTOM_KEY = 'custom'
+
+export const targetKey = (target: SendTarget): string =>
+  target._tag === 'Custom' ? CUSTOM_KEY : target.deckId
+
+export const wishlistNameOf = (target: SendTarget): string =>
+  target._tag === 'Custom'
+    ? 'Custom wishlist (cardtrader app)'
+    : `${target.deckName} (cardtrader app)`
+
 export const Model = defineTaggedUnion({
   NotLoaded: {},
   Loading: {},
@@ -38,7 +54,7 @@ export const Model = defineTaggedUnion({
     maybeSentWishlistId: Schema.Option(Wishlist.CardTraderWishlistId),
     saves: Schema.Record(Printing.PrintingId, Save),
     nextRevision: Schema.Int,
-    sending: Sending,
+    sendings: Schema.Record(Schema.String, Sending),
   },
 })
 export type Model = typeof Model.Type

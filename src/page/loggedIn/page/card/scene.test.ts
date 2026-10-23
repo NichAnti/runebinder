@@ -17,6 +17,7 @@ import { Collection, Printing } from '../../../../domain'
 import { AppRoute } from '../../../../route'
 import { testCard } from '../../../../testing'
 import * as CollectionState from '../../collection'
+import * as WishlistState from '../../wishlist'
 import { OutMessage } from './message'
 import { CardState } from './model'
 import { update } from './update'
@@ -46,6 +47,7 @@ describe('card page', () => {
       {
         update,
         view: withViewInputs(view, {
+          wishlist: WishlistState.init(),
           collection,
           route: routeFor(Option.none()),
         })(),
@@ -67,6 +69,7 @@ describe('card page', () => {
       {
         update,
         view: withViewInputs(view, {
+          wishlist: WishlistState.init(),
           collection,
           route: routeFor(Option.some('tst-001a-010')),
         })(),
@@ -88,6 +91,7 @@ describe('card page', () => {
       {
         update,
         view: withViewInputs(view, {
+          wishlist: WishlistState.init(),
           collection: ready,
           route: routeFor(Option.none()),
         })(),
@@ -120,6 +124,7 @@ describe('card page', () => {
       {
         update,
         view: withViewInputs(view, {
+          wishlist: WishlistState.init(),
           collection,
           route: routeFor(Option.none()),
         })(),
@@ -139,6 +144,7 @@ describe('card page', () => {
       {
         update,
         view: withViewInputs(view, {
+          wishlist: WishlistState.init(),
           collection: CollectionState.Model.Failed(),
           route: routeFor(Option.none()),
         })(),
@@ -155,6 +161,7 @@ describe('card page', () => {
       {
         update,
         view: withViewInputs(view, {
+          wishlist: WishlistState.init(),
           collection,
           route: routeFor(Option.none()),
         })(),

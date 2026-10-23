@@ -12,11 +12,13 @@ export const Message = defineMessageUnion({
   SkippedLoadCard: {},
   ClickedStepQuantity: { printingId: Printing.PrintingId, step: Step },
   ClickedRetryCollection: {},
+  ClickedAddToWishlist: { printingId: Printing.PrintingId },
 })
 export type Message = typeof Message.Type
 
 export const OutMessage = defineMessageUnion({
   SteppedQuantity: { printingId: Printing.PrintingId, step: Step },
   RequestedCollectionRetry: {},
+  AddedToWishlist: { printingId: Printing.PrintingId },
 })
 export type OutMessage = typeof OutMessage.Type

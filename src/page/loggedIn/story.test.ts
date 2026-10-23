@@ -14,6 +14,7 @@ import * as CardPage from './page/card'
 import * as CataloguePage from './page/catalogue'
 import * as DeckPage from './page/deck'
 import * as DeckListPage from './page/deckList'
+import * as WishlistPage from './page/wishlist'
 import { OpenDeck, enterRoute, update } from './update'
 import * as WishlistState from './wishlist'
 
@@ -343,5 +344,56 @@ describe('wishlist', () => {
       CollectionState.LoadCollection.name,
       WishlistState.LoadWishlist.name,
     ])
+  })
+})
+
+describe('marking wishlist cards as bought', () => {
+  test('adds the version that arrived and lowers the custom wishlist', () => {
+    const wanted = Printing.PrintingId.make('tst-001a-010')
+    const arrived = Printing.PrintingId.make('tst-001-010')
+    const onWishlist = modifyFields(init(AppRoute.Wishlist(), ada), {
+      catalogue: () =>
+        CatalogueState.Ready({ attempt: 0, allValues, printingSets: {} }),
+      decks: () =>
+        DecksState.Model.Ready({
+          decks: [],
+          saves: {},
+          nextRevision: 0,
+          creation: DecksState.Creation.Idle(),
+          removals: {},
+        }),
+      collection: () =>
+        CollectionState.Model.Ready({
+          owned: { [arrived]: Collection.OwnedQuantity.make(1) },
+          saves: {},
+          nextRevision: 0,
+          refresh: CollectionState.Refresh.Idle(),
+        }),
+      wishlist: () =>
+        WishlistState.Model.Ready({
+          added: { [wanted]: Collection.OwnedQuantity.make(3) },
+          maybeSentWishlistId: Option.none(),
+          saves: {},
+          nextRevision: 0,
+          sendings: {},
+        }),
+    })
+    const marked = update(
+      onWishlist,
+      Message.GotWishlistPageMessage({
+        message: WishlistPage.Message.ClickedBought({
+          purchases: [{ wanted, bought: arrived, copies: 2, isCustom: true }],
+        }),
+      }),
+    )
+
+    expect(
+      marked.model.collection._tag === 'Ready' &&
+        marked.model.collection.owned[arrived],
+    ).toBe(3)
+    expect(
+      marked.model.wishlist._tag === 'Ready' &&
+        marked.model.wishlist.added[wanted],
+    ).toBe(1)
   })
 })

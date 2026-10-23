@@ -153,6 +153,13 @@ const wishlistBody = ({ name, lines }: NewWishlist) => ({
 })
 
 const HTTP_NOT_FOUND = 404
+const WISHLIST_PAGE_SIZE = 100
+
+export const ListedWishlist = Schema.Struct({
+  id: Wishlist.CardTraderWishlistId,
+  name: Schema.String,
+})
+export type ListedWishlist = typeof ListedWishlist.Type
 
 export class CardTraderClient extends Context.Service<
   CardTraderClient,
@@ -168,6 +175,9 @@ export class CardTraderClient extends Context.Service<
       token: Redacted.Redacted<CardTraderToken>,
       wishlistId: Wishlist.CardTraderWishlistId,
     ) => Effect.Effect<void, CardTraderError>
+    readonly listWishlists: (
+      token: Redacted.Redacted<CardTraderToken>,
+    ) => Effect.Effect<ReadonlyArray<ListedWishlist>, CardTraderError>
   }
 >()('cardtrader/service/CardTraderClient') {
   static readonly layerWith = Layer.effect(
@@ -253,9 +263,45 @@ export class CardTraderClient extends Context.Service<
         },
       )
 
+      const listPage = (
+        token: Redacted.Redacted<CardTraderToken>,
+        page: number,
+      ) =>
+        get(
+          `/wishlists?game_id=${Wishlist.CARDTRADER_GAME_ID}&page=${page}&limit=${WISHLIST_PAGE_SIZE}`,
+          token,
+        ).pipe(
+          Effect.flatMap(response =>
+            response.json.pipe(Effect.mapError(unavailable)),
+          ),
+          Effect.flatMap(body =>
+            Schema.decodeUnknownEffect(Schema.Array(ListedWishlist))(body).pipe(
+              Effect.mapError(unavailable),
+            ),
+          ),
+        )
+
+      const listFrom = (
+        token: Redacted.Redacted<CardTraderToken>,
+        page: number,
+        found: ReadonlyArray<ListedWishlist>,
+      ): Effect.Effect<ReadonlyArray<ListedWishlist>, CardTraderError> =>
+        listPage(token, page).pipe(
+          Effect.flatMap(wishlists =>
+            Array.length(wishlists) < WISHLIST_PAGE_SIZE
+              ? Effect.succeed([...found, ...wishlists])
+              : listFrom(token, page + 1, [...found, ...wishlists]),
+          ),
+        )
+
+      const listWishlists = Effect.fn('CardTraderClient.listWishlists')(
+        (token: Redacted.Redacted<CardTraderToken>) => listFrom(token, 1, []),
+      )
+
       return CardTraderClient.of({
         createWishlist,
         deleteWishlist,
+        listWishlists,
         info: Effect.fn('CardTraderClient.info')(function* (token) {
           const response = yield* get('/info', token)
           const body = yield* response.json.pipe(

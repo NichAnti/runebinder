@@ -18,6 +18,7 @@ export {
   CardTraderError,
   CardTraderFailure,
   CardTraderToken,
+  ListedWishlist,
   type StoredToken,
   TokenStore,
   parseToken,

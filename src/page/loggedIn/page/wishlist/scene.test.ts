@@ -12,14 +12,16 @@ import {
 import { modifyFields } from 'foldkit/struct'
 import { describe, test } from 'vitest'
 
-import { Printing, Wishlist } from '../../../../domain'
+import { Collection, Deck, Printing, Wishlist } from '../../../../domain'
 import { testCard } from '../../../../testing'
 import * as WishlistState from '../../wishlist'
 import { OutMessage } from './message'
 import { init } from './model'
-import { type Context, update } from './update'
+import type { Context } from './sections'
+import { update } from './update'
 import { view } from './view'
 
+const base = Printing.PrintingId.make('tst-001-010')
 const alternate = Printing.PrintingId.make('tst-001a-010')
 const blueprintId = Printing.CardTraderBlueprintId.make(345245)
 const withBlueprints: Printing.Card = {
@@ -34,61 +36,79 @@ const withBlueprints: Printing.Card = {
   })),
 }
 
-const context: Context = {
-  needs: [{ printingId: alternate, needed: 3, owned: 1, missing: 2 }],
-  added: {},
+const deck: Deck.Deck = {
+  id: Deck.DeckId.make('7b0f2a7e-2a9c-4c6e-9d2b-6a6f1c9d2e11'),
+  name: Deck.DeckName.make('Vi aggro'),
+  contents: {
+    ...Deck.empty,
+    main: [{ printingId: alternate, copies: Deck.Copies.make(3) }],
+  },
 }
 
-const readyWishlist = WishlistState.Model.Ready({
-  added: {},
-  maybeSentWishlistId: Option.none(),
-  saves: {},
-  nextRevision: 0,
-  sending: WishlistState.Sending.Idle(),
-})
+const context: Context = {
+  decks: [deck],
+  owned: { [alternate]: Collection.OwnedQuantity.make(1) },
+  added: { [base]: Collection.OwnedQuantity.make(1) },
+}
 
-const inputs = (wishlist: WishlistState.Model) =>
+const readyWishlist = (sendings = {}) =>
+  WishlistState.Model.Ready({
+    added: context.added,
+    maybeSentWishlistId: Option.none(),
+    saves: {},
+    nextRevision: 0,
+    sendings,
+  })
+
+const sceneView = (wishlist: WishlistState.Model) =>
   withViewInputs(view, { isReady: true, hasFailed: false, context, wishlist })()
 
 const loaded = modifyFields(init(), {
   cards: () => ({ [testCard.id]: withBlueprints }),
 })
-const wanted = role('list', { name: 'Wanted cards' })
+const deckSection = role('region', { name: 'Vi aggro' })
+const customSection = role('region', { name: 'Custom wishlist' })
 
-describe('wishlist page', () => {
-  test('a missing card links to its exact version on CardTrader', () => {
+describe('wishlists page', () => {
+  test('each deck lists what it misses, linked to the exact version', () => {
     scene(
-      { update: update(context), view: inputs(readyWishlist) },
+      { update: update(context), view: sceneView(readyWishlist()) },
       given(loaded),
-      expect(wanted).toContainText('Missing from decks 2'),
+      expect(deckSection).toContainText('2× Test Unit, Tester'),
       expect(
-        within(wanted, role('link', { name: 'This version on CardTrader' })),
+        within(
+          deckSection,
+          role('link', { name: 'This version on CardTrader' }),
+        ),
       ).toHaveAttr('href', Wishlist.cardTraderCardUrl(blueprintId)),
     )
   })
 
-  test('a card can be wanted by hand on top of what decks miss', () => {
+  test('a deck is sent to CardTrader under its name', () => {
     scene(
-      { update: update(context), view: inputs(readyWishlist) },
+      { update: update(context), view: sceneView(readyWishlist()) },
       given(loaded),
-      click(within(wanted, role('button', { name: 'Add one' }))),
+      click(
+        within(deckSection, role('button', { name: 'Send to CardTrader' })),
+      ),
       expectOutMessage(
-        OutMessage.SteppedAdded({ printingId: alternate, step: 1 }),
+        OutMessage.RequestedSend({
+          target: { _tag: 'Deck', deckId: deck.id, deckName: 'Vi aggro' },
+          lines: [{ blueprintId, quantity: 2 }],
+        }),
       ),
     )
   })
 
-  test('sending asks for one line per card and set', () => {
+  test('only the custom wishlist can be changed by hand', () => {
     scene(
-      { update: update(context), view: inputs(readyWishlist) },
+      { update: update(context), view: sceneView(readyWishlist()) },
       given(loaded),
-      click(role('button', { name: 'Send to CardTrader' })),
-      expectOutMessage(
-        OutMessage.RequestedSend({
-          name: 'Riftbound decks (from cardtrader app)',
-          lines: [{ blueprintId, quantity: 2 }],
-        }),
-      ),
+      expect(
+        within(deckSection, role('button', { name: 'Add one' })),
+      ).not.toExist(),
+      click(within(customSection, role('button', { name: 'Add one' }))),
+      expectOutMessage(OutMessage.SteppedAdded({ printingId: base, step: 1 })),
     )
   })
 
@@ -96,23 +116,17 @@ describe('wishlist page', () => {
     scene(
       {
         update: update(context),
-        view: inputs(
-          WishlistState.Model.Ready({
-            added: {},
-            maybeSentWishlistId: Option.none(),
-            saves: {},
-            nextRevision: 0,
-            sending: WishlistState.Sending.Failed({ reason: 'NotConnected' }),
+        view: sceneView(
+          readyWishlist({
+            [WishlistState.CUSTOM_KEY]: WishlistState.Sending.Failed({
+              reason: 'NotConnected',
+            }),
           }),
         ),
       },
       given(loaded),
-      expect(role('alert')).toContainText(
+      expect(within(customSection, role('alert'))).toContainText(
         'Connect your CardTrader account first.',
-      ),
-      expect(role('link', { name: 'Connect CardTrader' })).toHaveAttr(
-        'href',
-        '/cardtrader',
       ),
     )
   })

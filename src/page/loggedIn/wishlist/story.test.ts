@@ -4,12 +4,13 @@ import { describe, expect, test } from 'vitest'
 
 import { Collection, Printing, Wishlist } from '../../../domain'
 import { Message } from './message'
-import { Model, Sending } from './model'
+import { CUSTOM_KEY, Model, Sending } from './model'
 import {
   SaveItem,
   SendWishlist,
   failedSaveCount,
   send,
+  sendingOf,
   step,
   update,
 } from './update'
@@ -20,7 +21,7 @@ const ready = Model.Ready({
   maybeSentWishlistId: Option.none(),
   saves: {},
   nextRevision: 0,
-  sending: Sending.Idle(),
+  sendings: {},
 })
 const wishlistId = Wishlist.CardTraderWishlistId.make(3572164)
 
@@ -77,7 +78,7 @@ describe('wishlist', () => {
 
   test('sending shows the new CardTrader wishlist', () => {
     const sending = send(ready, {
-      name: 'Riftbound decks',
+      target: { _tag: 'Custom' },
       lines: [
         {
           blueprintId: Printing.CardTraderBlueprintId.make(345245),
@@ -93,10 +94,14 @@ describe('wishlist', () => {
       update,
       given(sending.model),
       message(
-        Message.SucceededSendWishlist({ wishlistId, isPreviousDeleted: true }),
+        Message.SucceededSendWishlist({
+          key: CUSTOM_KEY,
+          wishlistId,
+          isPreviousDeleted: true,
+        }),
       ),
       model(next => {
-        expect(next._tag === 'Ready' && next.sending).toStrictEqual(
+        expect(sendingOf(next, CUSTOM_KEY)).toStrictEqual(
           Sending.Sent({ wishlistId, isPreviousDeleted: true }),
         )
       }),
@@ -107,9 +112,11 @@ describe('wishlist', () => {
     story(
       update,
       given(ready),
-      message(Message.FailedSendWishlist({ reason: 'NotConnected' })),
+      message(
+        Message.FailedSendWishlist({ key: CUSTOM_KEY, reason: 'NotConnected' }),
+      ),
       model(next => {
-        expect(next._tag === 'Ready' && next.sending).toStrictEqual(
+        expect(sendingOf(next, CUSTOM_KEY)).toStrictEqual(
           Sending.Failed({ reason: 'NotConnected' }),
         )
       }),

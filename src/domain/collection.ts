@@ -105,3 +105,11 @@ export const summarize = (
     ),
   }
 }
+
+export const clampQuantity = (count: number): Quantity =>
+  Option.getOrElse(
+    Schema.decodeOption(Quantity)(
+      Number.clamp(count, { minimum: 0, maximum: MAX_QUANTITY }),
+    ),
+    () => NONE,
+  )

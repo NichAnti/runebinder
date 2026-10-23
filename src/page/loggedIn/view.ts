@@ -139,6 +139,7 @@ export const view = Submodel.defineView<Model, Message>((model, h) =>
                   viewInputs: {
                     route: cardRoute,
                     collection: model.collection,
+                    wishlist: model.wishlist,
                   },
                   toParentMessage: message =>
                     Message.GotCardPageMessage({ message }),
@@ -162,7 +163,12 @@ export const view = Submodel.defineView<Model, Message>((model, h) =>
                   slotId: 'deck-page',
                   model: model.deckPage,
                   view: DeckPage.view,
-                  viewInputs: { decks: model.decks, deckId },
+                  viewInputs: {
+                    decks: model.decks,
+                    deckId,
+                    collection: model.collection,
+                    sending: WishlistState.sendingOf(model.wishlist, deckId),
+                  },
                   toParentMessage: message =>
                     Message.GotDeckPageMessage({ message }),
                 }),
@@ -182,10 +188,14 @@ export const view = Submodel.defineView<Model, Message>((model, h) =>
                       model.decks._tag === 'Failed' ||
                       model.collection._tag === 'Failed' ||
                       model.wishlist._tag === 'Failed',
-                    context: Option.getOrElse(wishlistContextOf(model), () => ({
-                      needs: [],
-                      added: {},
-                    })),
+                    context: Option.getOrElse(
+                      wishlistContextOf(model),
+                      (): WishlistPage.Context => ({
+                        decks: [],
+                        owned: {},
+                        added: {},
+                      }),
+                    ),
                     wishlist: model.wishlist,
                   },
                   toParentMessage: message =>

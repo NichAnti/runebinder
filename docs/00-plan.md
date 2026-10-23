@@ -71,7 +71,7 @@ Its structure is agreed before any code is written.
 ## Phase 8: Missing cards and wishlist
 
 - [x] 8.1 Missing-cards calculation, pure with tests: the most copies any one deck uses, per exact printing, minus what is owned
-- [x] 8.2 Wishlist page: what decks miss plus cards added by hand, per exact printing; Send to CardTrader creates a private wishlist with one line per card and set (CardTrader does not keep the version), records it in D1 and deletes the previous one; each printing links to its exact CardTrader page
+- [x] 8.2 Wishlists: one per deck (its missing cards, computed, read-only) and one custom wishlist (stored, edited by hand, also from the card page). Each is sent to CardTrader on its own as one line per card and set (CardTrader does not keep the version); a deck's wishlist replaces the one with the same name, the custom one replaces the stored id. Lines link to the exact version on CardTrader and can be marked as bought (one, selected, or all), which adds the version that arrived to the collection and lowers the custom wishlist
 
 ## Phase 9: Finishing the MVP
 

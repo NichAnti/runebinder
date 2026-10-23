@@ -1,22 +1,31 @@
-import { Array, Match, Number, Option } from 'effect'
+import { Array, Match, Number, Option, Record } from 'effect'
 import { Submodel } from 'foldkit'
 import type { Html, HtmlBuilder } from 'foldkit/html'
 
-import { type CatalogueSearch, Collection, Wishlist } from '../../../../domain'
+import {
+  type CatalogueSearch,
+  Collection,
+  type Printing,
+  Wishlist,
+} from '../../../../domain'
 import { cardTraderRouter } from '../../../../route'
 import {
   Button,
+  Checkbox,
   Link,
   Notice,
   QuantityStepper,
   SearchField,
+  Select,
+  Toast,
 } from '../../../../ui'
 import { VARIANT_LABELS } from '../../printings'
 import * as WishlistState from '../../wishlist'
 import { cardsByPrinting, nameOf } from '../deck/lines'
-import { Message } from './message'
+import { Message, type Purchase } from './message'
 import type { Model } from './model'
-import { type Context, finderOf, linesFor } from './update'
+import { type Context, type Section, lineKeyOf, sectionsOf } from './sections'
+import { finderOf } from './update'
 
 export type ViewInputs = Readonly<{
   isReady: boolean
@@ -32,26 +41,59 @@ const FAILURE_TEXT: Readonly<Record<WishlistState.SendFailure, string>> = {
   Unavailable: 'CardTrader could not be reached. Try again later.',
 }
 
+const versionLabel = (printing: Printing.Printing): string =>
+  `${VARIANT_LABELS[printing.variant]} · ${printing.publicCode}`
+
+const purchaseOf = (
+  model: Model,
+  section: Section,
+  line: Wishlist.Line,
+): Purchase => ({
+  wanted: line.printingId,
+  bought: Option.getOrElse(
+    Record.get(model.versions, lineKeyOf(section, line.printingId)),
+    () => line.printingId,
+  ),
+  copies: line.quantity,
+  isCustom: section.isCustom,
+})
+
 const lineView = (
   model: Model,
+  section: Section,
   line: Wishlist.Line,
   h: HtmlBuilder<Message>,
 ): Html => {
+  const lineKey = lineKeyOf(section, line.printingId)
   const maybePrinting = finderOf(model)(line.printingId)
-  const byPrinting = cardsByPrinting(model.cards)
-  const label = Option.match(
-    Option.fromNullishOr(byPrinting.get(line.printingId)),
-    { onNone: () => line.printingId, onSome: nameOf },
+  const maybeCard = Option.fromNullishOr(
+    cardsByPrinting(model.cards).get(line.printingId),
   )
+  const label = Option.match(maybeCard, {
+    onNone: () => line.printingId,
+    onSome: nameOf,
+  })
 
   return h.keyed('li')(
-    line.printingId,
+    lineKey,
     [
       h.Class(
         'flex flex-wrap items-center gap-3 rounded-card border border-border bg-surface p-3',
       ),
     ],
     [
+      Checkbox.view(
+        {
+          id: `select-${lineKey}`,
+          label: `Select ${label}`,
+          isChecked: Option.getOrElse(
+            Record.get(model.selected, lineKey),
+            () => false,
+          ),
+          onToggle: isChecked => Message.ToggledLine({ lineKey, isChecked }),
+        },
+        h,
+      ),
       ...Option.match(maybePrinting, {
         onNone: () => [],
         onSome: printing => [
@@ -66,176 +108,143 @@ const lineView = (
       h.div(
         [h.Class('flex min-w-48 flex-1 flex-col gap-0.5')],
         [
-          h.span([h.Class('text-sm font-semibold')], [label]),
+          h.span(
+            [h.Class('text-sm font-semibold')],
+            [`${line.quantity}× ${label}`],
+          ),
           h.span(
             [h.Class('text-xs text-fg-muted')],
             [
               Option.match(maybePrinting, {
                 onNone: () => '',
-                onSome: printing =>
-                  `${VARIANT_LABELS[printing.variant]} · ${printing.publicCode}`,
+                onSome: versionLabel,
               }),
             ],
           ),
-          h.span(
-            [h.Class('text-xs text-fg-muted tabular-nums')],
-            [
-              `Missing from decks ${line.missing} · added by hand ${line.added} · wanted ${line.quantity}`,
-            ],
+          ...Option.match(
+            Option.flatMap(
+              maybePrinting,
+              ({ maybeCardTraderBlueprintId }) => maybeCardTraderBlueprintId,
+            ),
+            {
+              onNone: () => [],
+              onSome: blueprintId => [
+                Link.view(
+                  {
+                    href: Wishlist.cardTraderCardUrl(blueprintId),
+                    content: ['This version on CardTrader'],
+                  },
+                  h,
+                ),
+              ],
+            },
           ),
         ],
       ),
-      QuantityStepper.view(
-        {
-          label: `Added by hand: ${label}`,
-          quantity: line.added,
-          max: Collection.MAX_QUANTITY,
-          onDecrement: Message.ClickedStepAdded({
-            printingId: line.printingId,
-            step: -1,
-          }),
-          onIncrement: Message.ClickedStepAdded({
-            printingId: line.printingId,
-            step: 1,
-          }),
-        },
-        h,
-      ),
-      ...Option.match(
-        Option.flatMap(
-          maybePrinting,
-          ({ maybeCardTraderBlueprintId }) => maybeCardTraderBlueprintId,
-        ),
-        {
-          onNone: () => [],
-          onSome: blueprintId => [
-            Link.view(
+      ...(section.isCustom
+        ? [
+            QuantityStepper.view(
               {
-                href: Wishlist.cardTraderCardUrl(blueprintId),
-                content: ['This version on CardTrader'],
+                label: `Wanted: ${label}`,
+                quantity: line.added,
+                max: Collection.MAX_QUANTITY,
+                onDecrement: Message.ClickedStepAdded({
+                  printingId: line.printingId,
+                  step: -1,
+                }),
+                onIncrement: Message.ClickedStepAdded({
+                  printingId: line.printingId,
+                  step: 1,
+                }),
               },
               h,
             ),
-          ],
-        },
-      ),
-    ],
-  )
-}
-
-const sendView = (
-  model: Model,
-  lines: ReadonlyArray<Wishlist.Line>,
-  wishlist: WishlistState.Model,
-  h: HtmlBuilder<Message>,
-): Html => {
-  const cardTrader = Wishlist.cardTraderLinesOf(lines, finderOf(model))
-  const copies = Number.sumAll(
-    Array.map(cardTrader.lines, ({ quantity }) => quantity),
-  )
-  const sending =
-    wishlist._tag === 'Ready' ? wishlist.sending : WishlistState.Sending.Idle()
-
-  return h.section(
-    [
-      h.AriaLabel('Send to CardTrader'),
-      h.Class(
-        'flex flex-col gap-3 rounded-card border border-border bg-surface p-4 lg:sticky lg:top-4',
-      ),
-    ],
-    [
-      h.h2([h.Class('text-base font-semibold')], ['Send to CardTrader']),
-      h.p(
-        [h.Class('text-sm text-fg-muted tabular-nums')],
-        [
-          Array.length(cardTrader.lines) === 1
-            ? `1 card, ${copies} copies.`
-            : `${Array.length(cardTrader.lines)} cards, ${copies} copies.`,
-        ],
-      ),
-      h.p(
-        [h.Class('text-sm text-fg-muted')],
-        [
-          'CardTrader wishlists keep the card and the set, not the version, so the Shop Optimizer may offer any version. Use the links beside each card to buy an exact version.',
-        ],
-      ),
-      h.p(
-        [h.Class('text-sm text-fg-muted')],
-        [
-          'Sending replaces the wishlist this app sent before. Changes you made to that wishlist on CardTrader are lost.',
-        ],
-      ),
-      Array.match(cardTrader.notOnCardTrader, {
-        onEmpty: () => h.empty,
-        onNonEmpty: missing =>
-          h.p(
-            [h.Role('status'), h.Class('text-sm text-fg-muted')],
-            [
-              `${Array.length(missing)} printing(s) are not on CardTrader and are left out.`,
-            ],
+          ]
+        : []),
+      ...Option.match(maybeCard, {
+        onNone: () => [],
+        onSome: card => [
+          Select.view(
+            {
+              id: `version-${lineKey}`,
+              label: 'Bought version',
+              value: Option.getOrElse(
+                Record.get(model.versions, lineKey),
+                () => line.printingId,
+              ),
+              options: Array.map(card.printings, printing => ({
+                value: printing.id,
+                label: versionLabel(printing),
+              })),
+              onChange: value => Message.SelectedVersion({ lineKey, value }),
+            },
+            h,
           ),
+        ],
       }),
       Button.view(
         {
-          content: [
-            sending._tag === 'Sending' ? 'Sending…' : 'Send to CardTrader',
-          ],
-          onClick: Message.ClickedSend(),
-          isDisabled:
-            sending._tag === 'Sending' ||
-            Array.isReadonlyArrayEmpty(cardTrader.lines),
+          content: ['Bought'],
+          variant: 'Secondary',
+          onClick: Message.ClickedBought({
+            purchases: [purchaseOf(model, section, line)],
+          }),
         },
         h,
       ),
-      WishlistState.Sending.match(sending, {
-        Idle: () => h.empty,
-        Sending: () => h.empty,
-        Sent: ({ wishlistId, isPreviousDeleted }) =>
-          h.div(
-            [h.Role('status'), h.Class('flex flex-col gap-1 text-sm')],
-            [
-              Link.view(
-                {
-                  href: Wishlist.cardTraderWishlistUrl(wishlistId),
-                  content: ['Open the wishlist on CardTrader'],
-                },
-                h,
-              ),
-              isPreviousDeleted
-                ? h.empty
-                : h.span(
-                    [h.Class('text-fg-muted')],
-                    [
-                      'The previous wishlist could not be deleted; remove it on CardTrader.',
-                    ],
-                  ),
-            ],
-          ),
-        Failed: ({ reason }) =>
-          h.div(
-            [
-              h.Role('alert'),
-              h.Class('flex flex-col gap-1 text-sm text-danger'),
-            ],
-            [
-              FAILURE_TEXT[reason],
-              ...(reason === 'NotConnected' || reason === 'InvalidToken'
-                ? [
-                    Link.view(
-                      {
-                        href: cardTraderRouter(),
-                        content: ['Connect CardTrader'],
-                      },
-                      h,
-                    ),
-                  ]
-                : []),
-            ],
-          ),
-      }),
     ],
   )
 }
+
+const sendStatusView = (
+  wishlist: WishlistState.Model,
+  section: Section,
+  h: HtmlBuilder<Message>,
+): Html =>
+  WishlistState.Sending.match(
+    WishlistState.sendingOf(wishlist, WishlistState.targetKey(section.target)),
+    {
+      Idle: () => h.empty,
+      Sending: () => h.empty,
+      Sent: ({ wishlistId, isPreviousDeleted }) =>
+        h.p(
+          [h.Role('status'), h.Class('flex flex-wrap gap-2 text-sm')],
+          [
+            Link.view(
+              {
+                href: Wishlist.cardTraderWishlistUrl(wishlistId),
+                content: ['Open it on CardTrader'],
+              },
+              h,
+            ),
+            isPreviousDeleted
+              ? ''
+              : 'The previous one could not be deleted; remove it on CardTrader.',
+          ],
+        ),
+      Failed: ({ reason }) =>
+        h.p(
+          [
+            h.Role('alert'),
+            h.Class('flex flex-wrap gap-2 text-sm text-danger'),
+          ],
+          [
+            FAILURE_TEXT[reason],
+            ...(reason === 'NotConnected' || reason === 'InvalidToken'
+              ? [
+                  Link.view(
+                    {
+                      href: cardTraderRouter(),
+                      content: ['Connect CardTrader'],
+                    },
+                    h,
+                  ),
+                ]
+              : []),
+          ],
+        ),
+    },
+  )
 
 const searchResultView = (
   card: CatalogueSearch.CardSummary,
@@ -266,15 +275,15 @@ const searchResultView = (
   )
 
 const addView = (model: Model, h: HtmlBuilder<Message>): Html =>
-  h.section(
-    [h.AriaLabel('Add a card by hand'), h.Class('flex flex-col gap-2')],
+  h.div(
+    [h.Class('flex flex-col gap-2')],
     [
       SearchField.view(
         {
           id: 'wishlist-add',
-          label: 'Add a card by hand',
+          label: 'Add a card to the custom wishlist',
           value: model.searchText,
-          placeholder: 'Add a card by hand…',
+          placeholder: 'Add a card…',
           onInput: value => Message.UpdatedSearch({ value }),
         },
         h,
@@ -294,56 +303,159 @@ const addView = (model: Model, h: HtmlBuilder<Message>): Html =>
     ],
   )
 
+const sectionView = (
+  model: Model,
+  wishlist: WishlistState.Model,
+  section: Section,
+  h: HtmlBuilder<Message>,
+): Html => {
+  const copies = Number.sumAll(
+    Array.map(section.lines, ({ quantity }) => quantity),
+  )
+  const selectedLines = Array.filter(section.lines, line =>
+    Option.getOrElse(
+      Record.get(model.selected, lineKeyOf(section, line.printingId)),
+      () => false,
+    ),
+  )
+  const isSending =
+    WishlistState.sendingOf(wishlist, WishlistState.targetKey(section.target))
+      ._tag === 'Sending'
+
+  return h.section(
+    [h.AriaLabel(section.title), h.Class('flex flex-col gap-3')],
+    [
+      h.div(
+        [h.Class('flex flex-wrap items-center justify-between gap-3')],
+        [
+          h.h2(
+            [h.Class('flex items-baseline gap-2 text-lg font-semibold')],
+            [
+              section.title,
+              h.span(
+                [h.Class('text-sm font-normal tabular-nums text-fg-muted')],
+                [copies === 1 ? '1 copy' : `${copies} copies`],
+              ),
+            ],
+          ),
+          Button.view(
+            {
+              content: [isSending ? 'Sending…' : 'Send to CardTrader'],
+              onClick: Message.ClickedSend({ target: section.target }),
+              isDisabled:
+                isSending || Array.isReadonlyArrayEmpty(section.lines),
+            },
+            h,
+          ),
+        ],
+      ),
+      sendStatusView(wishlist, section, h),
+      ...(section.isCustom ? [addView(model, h)] : []),
+      Array.match(section.lines, {
+        onEmpty: () =>
+          h.p(
+            [h.Class('text-sm text-fg-muted')],
+            [
+              section.isCustom
+                ? 'No cards added yet.'
+                : 'Nothing missing: your collection covers this deck.',
+            ],
+          ),
+        onNonEmpty: lines =>
+          h.div(
+            [h.Class('flex flex-col gap-2')],
+            [
+              h.ul(
+                [
+                  h.AriaLabel(`${section.title} cards`),
+                  h.Class('flex flex-col gap-2'),
+                ],
+                Array.map(lines, line => lineView(model, section, line, h)),
+              ),
+              h.div(
+                [h.Class('flex flex-wrap gap-2')],
+                [
+                  ...Array.match(selectedLines, {
+                    onEmpty: () => [],
+                    onNonEmpty: selected => [
+                      Button.view(
+                        {
+                          content: ['Mark selected as bought'],
+                          variant: 'Secondary',
+                          onClick: Message.ClickedBought({
+                            purchases: Array.map(selected, line =>
+                              purchaseOf(model, section, line),
+                            ),
+                          }),
+                        },
+                        h,
+                      ),
+                    ],
+                  }),
+                  Button.view(
+                    {
+                      content: ['Mark all as bought'],
+                      variant: 'Secondary',
+                      onClick: Message.ClickedBought({
+                        purchases: Array.map(lines, line =>
+                          purchaseOf(model, section, line),
+                        ),
+                      }),
+                    },
+                    h,
+                  ),
+                ],
+              ),
+            ],
+          ),
+      }),
+    ],
+  )
+}
+
 const readyView = (
   model: Model,
   { context, wishlist }: ViewInputs,
   h: HtmlBuilder<Message>,
-): Html => {
-  const lines = linesFor(context)
-
-  return h.div(
-    [h.Class('grid gap-8 lg:grid-cols-[minmax(0,1fr)_22rem]')],
+): Html =>
+  h.div(
+    [h.Class('flex flex-col gap-10')],
     [
-      h.div(
-        [h.Class('flex flex-col gap-4')],
-        [
-          addView(model, h),
-          Array.match(lines, {
-            onEmpty: () =>
-              Notice.view(
-                {
-                  title: 'Nothing to buy',
-                  description: [
-                    'Your decks are covered by your collection. Add cards by hand above to buy them anyway.',
-                  ],
-                },
-                h,
-              ),
-            onNonEmpty: nonEmpty =>
-              h.ul(
-                [h.AriaLabel('Wanted cards'), h.Class('flex flex-col gap-2')],
-                Array.map(nonEmpty, line => lineView(model, line, h)),
-              ),
-          }),
-        ],
+      Notice.view(
+        {
+          title: 'About CardTrader wishlists',
+          description: [
+            'CardTrader wishlists keep the card and the set, not the version, so the Shop Optimizer may offer any version. Use the links beside each card for an exact version. Sending again replaces the wishlist this app sent for that deck or list.',
+          ],
+        },
+        h,
       ),
-      sendView(model, lines, wishlist, h),
+      ...Array.map(sectionsOf(context), section =>
+        sectionView(model, wishlist, section, h),
+      ),
+      Toast.view(
+        {
+          slotId: 'wishlist-toast',
+          model: model.toast,
+          toParentMessage: message => Message.GotToastMessage({ message }),
+        },
+        h,
+      ),
     ],
   )
-}
 
 export const view = Submodel.defineView<Model, Message, ViewInputs>(
   (model, inputs, h) =>
     h.section(
       [h.Class('flex flex-col gap-6')],
       [
-        h.h1([h.Class('text-2xl font-semibold')], ['Wishlist']),
+        h.h1([h.Class('text-2xl font-semibold')], ['Wishlists']),
         Match.value(inputs).pipe(
           Match.withReturnType<Html>(),
           Match.when({ hasFailed: true }, () =>
             Notice.view(
               {
-                title: 'Your wishlist could not be loaded',
+                title: 'Your wishlists could not be loaded',
                 description: ['Check your connection and try again.'],
                 variant: 'Error',
                 actions: [
@@ -359,7 +471,7 @@ export const view = Submodel.defineView<Model, Message, ViewInputs>(
           Match.when({ isReady: true }, () => readyView(model, inputs, h)),
           Match.orElse(() =>
             Notice.view(
-              { title: 'Loading your wishlist…', description: [] },
+              { title: 'Loading your wishlists…', description: [] },
               h,
             ),
           ),

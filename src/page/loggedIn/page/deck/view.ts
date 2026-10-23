@@ -7,7 +7,9 @@ import {
   Deck,
   DeckRules,
   type DeckStructure,
+  Missing,
   Printing,
+  Wishlist,
 } from '../../../../domain'
 import { decksRouter } from '../../../../route'
 import {
@@ -23,8 +25,10 @@ import {
   Toast,
 } from '../../../../ui'
 import * as CardPanel from '../../cardPanel'
+import * as CollectionState from '../../collection'
 import * as DecksState from '../../decks'
 import * as Printings from '../../printings'
+import * as WishlistState from '../../wishlist'
 import { problemText } from '../deckList/view'
 import {
   type Line,
@@ -41,11 +45,15 @@ import { explain } from './problemText'
 export type ViewInputs = Readonly<{
   decks: DecksState.Model
   deckId: Deck.DeckId
+  collection: CollectionState.Model
+  sending: WishlistState.Sending
 }>
 
 type Context = Readonly<{
   model: Model
   deck: Deck.Deck
+  collection: CollectionState.Model
+  sending: WishlistState.Sending
   byPrinting: ReadonlyMap<string, Printing.Card>
   problems: Option.Option<ReadonlyArray<DeckRules.RuleProblem>>
   maybeLegend: Option.Option<Printing.Printing>
@@ -805,9 +813,78 @@ const headerView = (context: Context, h: HtmlBuilder<Message>): Html =>
         ],
       ),
       summaryView(context, h),
+      missingView(context, h),
       exportView(context.model, h),
     ],
   )
+
+const missingView = (context: Context, h: HtmlBuilder<Message>): Html =>
+  Option.match(CollectionState.maybeOwned(context.collection), {
+    onNone: () => h.empty,
+    onSome: owned => {
+      const lines = Wishlist.linesOf(Missing.needs([context.deck], owned), {})
+      const cardTrader = Wishlist.cardTraderLinesOf(
+        lines,
+        printingFinder(context.byPrinting),
+      )
+      const missing = Number.sumAll(
+        Array.map(lines, ({ quantity }) => quantity),
+      )
+
+      return h.div(
+        [h.Class('flex flex-wrap items-center gap-3')],
+        [
+          h.span(
+            [h.Class('text-sm text-fg-muted tabular-nums')],
+            [
+              missing === 0
+                ? 'You own every card in this deck.'
+                : `${missing} copies missing from your collection.`,
+            ],
+          ),
+          ...Array.match(cardTrader.lines, {
+            onEmpty: () => [],
+            onNonEmpty: nonEmpty => [
+              Button.view(
+                {
+                  content: [
+                    context.sending._tag === 'Sending'
+                      ? 'Sending…'
+                      : 'Send missing cards to CardTrader',
+                  ],
+                  variant: 'Secondary',
+                  onClick: Message.ClickedSendMissing({ lines: nonEmpty }),
+                  isDisabled: context.sending._tag === 'Sending',
+                },
+                h,
+              ),
+            ],
+          }),
+          WishlistState.Sending.match(context.sending, {
+            Idle: () => h.empty,
+            Sending: () => h.empty,
+            Sent: ({ wishlistId }) =>
+              Link.view(
+                {
+                  href: Wishlist.cardTraderWishlistUrl(wishlistId),
+                  content: ['Open it on CardTrader'],
+                },
+                h,
+              ),
+            Failed: ({ reason }) =>
+              h.span(
+                [h.Role('alert'), h.Class('text-sm text-danger')],
+                [
+                  reason === 'NotConnected'
+                    ? 'Connect your CardTrader account first.'
+                    : 'The wishlist could not be sent. Try again.',
+                ],
+              ),
+          }),
+        ],
+      )
+    },
+  })
 
 const deleteView = (
   model: Model,
@@ -843,6 +920,7 @@ const deckView = (
   model: Model,
   deck: Deck.Deck,
   removal: Option.Option<DecksState.Removal>,
+  { collection, sending }: ViewInputs,
   h: HtmlBuilder<Message>,
 ): Html => {
   const byPrinting = cardsByPrinting(model.cards)
@@ -852,6 +930,8 @@ const deckView = (
   const context: Context = {
     model,
     deck,
+    collection,
+    sending,
     byPrinting,
     problems:
       rules._tag === 'Checked' ? Option.some(rules.problems) : Option.none(),
@@ -928,8 +1008,8 @@ const deckView = (
 }
 
 export const view = Submodel.defineView<Model, Message, ViewInputs>(
-  (model, { decks, deckId }, h) =>
-    DecksState.Model.match(decks, {
+  (model, inputs, h) =>
+    DecksState.Model.match(inputs.decks, {
       NotLoaded: () =>
         Notice.view({ title: 'Loading your decks…', description: [] }, h),
       Loading: () =>
@@ -954,7 +1034,7 @@ export const view = Submodel.defineView<Model, Message, ViewInputs>(
         ),
       Ready: ready =>
         Option.match(
-          Array.findFirst(ready.decks, deck => deck.id === deckId),
+          Array.findFirst(ready.decks, deck => deck.id === inputs.deckId),
           {
             onNone: () =>
               Notice.view(
@@ -971,7 +1051,13 @@ export const view = Submodel.defineView<Model, Message, ViewInputs>(
                 h,
               ),
             onSome: deck =>
-              deckView(model, deck, Record.get(ready.removals, deck.id), h),
+              deckView(
+                model,
+                deck,
+                Record.get(ready.removals, deck.id),
+                inputs,
+                h,
+              ),
           },
         ),
     }),

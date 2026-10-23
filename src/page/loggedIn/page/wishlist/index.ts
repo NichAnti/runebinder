@@ -1,7 +1,7 @@
-export { Message, OutMessage } from './message'
+export { Message, OutMessage, Purchase } from './message'
 export { Model, init } from './model'
+export { type Context, type Section, sectionsOf } from './sections'
 export {
-  type Context,
   LoadCardToWish,
   LoadWishlistCards,
   SearchCardsToWish,

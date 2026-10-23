@@ -1,5 +1,15 @@
 export { Message } from './message'
-export { Model, Save, SendFailure, Sending, init } from './model'
+export {
+  CUSTOM_KEY,
+  Model,
+  Save,
+  SendFailure,
+  SendTarget,
+  Sending,
+  init,
+  targetKey,
+  wishlistNameOf,
+} from './model'
 export {
   LoadWishlist,
   SaveItem,
@@ -12,6 +22,9 @@ export {
   maybeAdded,
   retry,
   send,
+  sendingOf,
+  type SetAdded,
+  setAdded,
   step,
   update,
 } from './update'

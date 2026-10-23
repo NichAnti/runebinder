@@ -198,3 +198,28 @@ describe('CardTraderClient wishlists', () => {
       }),
     ))
 })
+
+describe('CardTraderClient wishlist list', () => {
+  test('lists Riftbound wishlists with their names', () =>
+    Effect.runPromise(
+      Effect.gen(function* () {
+        const fake = yield* fakeCardTrader(200, [
+          { id: 3572164, name: 'Vi aggro (cardtrader app)', game_id: 22 },
+        ])
+        const wishlists = yield* Effect.gen(function* () {
+          const client = yield* CardTraderClient
+          return yield* client.listWishlists(tokenOrThrow())
+        }).pipe(Effect.provide(fake.layer))
+        const request = yield* Ref.get(fake.seenRequest)
+
+        expect(wishlists).toStrictEqual([
+          { id: 3572164, name: 'Vi aggro (cardtrader app)' },
+        ])
+        expect(Option.map(request, ({ url }) => url)).toStrictEqual(
+          Option.some(
+            'https://api.cardtrader.com/api/v2/wishlists?game_id=22&page=1&limit=100',
+          ),
+        )
+      }),
+    ))
+})

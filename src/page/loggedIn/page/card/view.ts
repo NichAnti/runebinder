@@ -2,11 +2,12 @@ import { Array, Option, pipe } from 'effect'
 import { Submodel } from 'foldkit'
 import type { Html, HtmlBuilder } from 'foldkit/html'
 
-import { Printing } from '../../../../domain'
+import { Collection, Printing } from '../../../../domain'
 import { type CardRoute, cardRouter, catalogueHome } from '../../../../route'
-import { Badge, Link, Notice } from '../../../../ui'
+import { Badge, Button, Link, Notice } from '../../../../ui'
 import * as CollectionState from '../../collection'
 import * as Printings from '../../printings'
+import * as WishlistState from '../../wishlist'
 import { Message } from './message'
 import { CardState, type Model } from './model'
 import * as TextView from './textView'
@@ -14,6 +15,7 @@ import * as TextView from './textView'
 export type ViewInputs = Readonly<{
   route: CardRoute
   collection: CollectionState.Model
+  wishlist: WishlistState.Model
 }>
 
 const selectedPrinting = (
@@ -124,9 +126,43 @@ const detailsView = <M>(printing: Printing.Printing, h: HtmlBuilder<M>): Html =>
     ],
   )
 
+const wishlistView = (
+  printing: Printing.Printing,
+  wishlist: WishlistState.Model,
+  h: HtmlBuilder<Message>,
+): Html =>
+  Option.match(WishlistState.maybeAdded(wishlist), {
+    onNone: () => h.empty,
+    onSome: added => {
+      const wanted = Collection.quantityOf(added, printing.id)
+
+      return h.div(
+        [h.Class('flex flex-wrap items-center gap-3')],
+        [
+          Button.view(
+            {
+              content: ['Add to wishlist'],
+              variant: 'Secondary',
+              onClick: Message.ClickedAddToWishlist({
+                printingId: printing.id,
+              }),
+            },
+            h,
+          ),
+          wanted === 0
+            ? h.empty
+            : h.span(
+                [h.Role('status'), h.Class('text-sm text-fg-muted')],
+                [`In your custom wishlist: ${wanted}`],
+              ),
+        ],
+      )
+    },
+  })
+
 const foundView = (
   card: Printing.Card,
-  { route, collection }: ViewInputs,
+  { route, collection, wishlist }: ViewInputs,
   h: HtmlBuilder<Message>,
 ): Html => {
   const printing = selectedPrinting(card, route.printing)
@@ -150,7 +186,10 @@ const foundView = (
               `w-full rounded-card bg-surface-raised shadow-raised ${printing.orientation === 'Landscape' ? 'aspect-[1039/744]' : 'aspect-[744/1039]'}`,
             ),
           ]),
-          detailsView(printing, h),
+          h.div(
+            [h.Class('flex flex-col gap-6')],
+            [detailsView(printing, h), wishlistView(printing, wishlist, h)],
+          ),
         ],
       ),
       Printings.printingsView(

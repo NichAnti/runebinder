@@ -1,22 +1,28 @@
-import { Array, Effect, HashSet, Option, Record, Schema, String } from 'effect'
-import { Command, type Update } from 'foldkit'
+import {
+  Array,
+  Effect,
+  HashSet,
+  Number,
+  Option,
+  Record,
+  Schema,
+  String,
+} from 'effect'
+import { Command, Update } from 'foldkit'
 import { modifyFields } from 'foldkit/struct'
 
-import {
-  CatalogueQuery,
-  type Collection,
-  type Missing,
-  Printing,
-  Wishlist,
-} from '../../../../domain'
+import { CatalogueQuery, Printing, Wishlist } from '../../../../domain'
 import {
   CatalogueIndex,
   CatalogueIndexResource,
   type CatalogueIndexService,
 } from '../../../../service'
+import { Toast } from '../../../../ui'
+import * as WishlistState from '../../wishlist'
 import { cardsByPrinting } from '../deck/lines'
 import { Message, OutMessage } from './message'
 import type { Model } from './model'
+import { type Context, printingIdsOf, sectionsOf } from './sections'
 
 type UpdateReturn = Update.ReturnWithOutMessage<
   Model,
@@ -27,12 +33,6 @@ type UpdateReturn = Update.ReturnWithOutMessage<
 type EnterReturn = Update.Return<Model, Message, CatalogueIndexService>
 
 const SEARCH_LIMIT = 8
-const WISHLIST_NAME = 'Riftbound decks (from cardtrader app)'
-
-export type Context = Readonly<{
-  needs: ReadonlyArray<Missing.Need>
-  added: Collection.Owned
-}>
 
 // COMMAND
 
@@ -93,6 +93,30 @@ export const LoadCardToWish = Command.define('LoadCardToWish', {
     ),
 })
 
+// TOAST
+
+const toastFold = {
+  read: (model: Model) => Option.some(model.toast),
+  write: (model: Model, nextToast: Toast.Model): Model =>
+    modifyFields(model, { toast: () => nextToast }),
+  toParentMessage: (message: Toast.Message) =>
+    Message.GotToastMessage({ message }),
+  foldOutMessage: Toast.Notification.OutMessage.match<
+    Update.Step<Model, Message>
+  >({
+    DismissedToast: () => stepModel => ({ model: stepModel }),
+  }),
+}
+
+const foldToast = Update.foldChild({
+  update: Toast.Notification.update,
+  ...toastFold,
+})
+const showToast = Update.foldChild({
+  update: Toast.Notification.show,
+  ...toastFold,
+})
+
 // LINES
 
 export const finderOf = (model: Model) => {
@@ -103,9 +127,6 @@ export const finderOf = (model: Model) => {
       Array.findFirst(card.printings, ({ id }) => id === printingId),
     )
 }
-
-export const linesFor = (context: Context) =>
-  Wishlist.linesOf(context.needs, context.added)
 
 // ROUTE
 
@@ -120,7 +141,7 @@ export const enter = (
     ),
   )
   const missing = Array.filter(
-    Array.map(linesFor(context), ({ printingId }) => printingId),
+    printingIdsOf(context),
     printingId => !HashSet.has(known, printingId),
   )
 
@@ -130,6 +151,11 @@ export const enter = (
 }
 
 // UPDATE
+
+const boughtText = (copies: number): string =>
+  copies === 1
+    ? 'Added 1 card to your collection.'
+    : `Added ${copies} cards to your collection.`
 
 export const update = (context: Context) => (model: Model, message: Message) =>
   Message.match<UpdateReturn>(message, {
@@ -181,20 +207,61 @@ export const update = (context: Context) => (model: Model, message: Message) =>
       outMessage: OutMessage.SteppedAdded({ printingId, step }),
     }),
 
-    ClickedSend: () =>
-      Array.match(
-        Wishlist.cardTraderLinesOf(linesFor(context), finderOf(model)).lines,
-        {
-          onEmpty: () => ({ model }),
-          onNonEmpty: lines => ({
-            model,
-            outMessage: OutMessage.RequestedSend({
-              name: WISHLIST_NAME,
-              lines,
-            }),
+    ToggledLine: ({ lineKey, isChecked }) => ({
+      model: modifyFields(model, {
+        selected: selected => Record.set(selected, lineKey, isChecked),
+      }),
+    }),
+
+    SelectedVersion: ({ lineKey, value }) =>
+      Option.match(Schema.decodeOption(Printing.PrintingId)(value), {
+        onNone: () => ({ model }),
+        onSome: printingId => ({
+          model: modifyFields(model, {
+            versions: versions => Record.set(versions, lineKey, printingId),
           }),
+        }),
+      }),
+
+    ClickedBought: ({ purchases }) => {
+      const copies = Number.sumAll(Array.map(purchases, ({ copies }) => copies))
+      const toastShow = showToast(
+        modifyFields(model, { selected: () => ({}) }),
+        { variant: 'Success', payload: { text: boughtText(copies) } },
+      )
+
+      return {
+        model: toastShow.model,
+        commands: toastShow.commands ?? [],
+        outMessage: OutMessage.MarkedBought({ purchases }),
+      }
+    },
+
+    ClickedSend: ({ target }) =>
+      Option.match(
+        Array.findFirst(
+          sectionsOf(context),
+          section =>
+            WishlistState.targetKey(section.target) ===
+            WishlistState.targetKey(target),
+        ),
+        {
+          onNone: () => ({ model }),
+          onSome: section =>
+            Array.match(
+              Wishlist.cardTraderLinesOf(section.lines, finderOf(model)).lines,
+              {
+                onEmpty: () => ({ model }),
+                onNonEmpty: lines => ({
+                  model,
+                  outMessage: OutMessage.RequestedSend({ target, lines }),
+                }),
+              },
+            ),
         },
       ),
 
     ClickedRetry: () => ({ model, outMessage: OutMessage.RequestedRetry() }),
+
+    GotToastMessage: ({ message }) => foldToast(model, message),
   })

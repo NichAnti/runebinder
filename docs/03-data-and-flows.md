@@ -195,10 +195,12 @@ For each printing (the exact version a deck uses):
 uses in a deck = legend + chosen champion + main + runes + battlefields + sideboard + additional legends
 needed         = the most copies any one deck uses
 missing        = max(0, needed - collection_item.quantity)
-wishlist line  = missing + wishlist_item.quantity (added by hand)
+deck wishlist  = missing, per deck (computed, never stored)
+custom wishlist = wishlist_item.quantity (added by hand, stored)
 ```
 
 Cards move between decks, so two decks that each use 3 copies need 3, not 6.
+Each deck's wishlist counts only that deck; the custom wishlist is separate.
 Owning a different printing of the same card does not cover a missing one,
 because a deck's printings are chosen on purpose. The calculation is
 `domain/missing.ts`.

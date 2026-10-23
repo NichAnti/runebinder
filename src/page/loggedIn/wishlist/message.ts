@@ -15,9 +15,10 @@ export const Message = defineMessageUnion({
   FailedSaveItem: { printingId: Printing.PrintingId, revision: Schema.Int },
   ClickedRetryItemSaves: {},
   SucceededSendWishlist: {
+    key: Schema.String,
     wishlistId: Wishlist.CardTraderWishlistId,
     isPreviousDeleted: Schema.Boolean,
   },
-  FailedSendWishlist: { reason: SendFailure },
+  FailedSendWishlist: { key: Schema.String, reason: SendFailure },
 })
 export type Message = typeof Message.Type

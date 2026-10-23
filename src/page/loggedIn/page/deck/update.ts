@@ -549,6 +549,19 @@ export const update =
           { _tag: 'RemoveAdditionalLegend', position },
         ]),
 
+      ClickedSendMissing: ({ lines }) =>
+        Option.match(maybeDeck, {
+          onNone: () => ({ model }),
+          onSome: deck => ({
+            model,
+            outMessage: OutMessage.RequestedSendMissing({
+              deckId: deck.id,
+              deckName: deck.name,
+              lines,
+            }),
+          }),
+        }),
+
       ClickedCopyCode: () =>
         Option.match(maybeDeck, {
           onNone: () => ({ model }),
