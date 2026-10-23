@@ -33,6 +33,7 @@ export const DeckEdit = Schema.Union([
     printingId: PrintingId,
   }),
   Schema.TaggedStruct('MakeChampion', { printingId: PrintingId }),
+  Schema.TaggedStruct('SetChampion', { printingId: PrintingId }),
   Schema.TaggedStruct('ClearChampion', {}),
   Schema.TaggedStruct('ClearLegend', {}),
   Schema.TaggedStruct('AddAdditionalLegend', { printingId: PrintingId }),
@@ -174,6 +175,10 @@ export const applyEdit = (
           maybeChosenChampion: Option.some(printingId),
         }
       },
+      SetChampion: ({ printingId }) => ({
+        ...contents,
+        maybeChosenChampion: Option.some(printingId),
+      }),
       ClearChampion: () => championBackToMain(contents),
       ClearLegend: () => ({ ...contents, maybeLegend: Option.none() }),
       AddAdditionalLegend: ({ printingId }) => ({

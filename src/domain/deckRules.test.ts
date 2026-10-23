@@ -3,7 +3,7 @@ import { describe, expect, test } from 'vitest'
 
 import { printing } from '../testing'
 import { Copies, type DeckCard, type DeckContents } from './deck'
-import { check } from './deckRules'
+import { additionalLegendsAsked, check } from './deckRules'
 import {
   CardId,
   type Domain,
@@ -190,6 +190,24 @@ describe('deck rules', () => {
     ).toStrictEqual([
       { _tag: 'SignatureTagMismatch', cardId: signature.cardId },
     ])
+  })
+
+  test('a card that asks for additional legends needs exactly that many', () => {
+    const neeko = make('rad-167-167', unit, [], {
+      text: 'If Neeko is in your deck, choose 3 different legends in addition to your starting legend.',
+    })
+
+    expect(additionalLegendsAsked(neeko)).toBe(3)
+    expect(
+      check(
+        { ...legal, main: [...legal.main.slice(1), copies(neeko, 3)] },
+        (printingId: PrintingId) =>
+          printingId === neeko.id ? Option.some(neeko) : find(printingId),
+      ),
+    ).toStrictEqual({
+      _tag: 'Checked',
+      problems: [{ _tag: 'AdditionalLegendsCount', required: 3, count: 0 }],
+    })
   })
 
   test('constructed sizes are exact and battlefields are unique', () => {

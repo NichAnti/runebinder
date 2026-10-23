@@ -84,6 +84,10 @@ export const explain = (
         text: `The sideboard has ${size} cards. Tournaments allow ${DeckRules.MAX_SIDEBOARD} or fewer.`,
         reference: 'Tournament Rules 601.1.c.1',
       }),
+      AdditionalLegendsCount: ({ required, count }) => ({
+        text: `The deck asks for ${required} additional legends and has ${count}.`,
+        reference: 'Core Rules 103.1',
+      }),
       DuplicateAdditionalLegend: ({ cardId }) => ({
         text: `${nameFor(cardId)} is chosen as a legend more than once.`,
         reference: 'Core Rules 103.1',

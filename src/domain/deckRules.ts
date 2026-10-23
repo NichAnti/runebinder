@@ -1,5 +1,6 @@
 import {
   Array,
+  Match,
   Number,
   Option,
   Order,
@@ -53,10 +54,60 @@ export const RuleProblem = Schema.Union([
   Schema.TaggedStruct('DuplicateBattlefield', { cardId: CardId }),
   Schema.TaggedStruct('SideboardTooLarge', { size: Schema.Int }),
   Schema.TaggedStruct('DuplicateAdditionalLegend', { cardId: CardId }),
+  Schema.TaggedStruct('AdditionalLegendsCount', {
+    required: Schema.Int,
+    count: Schema.Int,
+  }),
 ])
 export type RuleProblem = typeof RuleProblem.Type
 
 export type FindPrinting = (printingId: PrintingId) => Option.Option<Printing>
+
+export const Section = Schema.Literals([
+  'Legend',
+  'ChosenChampion',
+  'Main',
+  'Runes',
+  'Battlefields',
+  'Sideboard',
+  'AdditionalLegends',
+])
+export type Section = typeof Section.Type
+
+const ADDITIONAL_LEGENDS_PATTERN =
+  /choose (\d+) different legends in addition to your starting legend/i
+
+export const additionalLegendsAsked = (printing: Printing): number =>
+  Option.match(
+    Option.flatMap(printing.maybeText, text =>
+      Option.fromNullishOr(ADDITIONAL_LEGENDS_PATTERN.exec(text)?.[1]),
+    ),
+    { onNone: () => 0, onSome: digits => globalThis.Number(digits) },
+  )
+
+export const sectionOf = (problem: RuleProblem): Section =>
+  Match.value(problem).pipe(
+    Match.withReturnType<Section>(),
+    Match.tagsExhaustive({
+      NoLegend: () => 'Legend',
+      MainDeckTooSmall: () => 'Main',
+      MainDeckNotForty: () => 'Main',
+      NoChosenChampion: () => 'ChosenChampion',
+      ChampionNotChampionUnit: () => 'ChosenChampion',
+      ChampionTagMismatch: () => 'ChosenChampion',
+      TooManyCopies: ({ isCountingSideboard }) =>
+        isCountingSideboard ? 'Sideboard' : 'Main',
+      OutsideDomainIdentity: ({ part }) => part,
+      TooManySignatureCards: () => 'Main',
+      SignatureTagMismatch: () => 'Main',
+      RuneDeckNotTwelve: () => 'Runes',
+      BattlefieldsNotThree: () => 'Battlefields',
+      DuplicateBattlefield: () => 'Battlefields',
+      SideboardTooLarge: () => 'Sideboard',
+      DuplicateAdditionalLegend: () => 'AdditionalLegends',
+      AdditionalLegendsCount: () => 'AdditionalLegends',
+    }),
+  )
 
 export type RulesCheck =
   | Readonly<{ _tag: 'Checked'; problems: ReadonlyArray<RuleProblem> }>
@@ -335,6 +386,23 @@ const uniquenessRules = (resolved: Resolved): ReadonlyArray<RuleProblem> => [
   ),
 ]
 
+const additionalLegendRules = (
+  resolved: Resolved,
+): ReadonlyArray<RuleProblem> => {
+  const required = Array.reduce(
+    [...championCopy(resolved), ...resolved.main],
+    0,
+    (most, { printing }) => Number.max(most, additionalLegendsAsked(printing)),
+  )
+  const count = Array.length(resolved.additionalLegends)
+
+  return when(count !== required, () => ({
+    _tag: 'AdditionalLegendsCount',
+    required,
+    count,
+  }))
+}
+
 export const check = (contents: DeckContents, find: FindPrinting): RulesCheck =>
   Option.match(resolve(contents, find), {
     onNone: () => ({ _tag: 'MissingCards' }),
@@ -350,6 +418,7 @@ export const check = (contents: DeckContents, find: FindPrinting): RulesCheck =>
         ...identityRules(resolved),
         ...signatureRules(resolved),
         ...uniquenessRules(resolved),
+        ...additionalLegendRules(resolved),
       ],
     }),
   })

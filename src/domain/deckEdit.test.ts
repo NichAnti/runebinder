@@ -83,6 +83,16 @@ describe('deck edits', () => {
     expect(copiesOf(second, 'Main', vi)).toBe(1)
   })
 
+  test('setting the champion replaces it without touching the main deck', () => {
+    const set = applyEdit(withMain(2), {
+      _tag: 'SetChampion',
+      printingId: viAlternate,
+    })
+
+    expect(set.maybeChosenChampion).toStrictEqual(Option.some(viAlternate))
+    expect(copiesOf(set, 'Main', vi)).toBe(2)
+  })
+
   test('clearing the champion returns its copy to the main deck', () => {
     const cleared = applyEdit(
       applyEdit(withMain(1), { _tag: 'MakeChampion', printingId: vi }),
