@@ -3,15 +3,18 @@ import { Command, given, message, model, story } from 'foldkit/story'
 import { modifyFields } from 'foldkit/struct'
 import { describe, expect, test } from 'vitest'
 
-import { CatalogueQuery, Collection, Printing } from '../../domain'
+import { CatalogueQuery, Collection, Deck, Printing } from '../../domain'
 import { AppRoute } from '../../route'
 import { ada, allValues, testCard } from '../../testing'
 import * as CollectionState from './collection'
+import * as DecksState from './decks'
 import { Message } from './message'
 import { CatalogueState, init } from './model'
 import * as CardPage from './page/card'
 import * as CataloguePage from './page/catalogue'
-import { enterRoute, update } from './update'
+import * as DeckPage from './page/deck'
+import * as DeckListPage from './page/deckList'
+import { OpenDeck, enterRoute, update } from './update'
 
 const onCatalogue = init(AppRoute.Catalogue(CatalogueQuery.empty), ada)
 
@@ -238,6 +241,90 @@ describe('collection page', () => {
         expect(
           next.collection._tag === 'Ready' && next.collection.refresh,
         ).toStrictEqual(CollectionState.Refresh.Failed())
+      }),
+    )
+  })
+})
+
+describe('decks', () => {
+  const deckId = Deck.DeckId.make('7b0f2a7e-2a9c-4c6e-9d2b-6a6f1c9d2e11')
+  const deck: Deck.Deck = {
+    id: deckId,
+    name: Deck.DeckName.make('Vi aggro'),
+    contents: Deck.empty,
+  }
+  const readyDecks = DecksState.Model.Ready({
+    decks: [],
+    saves: {},
+    nextRevision: 0,
+    creation: DecksState.Creation.Idle(),
+    removals: {},
+  })
+
+  test('the decks page loads decks once', () => {
+    const entered = enterRoute(init(AppRoute.Decks(), ada), AppRoute.Decks())
+
+    expect(entered.commands?.map(({ name }) => name)).toStrictEqual([
+      DecksState.LoadDecks.name,
+    ])
+  })
+
+  test('creating a deck opens it', () => {
+    story(
+      update,
+      given(
+        modifyFields(init(AppRoute.Decks(), ada), {
+          decks: () => readyDecks,
+        }),
+      ),
+      message(
+        Message.GotDeckListPageMessage({
+          message: DeckListPage.Message.UpdatedNewName({ value: 'Vi aggro' }),
+        }),
+      ),
+      message(
+        Message.GotDeckListPageMessage({
+          message: DeckListPage.Message.SubmittedNewDeck(),
+        }),
+      ),
+      Command.resolve(
+        DecksState.CreateDeck,
+        DecksState.Message.SucceededCreateDeck({ deck }),
+      ),
+      Command.expectExact(OpenDeck),
+      Command.resolve(OpenDeck, Message.CompletedOpenDeck()),
+    )
+  })
+
+  test('an edit on the deck page is saved', () => {
+    story(
+      update,
+      given(
+        modifyFields(init(AppRoute.Deck({ deckId }), ada), {
+          decks: () => modifyFields(readyDecks, { decks: () => [deck] }),
+        }),
+      ),
+      message(
+        Message.GotDeckPageMessage({
+          message: DeckPage.Message.UpdatedName({ value: 'Vi tempo' }),
+        }),
+      ),
+      Command.resolve(
+        DecksState.WaitToSaveDeck,
+        DecksState.Message.ElapsedSaveDeckDelay({ deckId, revision: 0 }),
+      ),
+      Command.expectExact(DecksState.SaveDeck),
+      Command.resolve(
+        DecksState.SaveDeck,
+        DecksState.Message.SucceededSaveDeck({ deckId, revision: 0 }),
+      ),
+      model(next => {
+        expect(
+          Option.map(
+            DecksState.maybeDeck(next.decks, deckId),
+            ({ name }) => name,
+          ),
+        ).toStrictEqual(Option.some('Vi tempo'))
       }),
     )
   })

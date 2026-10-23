@@ -11,6 +11,7 @@ import {
   cardTraderRouter,
   catalogueHome,
   collectionRouter,
+  decksRouter,
 } from './route'
 import { Button, Link } from './ui'
 
@@ -22,6 +23,8 @@ const title = (route: AppRoute): string =>
     Card: ({ cardId }) => `${cardId} | ${APP_NAME}`,
     CardTrader: () => `CardTrader | ${APP_NAME}`,
     Collection: () => `Collection | ${APP_NAME}`,
+    Decks: () => `Decks | ${APP_NAME}`,
+    Deck: () => `Deck | ${APP_NAME}`,
     NotFound: () => `Not found | ${APP_NAME}`,
   })
 
@@ -57,6 +60,16 @@ const navView = (loggedIn: LoggedIn.Model, h: HtmlBuilder<Message>): Html =>
           content: ['Collection'],
           variant: 'Nav',
           isCurrent: loggedIn.route._tag === 'Collection',
+        },
+        h,
+      ),
+      Link.view(
+        {
+          href: decksRouter(),
+          content: ['Decks'],
+          variant: 'Nav',
+          isCurrent:
+            loggedIn.route._tag === 'Decks' || loggedIn.route._tag === 'Deck',
         },
         h,
       ),

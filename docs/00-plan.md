@@ -65,7 +65,7 @@ Its structure is agreed before any code is written.
 
 - [x] 7.1 Deck domain (`Deck` with legend, chosen champion, Main / Runes / Battlefields / Sideboard zones and ordered additional legends); `@piltoverarchive/riftbound-deck-codes` pinned at `1.5.0`, wrapped so errors are typed; code import and export with round-trip tests
 - [x] 7.2 `deck`, `deck_card` and `deck_additional_legend` tables and migration; the Backend's printing file carries each printing's card type so it can check zones; deck API
-- [ ] 7.3 Deck list, deck view (one line per card, card panel, printing per copy), import and export a code
+- [x] 7.3 Deck list, deck view (one line per card, card panel, printing per copy), import and export a code
 - [ ] 7.4 Official deckbuilding rules enforced in the deck builder (required by Riot's policy)
 
 ## Phase 8: Missing cards and wishlist

@@ -4,9 +4,12 @@ import { defineTaggedUnion, taggedStruct } from 'foldkit/schema'
 import { CatalogueQuery, CatalogueSearch, Collection, User } from '../../domain'
 import { LoggedInRoute } from '../../route'
 import * as CollectionState from './collection'
+import * as DecksState from './decks'
 import * as CardPage from './page/card'
 import * as CardTraderPage from './page/cardTrader'
 import * as CataloguePage from './page/catalogue'
+import * as DeckPage from './page/deck'
+import * as DeckListPage from './page/deckList'
 
 export const CatalogueState = defineTaggedUnion({
   Loading: { attempt: Schema.Int },
@@ -24,10 +27,13 @@ export const Model = taggedStruct('LoggedIn', {
   user: User.User,
   catalogue: CatalogueState,
   collection: CollectionState.Model,
+  decks: DecksState.Model,
   cataloguePage: CataloguePage.Model,
   collectionPage: CataloguePage.Model,
   cardPage: CardPage.Model,
   cardTraderPage: CardTraderPage.Model,
+  deckListPage: DeckListPage.Model,
+  deckPage: DeckPage.Model,
 })
 export type Model = typeof Model.Type
 
@@ -37,6 +43,7 @@ export const init = (route: LoggedInRoute, user: User.User): Model =>
     user,
     catalogue: CatalogueState.Loading({ attempt: 0 }),
     collection: CollectionState.init(),
+    decks: DecksState.init(),
     cataloguePage: CataloguePage.init(
       route._tag === 'Catalogue' ? route : CatalogueQuery.empty,
     ),
@@ -45,4 +52,6 @@ export const init = (route: LoggedInRoute, user: User.User): Model =>
     ),
     cardPage: CardPage.init(),
     cardTraderPage: CardTraderPage.init(),
+    deckListPage: DeckListPage.init(),
+    deckPage: DeckPage.init(),
   })

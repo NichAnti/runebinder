@@ -41,11 +41,13 @@ const ready = Model.Ready({
 const addVi = (model: Model) =>
   edit(model, {
     deckId,
-    edit: {
-      _tag: 'AddCard',
-      printingId: vi,
-      maybeType: Option.some('Unit'),
-    },
+    edits: [
+      {
+        _tag: 'AddCard',
+        printingId: vi,
+        maybeType: Option.some('Unit'),
+      },
+    ],
   })
 
 describe('decks', () => {

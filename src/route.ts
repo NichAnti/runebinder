@@ -2,7 +2,7 @@ import { Option, Schema, SchemaTransformation, pipe } from 'effect'
 import { Route } from 'foldkit'
 import { defineRouteUnion, literal, schemaSegment, slash } from 'foldkit/route'
 
-import { CatalogueQuery, Printing } from './domain'
+import { CatalogueQuery, Deck, Printing } from './domain'
 
 export const AppRoute = defineRouteUnion({
   SignIn: {},
@@ -14,12 +14,15 @@ export const AppRoute = defineRouteUnion({
   },
   CardTrader: {},
   Collection: CatalogueQuery.Query.fields,
+  Decks: {},
+  Deck: { deckId: Deck.DeckId },
   NotFound: { path: Schema.String },
 })
 export type AppRoute = typeof AppRoute.Type
 export type CatalogueRoute = typeof AppRoute.Catalogue.Type
 export type CardRoute = typeof AppRoute.Card.Type
 export type CollectionRoute = typeof AppRoute.Collection.Type
+export type DeckRoute = typeof AppRoute.Deck.Type
 
 export const LoggedOutRoute = AppRoute.subset(['SignIn', 'SignUp', 'NotFound'])
 export type LoggedOutRoute = typeof LoggedOutRoute.Type
@@ -29,6 +32,8 @@ export const LoggedInRoute = AppRoute.subset([
   'Card',
   'CardTrader',
   'Collection',
+  'Decks',
+  'Deck',
   'NotFound',
 ])
 export type LoggedInRoute = typeof LoggedInRoute.Type
@@ -61,6 +66,12 @@ export const cardTraderRouter = pipe(
   literal('cardtrader'),
   Route.mapTo(AppRoute.CardTrader),
 )
+export const decksRouter = pipe(literal('decks'), Route.mapTo(AppRoute.Decks))
+export const deckRouter = pipe(
+  literal('decks'),
+  slash(schemaSegment('deckId', Deck.DeckId)),
+  Route.mapTo(AppRoute.Deck),
+)
 export const collectionRouter = pipe(
   literal('collection'),
   Route.query(CatalogueQuery.QueryParams),
@@ -86,6 +97,8 @@ const routeParser = Route.oneOf(
   cardRouter,
   cardTraderRouter,
   collectionRouter,
+  deckRouter,
+  decksRouter,
   catalogueRouter,
 )
 

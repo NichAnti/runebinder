@@ -6,12 +6,15 @@ import { catalogueHome } from '../../route'
 import { Button, Notice } from '../../ui'
 import * as NotFound from '../notFound'
 import * as CollectionState from './collection'
+import * as DecksState from './decks'
 import { Message } from './message'
 import { CatalogueState, type Model } from './model'
 import * as CardPage from './page/card'
 import * as CardTraderPage from './page/cardTrader'
 import * as CataloguePage from './page/catalogue'
 import * as CollectionPage from './page/collection'
+import * as DeckPage from './page/deck'
+import * as DeckListPage from './page/deckList'
 import { contextOf } from './update'
 
 const catalogueGate = (
@@ -58,6 +61,12 @@ export const view = Submodel.defineView<Model, Message>((model, h) =>
         model: model.collection,
         view: CollectionState.view,
         toParentMessage: message => Message.GotCollectionMessage({ message }),
+      }),
+      h.submodel({
+        slotId: 'decks-status',
+        model: model.decks,
+        view: DecksState.view,
+        toParentMessage: message => Message.GotDecksMessage({ message }),
       }),
       Match.value(model.route).pipe(
         Match.tagsExhaustive({
@@ -125,6 +134,29 @@ export const view = Submodel.defineView<Model, Message>((model, h) =>
                   },
                   toParentMessage: message =>
                     Message.GotCardPageMessage({ message }),
+                }),
+              h,
+            ),
+          Decks: () =>
+            h.submodel({
+              slotId: 'deck-list-page',
+              model: model.deckListPage,
+              view: DeckListPage.view,
+              viewInputs: { decks: model.decks },
+              toParentMessage: message =>
+                Message.GotDeckListPageMessage({ message }),
+            }),
+          Deck: ({ deckId }) =>
+            catalogueGate(
+              model,
+              () =>
+                h.submodel({
+                  slotId: 'deck-page',
+                  model: model.deckPage,
+                  view: DeckPage.view,
+                  viewInputs: { decks: model.decks, deckId },
+                  toParentMessage: message =>
+                    Message.GotDeckPageMessage({ message }),
                 }),
               h,
             ),

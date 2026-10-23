@@ -1,12 +1,15 @@
-import { Match, Option } from 'effect'
-import { Update } from 'foldkit'
+import { Effect, Match, Option } from 'effect'
+import { Command, Update } from 'foldkit'
+import { pushUrl, replaceUrl } from 'foldkit/navigation'
 import { modifyFields } from 'foldkit/struct'
 
-import { Printing } from '../../domain'
-import type {
-  CatalogueRoute,
-  CollectionRoute,
-  LoggedInRoute,
+import { Deck, Printing } from '../../domain'
+import {
+  type CatalogueRoute,
+  type CollectionRoute,
+  type LoggedInRoute,
+  deckRouter,
+  decksRouter,
 } from '../../route'
 import type {
   ApiClient,
@@ -15,11 +18,14 @@ import type {
   TokenStore,
 } from '../../service'
 import * as CollectionState from './collection'
+import * as DecksState from './decks'
 import { Message } from './message'
 import { CatalogueState, type Model } from './model'
 import * as CardPage from './page/card'
 import * as CardTraderPage from './page/cardTrader'
 import * as CataloguePage from './page/catalogue'
+import * as DeckPage from './page/deck'
+import * as DeckListPage from './page/deckList'
 
 type Requirements =
   | ApiClient
@@ -183,6 +189,119 @@ const refreshCollection = Update.foldChildStep({
   toParentMessage: toCollectionMessage,
 })
 
+// COMMAND
+
+export const OpenDeck = Command.define('OpenDeck', {
+  args: { deckId: Deck.DeckId },
+  messages: [Message.CompletedOpenDeck],
+  execute: ({ deckId }) =>
+    pushUrl(deckRouter({ deckId })).pipe(
+      Effect.as(Message.CompletedOpenDeck()),
+    ),
+})
+
+export const ReturnToDecks = Command.define('ReturnToDecks', {
+  messages: [Message.CompletedReturnToDecks],
+  execute: replaceUrl(decksRouter()).pipe(
+    Effect.as(Message.CompletedReturnToDecks()),
+  ),
+})
+
+// DECKS
+
+const readDecks = (model: Model) => Option.some(model.decks)
+const writeDecks = (model: Model, nextDecks: DecksState.Model): Model =>
+  modifyFields(model, { decks: () => nextDecks })
+const toDecksMessage = (message: DecksState.Message): Message =>
+  Message.GotDecksMessage({ message })
+
+const foldDecksOutMessage = DecksState.OutMessage.match<
+  Update.Step<Model, Message, ApiClient>
+>({
+  CreatedDeck:
+    ({ deckId }) =>
+    stepModel => ({
+      model: stepModel,
+      commands: [OpenDeck({ deckId })],
+    }),
+  RemovedDeck: () => stepModel => ({
+    model: stepModel,
+    commands: [ReturnToDecks()],
+  }),
+})
+
+const decksFold = {
+  read: readDecks,
+  write: writeDecks,
+  toParentMessage: toDecksMessage,
+  foldOutMessage: foldDecksOutMessage,
+}
+
+const foldDecks = Update.foldChild({ update: DecksState.update, ...decksFold })
+const ensureDecks = Update.foldChildStep({
+  update: DecksState.ensureLoaded,
+  ...decksFold,
+})
+const retryDecks = Update.foldChildStep({
+  update: DecksState.retry,
+  ...decksFold,
+})
+const createDeck = Update.foldChild({ update: DecksState.create, ...decksFold })
+const editDeck = Update.foldChild({ update: DecksState.edit, ...decksFold })
+const removeDeck = Update.foldChild({ update: DecksState.remove, ...decksFold })
+
+const foldDeckListPageOutMessage = DeckListPage.OutMessage.match<
+  Update.Step<Model, Message, ApiClient>
+>({
+  RequestedCreateDeck: newDeck => createDeck(newDeck),
+  RequestedRetryLoadDecks: () => retryDecks,
+})
+
+const foldDeckListPage = Update.foldChild({
+  update: DeckListPage.update,
+  read: (model: Model) => Option.some(model.deckListPage),
+  write: (model: Model, nextPage: DeckListPage.Model): Model =>
+    modifyFields(model, { deckListPage: () => nextPage }),
+  toParentMessage: message => Message.GotDeckListPageMessage({ message }),
+  foldOutMessage: foldDeckListPageOutMessage,
+})
+
+const foldDeckPageOutMessage = DeckPage.OutMessage.match<
+  Update.Step<Model, Message, ApiClient>
+>({
+  EditedDeck: edits => editDeck(edits),
+  RequestedRemoveDeck: ({ deckId }) => removeDeck(deckId),
+  RequestedRetryLoadDecks: () => retryDecks,
+})
+
+const deckPageSlot = {
+  read: (model: Model) => Option.some(model.deckPage),
+  write: (model: Model, nextPage: DeckPage.Model): Model =>
+    modifyFields(model, { deckPage: () => nextPage }),
+  toParentMessage: (message: DeckPage.Message) =>
+    Message.GotDeckPageMessage({ message }),
+}
+
+const foldDeckPage = (maybeDeck: Option.Option<Deck.Deck>) =>
+  Update.foldChild({
+    update: DeckPage.update(maybeDeck),
+    ...deckPageSlot,
+    foldOutMessage: foldDeckPageOutMessage,
+  })
+
+const enterDeckPage =
+  (deckId: Deck.DeckId): Update.Step<Model, Message, CatalogueIndexService> =>
+  stepModel =>
+    Update.foldChildStep({
+      update: (page: DeckPage.Model) =>
+        DeckPage.enter(
+          page,
+          DecksState.maybeDeck(stepModel.decks, deckId),
+          stepModel.catalogue._tag === 'Ready',
+        ),
+      ...deckPageSlot,
+    })(stepModel)
+
 // ROUTE
 
 export const enterRoute = (
@@ -223,12 +342,21 @@ export const enterRoute = (
           [foldCardPageEntry({ cardId, isIndexReady }), ensureCollection],
         ),
       CardTrader: () => enterCardTraderPage(routed),
+      Decks: () => ensureDecks(routed),
+      Deck: ({ deckId }) =>
+        Update.combine<Model, Message, Requirements>(routed, [
+          ensureDecks,
+          enterDeckPage(deckId),
+        ]),
       NotFound: () => ({ model: routed }),
     }),
   )
 }
 
 // UPDATE
+
+const isWaitingForDecks = (route: LoggedInRoute): boolean =>
+  route._tag === 'Deck'
 
 const isWaitingForCollection = (route: LoggedInRoute): boolean =>
   route._tag === 'Collection' ||
@@ -304,6 +432,32 @@ export const update = (model: Model, message: Message) =>
             stepModel => enterRoute(stepModel, stepModel.route),
           ])
         : foldCollection(model, message),
+
+    GotDecksMessage: ({ message }) =>
+      message._tag === 'SucceededLoadDecks' && isWaitingForDecks(model.route)
+        ? Update.combine<Model, Message, Requirements>(model, [
+            foldDecks(message),
+            stepModel => enterRoute(stepModel, stepModel.route),
+          ])
+        : foldDecks(model, message),
+
+    GotDeckListPageMessage: ({ message }) => foldDeckListPage(model, message),
+
+    GotDeckPageMessage: ({ message }) =>
+      Match.value(model.route).pipe(
+        withUpdateReturn,
+        Match.tag('Deck', ({ deckId }) =>
+          foldDeckPage(DecksState.maybeDeck(model.decks, deckId))(
+            model,
+            message,
+          ),
+        ),
+        Match.orElse(() => ({ model })),
+      ),
+
+    CompletedOpenDeck: () => ({ model }),
+
+    CompletedReturnToDecks: () => ({ model }),
 
     ClickedRetryCatalogue: () => ({
       model: modifyFields(model, {

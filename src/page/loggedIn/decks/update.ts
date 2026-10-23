@@ -118,18 +118,18 @@ const applyTo = (deck: Deck.Deck, edit: DeckEdit.DeckEdit): Deck.Deck =>
     ? { ...deck, name: edit.name }
     : { ...deck, contents: DeckEdit.applyEdit(deck.contents, edit) }
 
-export type Edit = Readonly<{
+export type Edits = Readonly<{
   deckId: Deck.DeckId
-  edit: DeckEdit.DeckEdit
+  edits: Array.NonEmptyReadonlyArray<DeckEdit.DeckEdit>
 }>
 
-export const edit = (model: Model, { deckId, edit }: Edit) =>
+export const edit = (model: Model, { deckId, edits }: Edits) =>
   whenReady(model, ready =>
     Array.some(ready.decks, deck => deck.id === deckId)
       ? {
           model: modifyFields(ready, {
             decks: Array.map(deck =>
-              deck.id === deckId ? applyTo(deck, edit) : deck,
+              deck.id === deckId ? Array.reduce(edits, deck, applyTo) : deck,
             ),
             saves: saves =>
               Record.set(
@@ -143,6 +143,9 @@ export const edit = (model: Model, { deckId, edit }: Edit) =>
         }
       : { model },
   )
+
+export const retry = (model: Model): UpdateReturn =>
+  model._tag === 'Failed' ? loading() : { model }
 
 export const remove = (model: Model, deckId: Deck.DeckId) =>
   whenReady(model, ready =>
@@ -202,8 +205,7 @@ export const update = (model: Model, message: Message) =>
 
     FailedLoadDecks: () => ({ model: Model.Failed() }),
 
-    ClickedRetryLoadDecks: () =>
-      model._tag === 'Failed' ? loading() : { model },
+    ClickedRetryLoadDecks: () => retry(model),
 
     SucceededCreateDeck: ({ deck }) =>
       whenReady(model, ready => ({
