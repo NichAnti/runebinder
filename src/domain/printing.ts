@@ -44,6 +44,11 @@ export const CardType = Schema.Literals([
 ])
 export type CardType = typeof CardType.Type
 
+export type KnownPrinting = Readonly<{
+  printingId: PrintingId
+  maybeType: Option.Option<CardType>
+}>
+
 export const Supertype = Schema.Literals([
   'Champion',
   'Signature',

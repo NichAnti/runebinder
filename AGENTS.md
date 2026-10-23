@@ -63,6 +63,7 @@ Domain vocabulary, deployment steps, local conventions that differ from Foldkit'
 - Drizzle is the only way to define and query the database. Tables live in `src/worker/schema/` (Better Auth's tables in `auth.ts`, generated with `npx auth@1.7.5 generate` against `@better-auth/drizzle-adapter/relations-v2`). `Drizzle.Schema` generates migrations into `migrations/` from those tables; commit them and never edit them by hand.
 - `drizzle-orm` and `drizzle-kit` are pinned to exactly the version `alchemy` pins; upgrade them together with `alchemy`.
 - App code queries through the Effect handle (`Drizzle.D1`) inside per-feature repository services (`src/worker/<feature>/repository.ts`). Handlers never query directly.
+- Writes that must succeed or fail together use Drizzle's `drizzle-orm/d1` driver's `batch` (D1 runs a batch as one transaction), wrapped in `Effect.tryPromise` inside the repository. D1 has no interactive transactions, and the Effect driver has no `batch`.
 - Rows are parsed at the boundary with schemas derived by `drizzle-orm/effect-schema`, overriding columns with branded domain types (`CardCode`, `UserId`, …).
 
 ### Working Rules

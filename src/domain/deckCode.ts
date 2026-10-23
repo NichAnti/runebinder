@@ -17,7 +17,12 @@ import {
 
 import { CardCode, cardCodeOf, normalizeCardCode } from './cardCode'
 import { Copies, type DeckCard, type DeckContents, MAX_COPIES } from './deck'
-import { type CardType, type Printing, PrintingId } from './printing'
+import {
+  type CardType,
+  type KnownPrinting,
+  type Printing,
+  PrintingId,
+} from './printing'
 
 export const DeckCode = Schema.String.check(
   Schema.isPattern(/^[A-Z2-7]+$/),
@@ -34,11 +39,6 @@ export const DeckCodeProblem = Schema.Union([
   Schema.TaggedStruct('RejectedByFormat', {}),
 ])
 export type DeckCodeProblem = typeof DeckCodeProblem.Type
-
-export type KnownPrinting = Readonly<{
-  printingId: PrintingId
-  maybeType: Option.Option<CardType>
-}>
 
 export type CardLookup = (cardCode: CardCode) => Option.Option<KnownPrinting>
 
