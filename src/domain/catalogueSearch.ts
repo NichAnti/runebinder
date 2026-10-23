@@ -11,6 +11,7 @@ export const CardSummary = Schema.Struct({
   imageUrl: Schema.String,
   maybeAccessibilityText: Schema.Option(Schema.String),
   printingIds: Schema.NonEmptyArray(PrintingId),
+  maybeCopyLimit: Schema.Option(Schema.Int),
 })
 export type CardSummary = typeof CardSummary.Type
 

@@ -109,6 +109,41 @@ export const sectionOf = (problem: RuleProblem): Section =>
     }),
   )
 
+export const isUnfinished = (problem: RuleProblem): boolean =>
+  Match.value(problem).pipe(
+    Match.withReturnType<boolean>(),
+    Match.tagsExhaustive({
+      NoLegend: () => true,
+      MainDeckTooSmall: () => true,
+      MainDeckNotForty: ({ size }) => size < CONSTRUCTED_MAIN_DECK_SIZE,
+      NoChosenChampion: () => true,
+      ChampionNotChampionUnit: () => false,
+      ChampionTagMismatch: () => false,
+      TooManyCopies: () => false,
+      OutsideDomainIdentity: () => false,
+      TooManySignatureCards: () => false,
+      SignatureTagMismatch: () => false,
+      RuneDeckNotTwelve: ({ size }) => size < RUNE_DECK_SIZE,
+      BattlefieldsNotThree: ({ count }) => count < CONSTRUCTED_BATTLEFIELDS,
+      DuplicateBattlefield: () => false,
+      SideboardTooLarge: () => false,
+      DuplicateAdditionalLegend: () => false,
+      AdditionalLegendsCount: ({ required, count }) => count < required,
+    }),
+  )
+
+export type Progress = 'Done' | 'Unfinished' | 'Problem'
+
+export const progressOf = (problems: ReadonlyArray<RuleProblem>): Progress => {
+  if (Array.some(problems, problem => !isUnfinished(problem))) {
+    return 'Problem'
+  } else if (Array.isReadonlyArrayNonEmpty(problems)) {
+    return 'Unfinished'
+  } else {
+    return 'Done'
+  }
+}
+
 export type RulesCheck =
   | Readonly<{ _tag: 'Checked'; problems: ReadonlyArray<RuleProblem> }>
   | Readonly<{ _tag: 'MissingCards' }>
@@ -212,6 +247,19 @@ const allowsAnyNumber = (printing: Printing): boolean =>
       `Your deck can have any number of cards named ${printing.name}`,
     ),
   )
+
+export const copyLimitOf = (printing: Printing): Option.Option<number> => {
+  if (Option.exists(printing.maybeType, type => type === 'Battlefield')) {
+    return Option.some(1)
+  } else if (
+    Option.exists(printing.maybeType, type => type === 'Rune') ||
+    allowsAnyNumber(printing)
+  ) {
+    return Option.none()
+  } else {
+    return Option.some(MAX_COPIES_OF_A_NAME)
+  }
+}
 
 const byCard = Order.mapInput(
   Order.String,

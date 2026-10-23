@@ -3,7 +3,12 @@ import { describe, expect, test } from 'vitest'
 
 import { printing } from '../testing'
 import { Copies, type DeckCard, type DeckContents } from './deck'
-import { additionalLegendsAsked, check } from './deckRules'
+import {
+  additionalLegendsAsked,
+  check,
+  copyLimitOf,
+  progressOf,
+} from './deckRules'
 import {
   CardId,
   type Domain,
@@ -229,5 +234,39 @@ describe('deck rules', () => {
         },
       ]),
     )
+  })
+})
+
+describe('progress', () => {
+  test('a part with no problems is done', () => {
+    expect(progressOf([])).toBe('Done')
+  })
+
+  test('a part that only lacks cards is unfinished', () => {
+    expect(
+      progressOf([
+        { _tag: 'MainDeckNotForty', size: 32 },
+        { _tag: 'NoChosenChampion' },
+      ]),
+    ).toBe('Unfinished')
+  })
+
+  test('too many cards or a broken rule is a problem', () => {
+    expect(progressOf([{ _tag: 'MainDeckNotForty', size: 41 }])).toBe('Problem')
+    expect(
+      progressOf([
+        { _tag: 'RuneDeckNotTwelve', size: 10 },
+        { _tag: 'DuplicateBattlefield', cardId: CardId.make('the-arena') },
+      ]),
+    ).toBe('Problem')
+  })
+})
+
+describe('copy limits', () => {
+  test('three of a card, one of a battlefield, runes and Spiderling unlimited', () => {
+    expect(copyLimitOf(firstFiller)).toStrictEqual(Option.some(3))
+    expect(copyLimitOf(firstBattlefield)).toStrictEqual(Option.some(1))
+    expect(copyLimitOf(furyRune)).toStrictEqual(Option.none())
+    expect(copyLimitOf(spiderling)).toStrictEqual(Option.none())
   })
 })

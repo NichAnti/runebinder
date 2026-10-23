@@ -43,7 +43,10 @@ export type DeckEdit = typeof DeckEdit.Type
 
 // ZONES
 
-const cardsIn = (contents: DeckContents, zone: Zone): ReadonlyArray<DeckCard> =>
+export const cardsIn = (
+  contents: DeckContents,
+  zone: Zone,
+): ReadonlyArray<DeckCard> =>
   Match.value(zone).pipe(
     Match.withReturnType<ReadonlyArray<DeckCard>>(),
     Match.when('Main', () => contents.main),

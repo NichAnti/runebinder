@@ -6,6 +6,7 @@ import {
   CatalogueSearch,
   Deck,
   DeckCode,
+  type DeckRules,
   DeckStructure,
   Printing,
 } from '../../../../domain'
@@ -31,6 +32,19 @@ export const AddTab = Schema.Literals([
   'AdditionalLegend',
 ])
 export type AddTab = typeof AddTab.Type
+
+export const TAB_FOR_SECTION: Readonly<Record<DeckRules.Section, AddTab>> = {
+  Legend: 'Legend',
+  ChosenChampion: 'Champion',
+  Main: 'Unit',
+  Runes: 'Rune',
+  Battlefields: 'Battlefield',
+  Sideboard: 'Unit',
+  AdditionalLegends: 'AdditionalLegend',
+}
+
+export const sectionElementId = (section: DeckRules.Section): string =>
+  `deck-section-${section}`
 
 export const Layout = Schema.Literals(['Grid', 'List'])
 export type Layout = typeof Layout.Type
@@ -68,7 +82,7 @@ export const init = (): Model => ({
   addTab: 'Legend',
   searchText: '',
   searchResults: [],
-  isOnlyLegal: false,
+  isOnlyLegal: true,
   layout: 'Grid',
   panels: {
     Legend: CardPanel.init(),

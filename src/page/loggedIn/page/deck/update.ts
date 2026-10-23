@@ -9,7 +9,7 @@ import {
   Schema,
   String,
 } from 'effect'
-import { Command, Update } from 'foldkit'
+import { Command, Dom, Update } from 'foldkit'
 import {
   NotValidated,
   Rule,
@@ -23,6 +23,7 @@ import {
   Deck,
   DeckCode,
   DeckEdit,
+  DeckRules,
   type DeckStructure,
   Printing,
 } from '../../../../domain'
@@ -35,7 +36,15 @@ import { Toast } from '../../../../ui'
 import * as CardPanel from '../../cardPanel'
 import { cardsByPrinting, nameOf } from './lines'
 import { Message, OutMessage } from './message'
-import { AddTab, Export, type Model, defaultTab, init } from './model'
+import {
+  AddTab,
+  Export,
+  type Model,
+  TAB_FOR_SECTION,
+  defaultTab,
+  init,
+  sectionElementId,
+} from './model'
 
 type UpdateReturn = Update.ReturnWithOutMessage<
   Model,
@@ -163,6 +172,15 @@ export const CopyDeckCode = Command.define('CopyDeckCode', {
       Effect.as(Message.CompletedCopyDeckCode({ code })),
       Effect.catch(() => Effect.succeed(Message.FailedCopyDeckCode({ code }))),
     ),
+})
+
+export const ScrollToSection = Command.define('ScrollToSection', {
+  args: { section: DeckRules.Section },
+  messages: [Message.CompletedScrollToSection],
+  execute: ({ section }) =>
+    Dom.scrollIntoView(`#${sectionElementId(section)}`, {
+      block: 'start',
+    }).pipe(Effect.ignore, Effect.as(Message.CompletedScrollToSection())),
 })
 
 // TOAST
@@ -365,6 +383,9 @@ const editFor = (tab: AddTab, card: Printing.Card): DeckEdit.DeckEdit => {
   )
 }
 
+export const isChoiceTab = (tab: AddTab): boolean =>
+  tab === 'Legend' || tab === 'Champion' || tab === 'AdditionalLegend'
+
 const addedText = (tab: AddTab, card: Printing.Card): string => {
   const name = nameOf(card)
 
@@ -455,6 +476,24 @@ export const update =
         return { model: nextModel, commands: [searchFor(nextModel, maybeDeck)] }
       },
 
+      ClickedProgress: ({ section }) => {
+        const tab = TAB_FOR_SECTION[section]
+        const nextModel = modifyFields(model, {
+          addTab: () => tab,
+          searchResults: results => (tab === model.addTab ? results : []),
+        })
+
+        return {
+          model: nextModel,
+          commands: [
+            ScrollToSection({ section }),
+            ...(tab === model.addTab ? [] : [searchFor(nextModel, maybeDeck)]),
+          ],
+        }
+      },
+
+      CompletedScrollToSection: () => ({ model }),
+
       ToggledOnlyLegal: ({ isChecked }) => ({
         model: modifyFields(model, { isOnlyLegal: () => isChecked }),
       }),
@@ -480,10 +519,12 @@ export const update =
           addTab: () => nextTab,
           searchResults: results => (nextTab === tab ? results : []),
         })
-        const toastShow = showToast(stored, {
-          variant: 'Success',
-          payload: { text: addedText(tab, card) },
-        })
+        const toastShow = isChoiceTab(tab)
+          ? showToast(stored, {
+              variant: 'Success',
+              payload: { text: addedText(tab, card) },
+            })
+          : { model: stored }
         const edit = edited(toastShow.model, maybeDeck, () => [
           editFor(tab, card),
         ])

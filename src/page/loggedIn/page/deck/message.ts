@@ -6,6 +6,7 @@ import {
   Deck,
   DeckCode,
   DeckEdit,
+  DeckRules,
   DeckStructure,
   Printing,
 } from '../../../../domain'
@@ -17,6 +18,8 @@ export const Message = defineMessageUnion({
   UpdatedName: { value: Schema.String },
   UpdatedSearch: { value: Schema.String },
   SelectedAddTab: { tab: AddTab },
+  ClickedProgress: { section: DeckRules.Section },
+  CompletedScrollToSection: {},
   ToggledOnlyLegal: { isChecked: Schema.Boolean },
   SelectedLayout: { layout: Layout },
   SucceededSearchCardsToAdd: {

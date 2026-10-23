@@ -7,6 +7,7 @@ import {
   CatalogueQuery,
   CatalogueSearch,
   Collection,
+  DeckRules,
   Printing,
 } from '../domain'
 
@@ -251,6 +252,7 @@ const toSummary = (card: Printing.Card): CatalogueSearch.CardSummary => {
     imageUrl: base.imageUrl,
     maybeAccessibilityText: base.maybeAccessibilityText,
     printingIds: Array.map(card.printings, ({ id }) => id),
+    maybeCopyLimit: DeckRules.copyLimitOf(base),
   }
 }
 

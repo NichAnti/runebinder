@@ -5,6 +5,7 @@ import type { Html, HtmlBuilder } from 'foldkit/html'
 import {
   type CatalogueSearch,
   Deck,
+  DeckEdit,
   DeckRules,
   type DeckStructure,
   Missing,
@@ -18,6 +19,7 @@ import {
   Checkbox,
   Link,
   Notice,
+  ProgressChip,
   QuantityStepper,
   SearchField,
   SegmentedControl,
@@ -38,7 +40,7 @@ import {
   quantitiesOf,
 } from './lines'
 import { Message } from './message'
-import type { AddTab, Layout, Model } from './model'
+import { type AddTab, type Layout, type Model, sectionElementId } from './model'
 import { explain } from './problemText'
 
 export type ViewInputs = Readonly<{
@@ -314,6 +316,12 @@ const gridLineView = (
           ),
       }),
       lineStepper(zone, line, h),
+      ...Array.match(lineActions(zone, line, h), {
+        onEmpty: () => [],
+        onNonEmpty: actions => [
+          h.div([h.Class('flex flex-wrap gap-1')], actions),
+        ],
+      }),
     ],
   )
 
@@ -357,7 +365,11 @@ const zoneView = (
   h: HtmlBuilder<Message>,
 ): Html =>
   h.section(
-    [h.AriaLabel(SECTION_LABELS[zone]), h.Class('flex flex-col gap-3')],
+    [
+      h.Id(sectionElementId(zone)),
+      h.AriaLabel(SECTION_LABELS[zone]),
+      h.Class('flex scroll-mt-16 flex-col gap-3'),
+    ],
     [
       sectionHeader(
         context,
@@ -399,7 +411,11 @@ const slotView = (
   h: HtmlBuilder<Message>,
 ): Html =>
   h.section(
-    [h.AriaLabel(SECTION_LABELS[place]), h.Class('flex flex-col gap-2')],
+    [
+      h.Id(sectionElementId(place)),
+      h.AriaLabel(SECTION_LABELS[place]),
+      h.Class('flex scroll-mt-16 flex-col gap-2'),
+    ],
     [
       sectionHeader(context, place, Option.none(), h),
       Option.match(
@@ -475,8 +491,9 @@ const additionalLegendsView = (
     ? h.empty
     : h.section(
         [
+          h.Id(sectionElementId('AdditionalLegends')),
           h.AriaLabel(SECTION_LABELS.AdditionalLegends),
-          h.Class('flex flex-col gap-2'),
+          h.Class('flex scroll-mt-16 flex-col gap-2'),
         ],
         [
           sectionHeader(
@@ -606,21 +623,91 @@ const inDeckText = (
   return text
 }
 
+const zoneOfTab = (tab: AddTab): Deck.Zone => {
+  if (tab === 'Rune') {
+    return 'Runes'
+  } else if (tab === 'Battlefield') {
+    return 'Battlefields'
+  } else {
+    return 'Main'
+  }
+}
+
+const cardsOf = (
+  card: CatalogueSearch.CardSummary,
+  zoneCards: ReadonlyArray<Deck.DeckCard>,
+): ReadonlyArray<Deck.DeckCard> =>
+  Array.filter(zoneCards, ({ printingId }) =>
+    Array.contains(card.printingIds, printingId),
+  )
+
+const resultStepper = (
+  context: Context,
+  card: CatalogueSearch.CardSummary,
+  label: string,
+  h: HtmlBuilder<Message>,
+): Html => {
+  const { contents } = context.deck
+  const zone = zoneOfTab(context.model.addTab)
+  const inZone = cardsOf(card, DeckEdit.cardsIn(contents, zone))
+  const copies = Deck.copiesIn(inZone)
+  const used =
+    zone === 'Main'
+      ? copies +
+        Deck.copiesIn(cardsOf(card, contents.sideboard)) +
+        (Option.exists(contents.maybeChosenChampion, printingId =>
+          Array.contains(card.printingIds, printingId),
+        )
+          ? 1
+          : 0)
+      : copies
+  const mostCopies = Array.reduce(
+    inZone,
+    Option.none<Deck.DeckCard>(),
+    (most, deckCard) =>
+      Option.exists(most, ({ copies }) => copies >= deckCard.copies)
+        ? most
+        : Option.some(deckCard),
+  )
+
+  return QuantityStepper.view(
+    {
+      label: `In ${SECTION_LABELS[zone]}: ${label}`,
+      quantity: copies,
+      max: Option.match(card.maybeCopyLimit, {
+        onNone: () => Deck.MAX_COPIES,
+        onSome: limit => copies + Number.max(0, limit - used),
+      }),
+      onDecrement: Message.ClickedStepLine({
+        zone,
+        printingId: Option.match(mostCopies, {
+          onNone: () => Array.headNonEmpty(card.printingIds),
+          onSome: ({ printingId }) => printingId,
+        }),
+        step: -1,
+      }),
+      onIncrement: Message.ClickedAddCard({ cardId: card.id }),
+    },
+    h,
+  )
+}
+
 const resultView = (
   context: Context,
   card: CatalogueSearch.CardSummary,
   h: HtmlBuilder<Message>,
 ): Html => {
   const tab = context.model.addTab
-  const isChoice = tab === 'Legend' || tab === 'Champion'
   const label = Option.match(card.maybeSubtitle, {
     onNone: () => card.name,
     onSome: subtitle => `${card.name}, ${subtitle}`,
   })
+  const isChoice =
+    tab === 'Legend' || tab === 'Champion' || tab === 'AdditionalLegend'
 
   return h.keyed('li')(
     card.id,
-    [h.Class('flex flex-col gap-2')],
+    [h.Class('flex flex-col items-center gap-2')],
     [
       CardTile.view(
         {
@@ -633,20 +720,24 @@ const resultView = (
           maybeSubtitle: card.maybeSubtitle,
           domains: card.domains,
           meta: '',
-          highlights: Option.toArray(
-            inDeckText(tab, context.deck.contents, card),
-          ),
+          highlights: isChoice
+            ? Option.toArray(inDeckText(tab, context.deck.contents, card))
+            : [],
         },
         h,
       ),
-      Button.view(
-        {
-          content: [isChoice ? `Choose ${label}` : `Add ${label}`],
-          variant: 'Secondary',
-          onClick: Message.ClickedAddCard({ cardId: card.id }),
-        },
-        h,
-      ),
+      isChoice
+        ? Button.view(
+            {
+              content: [
+                tab === 'AdditionalLegend' ? `Add ${label}` : `Choose ${label}`,
+              ],
+              variant: 'Secondary',
+              onClick: Message.ClickedAddCard({ cardId: card.id }),
+            },
+            h,
+          )
+        : resultStepper(context, card, label, h),
     ],
   )
 }
@@ -718,27 +809,111 @@ const addPanelView = (context: Context, h: HtmlBuilder<Message>): Html => {
 
 // HEADER
 
-const summaryView = (context: Context, h: HtmlBuilder<Message>): Html => {
+type Part = Readonly<{
+  section: DeckRules.Section
+  label: string
+  value: string
+}>
+
+const slotValue = (maybePrintingId: Option.Option<Printing.PrintingId>) =>
+  Option.isSome(maybePrintingId) ? 'chosen' : 'to choose'
+
+const partsOf = (context: Context): ReadonlyArray<Part> => {
   const { contents } = context.deck
-  const status = Option.match(context.problems, {
+  const additional: ReadonlyArray<Part> =
+    context.additionalLegendsAsked > 0
+      ? [
+          {
+            section: 'AdditionalLegends',
+            label: 'Additional legends',
+            value: `${Array.length(contents.additionalLegends)}/${context.additionalLegendsAsked}`,
+          },
+        ]
+      : []
+
+  return [
+    {
+      section: 'Legend',
+      label: 'Legend',
+      value: slotValue(contents.maybeLegend),
+    },
+    {
+      section: 'ChosenChampion',
+      label: 'Champion',
+      value: slotValue(contents.maybeChosenChampion),
+    },
+    {
+      section: 'Main',
+      label: 'Main',
+      value: `${Deck.mainDeckSize(contents)}/${DeckRules.CONSTRUCTED_MAIN_DECK_SIZE}`,
+    },
+    {
+      section: 'Runes',
+      label: 'Runes',
+      value: `${Deck.copiesIn(contents.runes)}/${DeckRules.RUNE_DECK_SIZE}`,
+    },
+    {
+      section: 'Battlefields',
+      label: 'Battlefields',
+      value: `${Deck.copiesIn(contents.battlefields)}/${DeckRules.CONSTRUCTED_BATTLEFIELDS}`,
+    },
+    {
+      section: 'Sideboard',
+      label: 'Sideboard',
+      value: `${Deck.copiesIn(contents.sideboard)}/${DeckRules.MAX_SIDEBOARD}`,
+    },
+    ...additional,
+  ]
+}
+
+const statusOf = (
+  context: Context,
+  section: DeckRules.Section,
+): ProgressChip.Status =>
+  Option.match(context.problems, {
+    onNone: () => 'Unfinished',
+    onSome: () => DeckRules.progressOf(problemsIn(context, section)),
+  })
+
+const rulesText = (context: Context): string =>
+  Option.match(context.problems, {
     onNone: () => 'Checking the rules…',
     onSome: problems =>
       Array.match(problems, {
-        onEmpty: () => '✓ Follows the official deckbuilding rules',
+        onEmpty: () => 'Follows the official deckbuilding rules',
         onNonEmpty: nonEmpty =>
-          Array.length(nonEmpty) === 1
-            ? '⚠ 1 rule problem'
-            : `⚠ ${Array.length(nonEmpty)} rule problems`,
+          Array.every(nonEmpty, DeckRules.isUnfinished)
+            ? 'Not finished yet'
+            : 'Breaks a deckbuilding rule: see the marked parts',
       }),
   })
 
-  return h.p(
-    [h.Role('status'), h.Class('text-sm text-fg-muted tabular-nums')],
+const progressView = (context: Context, h: HtmlBuilder<Message>): Html =>
+  h.nav(
     [
-      `Main ${Deck.mainDeckSize(contents)}/${DeckRules.CONSTRUCTED_MAIN_DECK_SIZE} · Runes ${Deck.copiesIn(contents.runes)}/${DeckRules.RUNE_DECK_SIZE} · Battlefields ${Deck.copiesIn(contents.battlefields)}/${DeckRules.CONSTRUCTED_BATTLEFIELDS} · ${status}`,
+      h.AriaLabel('Deck progress'),
+      h.Class(
+        'sticky top-0 z-10 -mx-4 flex flex-wrap items-center gap-2 border-b border-border bg-canvas px-4 py-2',
+      ),
+    ],
+    [
+      ...Array.map(partsOf(context), ({ section, label, value }) =>
+        ProgressChip.view(
+          {
+            label,
+            value,
+            status: statusOf(context, section),
+            onClick: Message.ClickedProgress({ section }),
+          },
+          h,
+        ),
+      ),
+      h.p(
+        [h.Role('status'), h.Class('ml-auto text-sm text-fg-muted')],
+        [rulesText(context)],
+      ),
     ],
   )
-}
 
 const exportView = (model: Model, h: HtmlBuilder<Message>): Html =>
   Match.value(model.export).pipe(
@@ -811,7 +986,6 @@ const headerView = (context: Context, h: HtmlBuilder<Message>): Html =>
           ),
         ],
       ),
-      summaryView(context, h),
       missingView(context, h),
       exportView(context.model, h),
     ],
@@ -922,9 +1096,10 @@ const deckView = (
   }
 
   return h.article(
-    [h.Class('flex flex-col gap-8')],
+    [h.Class('flex flex-col gap-6')],
     [
       headerView(context, h),
+      progressView(context, h),
       h.div(
         [h.Class('grid gap-8 lg:grid-cols-[minmax(0,1fr)_26rem]')],
         [

@@ -94,6 +94,7 @@ export const searchResult: CatalogueSearch.SearchResult = {
         Printing.PrintingId.make('tst-001-010'),
         Printing.PrintingId.make('tst-001a-010'),
       ],
+      maybeCopyLimit: Option.some(3),
     },
   ],
   facets: {

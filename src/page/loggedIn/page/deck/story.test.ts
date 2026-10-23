@@ -75,7 +75,7 @@ describe('adding cards', () => {
     )
   })
 
-  test('adding a unit says where it went', () => {
+  test('adding a unit adds a copy without a toast', () => {
     const onUnits = modifyFields(init(), {
       maybeDeckId: () => Option.some(deck.id),
       addTab: (): AddTab => 'Unit',
@@ -85,9 +85,19 @@ describe('adding cards', () => {
       Message.SucceededLoadCardToAdd({ card: testCard, tab: 'Unit' }),
     )
 
-    expect(
-      Array.map(added.model.toast.entries, ({ payload }) => payload.text),
-    ).toStrictEqual(['Added Test Unit, Tester to the main deck.'])
+    expect(added.model.toast.entries).toStrictEqual([])
+    expect(added.outMessage).toStrictEqual(
+      OutMessage.EditedDeck({
+        deckId: deck.id,
+        edits: [
+          {
+            _tag: 'AddCard',
+            printingId: Printing.PrintingId.make('tst-001-010'),
+            maybeType: Option.some('Unit'),
+          },
+        ],
+      }),
+    )
     expect(added.model.addTab).toBe('Unit')
   })
 })

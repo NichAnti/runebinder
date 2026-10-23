@@ -15,13 +15,18 @@ import { modifyFields } from 'foldkit/struct'
 import { describe, test } from 'vitest'
 
 import { Deck, Printing } from '../../../../domain'
-import { testCard } from '../../../../testing'
+import { searchResult, testCard } from '../../../../testing'
 import * as CardPanel from '../../cardPanel'
 import * as CollectionState from '../../collection'
 import * as DecksState from '../../decks'
-import { OutMessage } from './message'
+import { Message, OutMessage } from './message'
 import { type AddTab, init } from './model'
-import { update } from './update'
+import {
+  LoadCardToAdd,
+  ScrollToSection,
+  SearchCardsToAdd,
+  update,
+} from './update'
 import { view } from './view'
 
 const base = Printing.PrintingId.make('tst-001-010')
@@ -167,6 +172,105 @@ describe('deck page', () => {
           ],
         }),
       ),
+    )
+  })
+
+  test('the progress bar shows each part and jumps to it', () => {
+    scene(
+      { update: update(Option.some(deck)), view: sceneView() },
+      given(loaded),
+      expect(role('button', { name: 'Main 3/40, not finished' })).toExist(),
+      expect(
+        role('button', { name: 'Legend to choose, not finished' }),
+      ).toExist(),
+      click(role('button', { name: 'Runes 0/12, not finished' })),
+      Command.expectExact(ScrollToSection, SearchCardsToAdd),
+      Command.resolve(ScrollToSection, Message.CompletedScrollToSection()),
+      Command.resolve(
+        SearchCardsToAdd,
+        Message.SucceededSearchCardsToAdd({ term: '', tab: 'Rune', cards: [] }),
+      ),
+      expect(role('button', { name: 'Runes', pressed: true })).toExist(),
+    )
+  })
+
+  test('a search result steps its copies up to the limit', () => {
+    const withResults = modifyFields(loaded, {
+      searchResults: () => searchResult.cards,
+    })
+    const stepper = role('group', { name: 'In Main deck: Test Unit, Tester' })
+
+    scene(
+      { update: update(Option.some(deck)), view: sceneView() },
+      given(withResults),
+      expect(within(stepper, role('status'))).toHaveText('3'),
+      expect(
+        within(stepper, role('button', { name: 'Add one' })),
+      ).toBeDisabled(),
+      click(within(stepper, role('button', { name: 'Remove one' }))),
+      expectOutMessage(
+        OutMessage.EditedDeck({
+          deckId: deck.id,
+          edits: [
+            { _tag: 'StepCopies', zone: 'Main', printingId: base, step: -1 },
+          ],
+        }),
+      ),
+    )
+  })
+
+  test('a search result below the limit adds a copy', () => {
+    const twoCopies: Deck.Deck = {
+      ...deck,
+      contents: {
+        ...deck.contents,
+        main: [{ printingId: base, copies: Deck.Copies.make(2) }],
+      },
+    }
+    const withResults = modifyFields(loaded, {
+      searchResults: () => searchResult.cards,
+    })
+
+    scene(
+      {
+        update: update(Option.some(twoCopies)),
+        view: withViewInputs(view, {
+          decks: DecksState.Model.Ready({
+            decks: [twoCopies],
+            saves: {},
+            nextRevision: 0,
+            creation: DecksState.Creation.Idle(),
+            removals: {},
+          }),
+          deckId: deck.id,
+          collection: CollectionState.init(),
+        })(),
+      },
+      given(withResults),
+      click(
+        within(
+          role('group', { name: 'In Main deck: Test Unit, Tester' }),
+          role('button', { name: 'Add one' }),
+        ),
+      ),
+      Command.expectExact(LoadCardToAdd),
+      Command.resolve(
+        LoadCardToAdd,
+        Message.SucceededLoadCardToAdd({ card: testCard, tab: 'Unit' }),
+      ),
+    )
+  })
+
+  test('grid tiles offer the same actions as the list', () => {
+    scene(
+      { update: update(Option.some(deck)), view: sceneView() },
+      given(loaded),
+      expect(
+        within(mainDeck, role('button', { name: 'To sideboard' })),
+      ).toExist(),
+      expect(
+        within(mainDeck, role('button', { name: 'Make champion' })),
+      ).toExist(),
     )
   })
 
