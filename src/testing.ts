@@ -90,7 +90,10 @@ export const searchResult: CatalogueSearch.SearchResult = {
       domains: ['Fury', 'Calm'],
       imageUrl: 'https://example.com/test-unit.png',
       maybeAccessibilityText: Option.some('Test Unit artwork'),
-      printingCount: 2,
+      printingIds: [
+        Printing.PrintingId.make('tst-001-010'),
+        Printing.PrintingId.make('tst-001a-010'),
+      ],
     },
   ],
   facets: {

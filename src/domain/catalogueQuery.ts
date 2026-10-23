@@ -56,6 +56,11 @@ export const anyRange: Range = {
 export const isAnyRange = (range: Range): boolean =>
   Option.isNone(range.maybeMin) && Option.isNone(range.maybeMax)
 
+// OWNERSHIP
+
+export const Ownership = Schema.Literals(['All', 'Owned', 'NotOwned'])
+export type Ownership = typeof Ownership.Type
+
 // QUERY
 
 const queryFields = {
@@ -71,6 +76,7 @@ const queryFields = {
   energy: Range,
   might: Range,
   power: Range,
+  ownership: Ownership,
   sort: Schema.Option(Sort),
 }
 
@@ -90,6 +96,7 @@ export const empty: Query = {
   energy: anyRange,
   might: anyRange,
   power: anyRange,
+  ownership: 'All',
   sort: Option.none(),
 }
 
@@ -107,7 +114,8 @@ export const activeFilterCount = (query: Query): number =>
       [query.energy, query.might, query.power],
       range => !isAnyRange(range),
     ),
-  )
+  ) +
+  (query.ownership === 'All' ? 0 : 1)
 
 export const clearFilters = (query: Query): Query => ({
   ...empty,
@@ -283,6 +291,30 @@ const sortParam = optionalParam.pipe(
   ),
 )
 
+const OWNERSHIP_PARAMS: Readonly<Record<Ownership, string>> = {
+  All: 'all',
+  Owned: 'owned',
+  NotOwned: 'not-owned',
+}
+
+const ownershipParam = optionalParam.pipe(
+  Schema.decodeTo(
+    Ownership,
+    SchemaTransformation.transform({
+      decode: (maybeRaw: Option.Option<string>): Ownership =>
+        pipe(
+          maybeRaw,
+          Option.flatMap(raw => findKey(OWNERSHIP_PARAMS, raw)),
+          Option.getOrElse((): Ownership => 'All'),
+        ),
+      encode: (ownership: Ownership): Option.Option<string> =>
+        ownership === 'All'
+          ? Option.none()
+          : Option.some(OWNERSHIP_PARAMS[ownership]),
+    }),
+  ),
+)
+
 export const QueryParams = Schema.Struct({
   q: termParam,
   set: listParam(SetCode),
@@ -296,6 +328,7 @@ export const QueryParams = Schema.Struct({
   energy: rangeParam,
   might: rangeParam,
   power: rangeParam,
+  ownership: ownershipParam,
   sort: sortParam,
 })
 
@@ -395,6 +428,12 @@ export const selectedValues = (
   query: Query,
   facet: FacetName,
 ): ReadonlyArray<string> => query[facet]
+
+export const parseOwnership = (raw: string): Ownership =>
+  Option.getOrElse(
+    Schema.decodeUnknownOption(Ownership)(raw),
+    (): Ownership => 'All',
+  )
 
 export const withTerm = (query: Query, text: string): Query => ({
   ...query,

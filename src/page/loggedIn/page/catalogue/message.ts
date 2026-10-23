@@ -14,6 +14,7 @@ export const Message = defineMessageUnion({
     value: Schema.Option(Schema.Int),
   },
   SelectedSort: { value: Schema.String },
+  SelectedOwnership: { value: Schema.String },
   ClickedClearFilters: {},
   ClickedShowMore: {},
   ToggledFiltersPanel: { isOpen: Schema.Boolean },

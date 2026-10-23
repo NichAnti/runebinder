@@ -15,6 +15,7 @@ const RawParams = Schema.Struct({
   domain: Schema.optionalKey(Schema.String),
   keyword: Schema.optionalKey(Schema.String),
   energy: Schema.optionalKey(Schema.String),
+  ownership: Schema.optionalKey(Schema.String),
   sort: Schema.optionalKey(Schema.String),
 })
 
@@ -47,6 +48,7 @@ const canonicalQuery = Arbitrary.all({
   energy: range,
   might: range,
   power: range,
+  ownership: Arbitrary.schema(CatalogueQuery.Ownership),
   sort: Arbitrary.schema(Schema.Option(CatalogueQuery.Sort)),
 })
 
@@ -61,6 +63,7 @@ describe('QueryParams', () => {
         energy: '2-5',
         might: '-3',
         power: '1-',
+        ownership: 'not-owned',
         sort: 'energy-desc',
       }),
     ).toStrictEqual({
@@ -72,13 +75,20 @@ describe('QueryParams', () => {
       energy: { maybeMin: Option.some(2), maybeMax: Option.some(5) },
       might: { maybeMin: Option.none(), maybeMax: Option.some(3) },
       power: { maybeMin: Option.some(1), maybeMax: Option.none() },
+      ownership: 'NotOwned',
       sort: Option.some({ field: 'Energy', direction: 'Descending' }),
     })
   })
 
   test('invalid values are dropped instead of failing', () => {
     expect(
-      decode({ energy: '5-2', might: 'lots', sort: 'sideways', q: '   ' }),
+      decode({
+        energy: '5-2',
+        might: 'lots',
+        sort: 'sideways',
+        q: '   ',
+        ownership: 'mine',
+      }),
     ).toStrictEqual(CatalogueQuery.empty)
   })
 

@@ -31,6 +31,7 @@ layer(NodeServices.layer)('the catalogue index', it => {
         index,
         CatalogueQuery.empty,
         LIMIT,
+        [],
       )
       assert.strictEqual(result.total, index.cards.size)
       assert.strictEqual(Array.length(result.cards), index.cards.size)
@@ -44,11 +45,13 @@ layer(NodeServices.layer)('the catalogue index', it => {
         index,
         query({ q: Option.some('piltover') }),
         LIMIT,
+        [],
       )
       const typo = yield* CatalogueIndex.searchCards(
         index,
         query({ q: Option.some('piltovr') }),
         LIMIT,
+        [],
       )
 
       assert.isTrue(exact.total > 0)
@@ -59,6 +62,40 @@ layer(NodeServices.layer)('the catalogue index', it => {
     }),
   )
 
+  it.effect('the ownership filter keeps owned or not owned cards', () =>
+    Effect.gen(function* () {
+      const index = yield* loadIndex
+      const vi = cardOf(index, 'vi-destructive')
+      const ownedPrintingIds = Array.map(vi.printings, ({ id }) => id)
+
+      const owned = yield* CatalogueIndex.searchCards(
+        index,
+        query({ ownership: 'Owned' }),
+        LIMIT,
+        ownedPrintingIds,
+      )
+      const notOwned = yield* CatalogueIndex.searchCards(
+        index,
+        query({ ownership: 'NotOwned' }),
+        LIMIT,
+        ownedPrintingIds,
+      )
+      const nothingOwned = yield* CatalogueIndex.searchCards(
+        index,
+        query({ ownership: 'Owned' }),
+        LIMIT,
+        [],
+      )
+
+      assert.deepStrictEqual(
+        Array.map(owned.cards, ({ id }) => id),
+        [vi.id],
+      )
+      assert.strictEqual(notOwned.total, index.cards.size - 1)
+      assert.strictEqual(nothingOwned.total, 0)
+    }),
+  )
+
   it.effect('a domain filter keeps only cards of that domain', () =>
     Effect.gen(function* () {
       const index = yield* loadIndex
@@ -66,6 +103,7 @@ layer(NodeServices.layer)('the catalogue index', it => {
         index,
         query({ domain: ['Fury'] }),
         LIMIT,
+        [],
       )
 
       assert.isTrue(result.total > 0)
@@ -86,6 +124,7 @@ layer(NodeServices.layer)('the catalogue index', it => {
           index,
           query({ domain: ['Fury'] }),
           LIMIT,
+          [],
         )
         const calm = Array.findFirst(
           result.facets.domain,
@@ -105,6 +144,7 @@ layer(NodeServices.layer)('the catalogue index', it => {
           energy: { maybeMin: Option.some(2), maybeMax: Option.some(3) },
         }),
         LIMIT,
+        [],
       )
 
       assert.isTrue(result.total > 0)
@@ -127,6 +167,7 @@ layer(NodeServices.layer)('the catalogue index', it => {
           sort: Option.some({ field: 'Energy', direction: 'Ascending' }),
         }),
         LIMIT,
+        [],
       )
       const energies = Array.getSomes(
         Array.map(

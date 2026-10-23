@@ -137,3 +137,37 @@ describe('collection on the card page', () => {
     )
   })
 })
+
+describe('collection and the ownership filter', () => {
+  test('an Owned search waits for the collection, then runs', () => {
+    const ownedRoute = AppRoute.Catalogue({
+      ...CatalogueQuery.empty,
+      ownership: 'Owned',
+    })
+    const onOwned = modifyFields(init(ownedRoute, ada), {
+      catalogue: () => CatalogueState.Ready({ attempt: 0, allValues }),
+    })
+    const entered = enterRoute(onOwned, ownedRoute)
+
+    expect(entered.commands?.map(({ name }) => name)).toStrictEqual([
+      CollectionState.LoadCollection.name,
+    ])
+
+    story(
+      update,
+      given(entered.model),
+      message(
+        Message.GotCollectionMessage({
+          message: CollectionState.Message.SucceededLoadCollection({
+            items: [],
+          }),
+        }),
+      ),
+      Command.expectExact(CataloguePage.SearchCatalogue),
+      Command.resolve(
+        CataloguePage.SearchCatalogue,
+        CataloguePage.Message.SkippedSearchCatalogue(),
+      ),
+    )
+  })
+})

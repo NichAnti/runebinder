@@ -1,6 +1,6 @@
 import { Schema } from 'effect'
 
-import { CardId, CardType, Domain } from './printing'
+import { CardId, CardType, Domain, PrintingId } from './printing'
 
 export const CardSummary = Schema.Struct({
   id: CardId,
@@ -10,7 +10,7 @@ export const CardSummary = Schema.Struct({
   domains: Schema.Array(Domain),
   imageUrl: Schema.String,
   maybeAccessibilityText: Schema.Option(Schema.String),
-  printingCount: Schema.Int,
+  printingIds: Schema.NonEmptyArray(PrintingId),
 })
 export type CardSummary = typeof CardSummary.Type
 

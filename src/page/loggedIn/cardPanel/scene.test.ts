@@ -45,6 +45,7 @@ const sceneView = withViewInputs(tileView, {
     maybeSubtitle: Option.none(),
     domains: ['Fury'],
     meta: '2 printings',
+    maybeHighlight: Option.none(),
   },
   collection,
 })

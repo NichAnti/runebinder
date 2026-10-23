@@ -10,6 +10,7 @@ const createDatabase = () =>
   create({
     schema: {
       id: 'string',
+      cardKey: 'enum',
       name: 'string',
       subtitle: 'string',
       keywordText: 'string',
@@ -37,6 +38,7 @@ type Database = ReturnType<typeof createDatabase>
 export type CatalogueIndex = Readonly<{
   database: Database
   cards: ReadonlyMap<string, Printing.Card>
+  cardIdByPrinting: ReadonlyMap<string, Printing.CardId>
   allValues: CatalogueSearch.Facets
 }>
 
@@ -93,6 +95,7 @@ export const toDocument = (card: Printing.Card) => {
 
   return {
     id: card.id,
+    cardKey: card.id,
     name: base.name,
     subtitle,
     keywordText: Array.join(keywords, ' '),
@@ -152,8 +155,27 @@ const within = (range: CatalogueQuery.Range): Option.Option<RangeCondition> =>
       ),
   })
 
+const ownedCondition = (
+  ownership: CatalogueQuery.Ownership,
+  ownedCardIds: ReadonlyArray<Printing.CardId>,
+) =>
+  Match.value(ownership).pipe(
+    Match.withReturnType<
+      Option.Option<{ in: Array<string> } | { nin: Array<string> }>
+    >(),
+    Match.when('All', () => Option.none()),
+    Match.when('Owned', () =>
+      Option.some({ in: Array.fromIterable(ownedCardIds) }),
+    ),
+    Match.when('NotOwned', () =>
+      Option.some({ nin: Array.fromIterable(ownedCardIds) }),
+    ),
+    Match.exhaustive,
+  )
+
 const whereFor = (
   query: CatalogueQuery.Query,
+  ownedCardIds: ReadonlyArray<Printing.CardId>,
   maybeExcluded: Option.Option<CatalogueSearch.FacetName>,
 ) => {
   const unless = <A>(
@@ -176,6 +198,7 @@ const whereFor = (
     ...optionalField('energy', within(query.energy)),
     ...optionalField('might', within(query.might)),
     ...optionalField('power', within(query.power)),
+    ...optionalField('cardKey', ownedCondition(query.ownership, ownedCardIds)),
   }
 }
 
@@ -226,7 +249,7 @@ const toSummary = (card: Printing.Card): CatalogueSearch.CardSummary => {
     domains: base.domains,
     imageUrl: base.imageUrl,
     maybeAccessibilityText: base.maybeAccessibilityText,
-    printingCount: Array.length(card.printings),
+    printingIds: Array.map(card.printings, ({ id }) => id),
   }
 }
 
@@ -248,6 +271,7 @@ const facetValues = (
 const facetCounts = (
   database: Database,
   query: CatalogueQuery.Query,
+  ownedCardIds: ReadonlyArray<Printing.CardId>,
   facet: CatalogueSearch.FacetName,
 ) =>
   Effect.promise(async () =>
@@ -255,7 +279,7 @@ const facetCounts = (
       (
         await search(database, {
           ...textSearch(query),
-          where: whereFor(query, Option.some(facet)),
+          where: whereFor(query, ownedCardIds, Option.some(facet)),
           facets: { [facet]: { limit: FACET_VALUE_LIMIT } },
           limit: 0,
         })
@@ -266,11 +290,15 @@ const facetCounts = (
 
 const FACET_NAMES = CatalogueSearch.FacetName.literals
 
-const allFacetCounts = (database: Database, query: CatalogueQuery.Query) =>
+const allFacetCounts = (
+  database: Database,
+  query: CatalogueQuery.Query,
+  ownedCardIds: ReadonlyArray<Printing.CardId>,
+) =>
   Effect.all(
     Record.fromIterableWith(FACET_NAMES, facet => [
       facet,
-      facetCounts(database, query, facet),
+      facetCounts(database, query, ownedCardIds, facet),
     ]),
   ).pipe(
     Effect.map((counts): CatalogueSearch.Facets => ({
@@ -296,31 +324,54 @@ export const build = (printings: ReadonlyArray<Printing.Printing>) =>
       insertMultiple(database, Array.map(cards, toDocument)),
     )
 
-    const allValues = yield* allFacetCounts(database, CatalogueQuery.empty)
+    const allValues = yield* allFacetCounts(database, CatalogueQuery.empty, [])
 
     return {
       database,
       cards: new Map(Array.map(cards, card => [card.id, card])),
+      cardIdByPrinting: new Map(
+        Array.flatMap(cards, card =>
+          Array.map(
+            card.printings,
+            ({ id }): readonly [string, Printing.CardId] => [id, card.id],
+          ),
+        ),
+      ),
       allValues,
     } satisfies CatalogueIndex
   })
+
+export const cardIdsOwning = (
+  index: CatalogueIndex,
+  printingIds: ReadonlyArray<Printing.PrintingId>,
+): ReadonlyArray<Printing.CardId> =>
+  Array.dedupe(
+    Array.filterMap(printingIds, id =>
+      Result.fromOption(
+        Option.fromNullishOr(index.cardIdByPrinting.get(id)),
+        () => id,
+      ),
+    ),
+  )
 
 export const searchCards = (
   index: CatalogueIndex,
   query: CatalogueQuery.Query,
   limit: number,
+  ownedPrintingIds: ReadonlyArray<Printing.PrintingId>,
 ): Effect.Effect<CatalogueSearch.SearchResult> =>
   Effect.gen(function* () {
+    const ownedCardIds = cardIdsOwning(index, ownedPrintingIds)
     const results = yield* Effect.promise(async () =>
       search(index.database, {
         ...textSearch(query),
         ...sortBy(CatalogueQuery.effectiveSort(query)),
-        where: whereFor(query, Option.none()),
+        where: whereFor(query, ownedCardIds, Option.none()),
         limit,
       }),
     )
 
-    const facets = yield* allFacetCounts(index.database, query)
+    const facets = yield* allFacetCounts(index.database, query, ownedCardIds)
 
     return {
       total: results.count,

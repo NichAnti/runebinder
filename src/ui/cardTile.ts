@@ -10,6 +10,7 @@ export type ViewConfig = Readonly<{
   maybeSubtitle: Option.Option<string>
   domains: ReadonlyArray<Printing.Domain>
   meta: string
+  maybeHighlight: Option.Option<string>
 }>
 
 const DOMAIN_DOT: Readonly<Record<Printing.Domain, string>> = {
@@ -33,10 +34,19 @@ const recipe = {
   dots: 'flex gap-1',
   dot: 'size-2.5 rounded-full',
   meta: 'text-xs text-fg-muted',
+  highlight: 'text-xs font-semibold text-accent',
 }
 
 export const view = <Message>(
-  { imageUrl, imageAlt, title, maybeSubtitle, domains, meta }: ViewConfig,
+  {
+    imageUrl,
+    imageAlt,
+    title,
+    maybeSubtitle,
+    domains,
+    meta,
+    maybeHighlight,
+  }: ViewConfig,
   h: HtmlBuilder<Message>,
 ): Html =>
   h.span(
@@ -78,10 +88,21 @@ export const view = <Message>(
               ]),
             ),
           ),
-          h.span(
-            [h.DataAttribute('slot', 'meta'), h.Class(recipe.meta)],
-            [meta],
-          ),
+          Option.match(maybeHighlight, {
+            onNone: () =>
+              h.span(
+                [h.DataAttribute('slot', 'meta'), h.Class(recipe.meta)],
+                [meta],
+              ),
+            onSome: highlight =>
+              h.span(
+                [
+                  h.DataAttribute('slot', 'highlight'),
+                  h.Class(recipe.highlight),
+                ],
+                [highlight],
+              ),
+          }),
         ],
       ),
     ],

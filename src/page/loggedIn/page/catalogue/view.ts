@@ -2,7 +2,12 @@ import { Array, Match, Option, Order, pipe } from 'effect'
 import { Submodel } from 'foldkit'
 import type { Html, HtmlBuilder } from 'foldkit/html'
 
-import { CatalogueQuery, CatalogueSearch, Printing } from '../../../../domain'
+import {
+  CatalogueQuery,
+  CatalogueSearch,
+  Collection,
+  Printing,
+} from '../../../../domain'
 import {
   Button,
   Disclosure,
@@ -236,6 +241,18 @@ const activeFiltersView = (
                 ),
             ),
           ),
+          ...(inputs.query.ownership === 'All'
+            ? []
+            : [
+                Button.view(
+                  {
+                    content: [`${OWNERSHIP_LABELS[inputs.query.ownership]} ×`],
+                    variant: 'Secondary',
+                    onClick: Message.SelectedOwnership({ value: 'All' }),
+                  },
+                  h,
+                ),
+              ]),
           Button.view(
             {
               content: ['Clear filters'],
@@ -246,6 +263,45 @@ const activeFiltersView = (
           ),
         ],
       )
+
+const OWNERSHIP_LABELS: Readonly<Record<CatalogueQuery.Ownership, string>> = {
+  All: 'All cards',
+  Owned: 'Owned',
+  NotOwned: 'Not owned',
+}
+
+const ownershipView = (inputs: ViewInputs, h: HtmlBuilder<Message>): Html =>
+  Select.view(
+    {
+      id: 'catalogue-ownership',
+      label: 'Show',
+      value: inputs.query.ownership,
+      options: Array.map(CatalogueQuery.Ownership.literals, ownership => ({
+        value: ownership,
+        label: OWNERSHIP_LABELS[ownership],
+      })),
+      onChange: value => Message.SelectedOwnership({ value }),
+    },
+    h,
+  )
+
+const printingCountText = (
+  printingIds: ReadonlyArray<Printing.PrintingId>,
+): string =>
+  Array.length(printingIds) === 1
+    ? '1 printing'
+    : `${Array.length(printingIds)} printings`
+
+const ownedText = (
+  collection: CollectionState.Model,
+  printingIds: ReadonlyArray<Printing.PrintingId>,
+): Option.Option<string> =>
+  pipe(
+    CollectionState.maybeOwned(collection),
+    Option.map(owned => Collection.totalOf(owned, printingIds)),
+    Option.filter(total => total > 0),
+    Option.map(total => `Owned ${total}`),
+  )
 
 const sortView = (inputs: ViewInputs, h: HtmlBuilder<Message>): Html => {
   const current = CatalogueQuery.effectiveSort(inputs.query)
@@ -336,10 +392,11 @@ const resultsView = (
                             title: card.name,
                             maybeSubtitle: card.maybeSubtitle,
                             domains: card.domains,
-                            meta:
-                              card.printingCount === 1
-                                ? '1 printing'
-                                : `${card.printingCount} printings`,
+                            meta: printingCountText(card.printingIds),
+                            maybeHighlight: ownedText(
+                              collection,
+                              card.printingIds,
+                            ),
                           },
                           collection,
                         },
@@ -446,7 +503,10 @@ export const view = Submodel.defineView<Model, Message, ViewInputs>(
                       [h.AriaLive('polite'), h.Class('text-sm text-fg-muted')],
                       [countText(model)],
                     ),
-                    sortView(inputs, h),
+                    h.div(
+                      [h.Class('flex flex-wrap items-center gap-3')],
+                      [ownershipView(inputs, h), sortView(inputs, h)],
+                    ),
                   ],
                 ),
                 activeFiltersView(inputs, h),

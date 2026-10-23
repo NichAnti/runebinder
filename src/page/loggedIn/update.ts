@@ -2,7 +2,7 @@ import { Match, Option } from 'effect'
 import { Update } from 'foldkit'
 import { modifyFields } from 'foldkit/struct'
 
-import { CatalogueQuery, Printing } from '../../domain'
+import { CatalogueQuery, Collection, Printing } from '../../domain'
 import type { CatalogueRoute, LoggedInRoute } from '../../route'
 import type {
   ApiClient,
@@ -17,16 +17,18 @@ import * as CardPage from './page/card'
 import * as CardTraderPage from './page/cardTrader'
 import * as CataloguePage from './page/catalogue'
 
-type UpdateReturn = Update.Return<
-  Model,
-  Message,
-  ApiClient | CatalogueIndexService | CardTraderClient | TokenStore
->
+type Requirements =
+  | ApiClient
+  | CatalogueIndexService
+  | CardTraderClient
+  | TokenStore
+type UpdateReturn = Update.Return<Model, Message, Requirements>
 const withUpdateReturn = Match.withReturnType<UpdateReturn>()
 
 type CataloguePageEntry = Readonly<{
   query: CatalogueQuery.Query
   isIndexReady: boolean
+  maybeOwned: Option.Option<Collection.Owned>
 }>
 
 type CardPageEntry = Readonly<{
@@ -55,7 +57,12 @@ const toCardPageMessage = (message: CardPage.Message): Message =>
 
 const foldCataloguePageEntry = Update.foldChild({
   update: (page: CataloguePage.Model, entry: CataloguePageEntry) =>
-    CataloguePage.enter(page, entry.query, entry.isIndexReady),
+    CataloguePage.enter(
+      page,
+      entry.query,
+      entry.isIndexReady,
+      entry.maybeOwned,
+    ),
   read: readCataloguePage,
   write: writeCataloguePage,
   toParentMessage: toCataloguePageMessage,
@@ -68,9 +75,12 @@ const foldCataloguePageOutMessage = CataloguePage.OutMessage.match<
   RequestedCollectionRetry: () => refreshCollection,
 })
 
-const foldCataloguePage = (query: CatalogueQuery.Query) =>
+const foldCataloguePage = (
+  query: CatalogueQuery.Query,
+  maybeOwned: Option.Option<Collection.Owned>,
+) =>
   Update.foldChild({
-    update: CataloguePage.update(query),
+    update: CataloguePage.update(query, maybeOwned),
     read: readCataloguePage,
     write: writeCataloguePage,
     toParentMessage: toCataloguePageMessage,
@@ -177,6 +187,7 @@ export const enterRoute = (
             foldCataloguePageEntry({
               query: queryOf(catalogueRoute),
               isIndexReady,
+              maybeOwned: CollectionState.maybeOwned(routed.collection),
             }),
             ensureCollection,
           ],
@@ -194,6 +205,9 @@ export const enterRoute = (
 
 // UPDATE
 
+const isWaitingForCollection = (route: LoggedInRoute): boolean =>
+  route._tag === 'Catalogue' && route.ownership !== 'All'
+
 const attemptOf = (state: CatalogueState): number =>
   CatalogueState.match(state, {
     Loading: ({ attempt }) => attempt,
@@ -207,7 +221,10 @@ export const update = (model: Model, message: Message) =>
       Match.value(model.route).pipe(
         withUpdateReturn,
         Match.tag('Catalogue', catalogueRoute =>
-          foldCataloguePage(queryOf(catalogueRoute))(model, message),
+          foldCataloguePage(
+            queryOf(catalogueRoute),
+            CollectionState.maybeOwned(model.collection),
+          )(model, message),
         ),
         Match.orElse(() => ({ model })),
       ),
@@ -235,7 +252,14 @@ export const update = (model: Model, message: Message) =>
       }),
     }),
 
-    GotCollectionMessage: ({ message }) => foldCollection(model, message),
+    GotCollectionMessage: ({ message }) =>
+      message._tag === 'SucceededLoadCollection' &&
+      isWaitingForCollection(model.route)
+        ? Update.combine<Model, Message, Requirements>(model, [
+            foldCollection(message),
+            stepModel => enterRoute(stepModel, stepModel.route),
+          ])
+        : foldCollection(model, message),
 
     ClickedRetryCatalogue: () => ({
       model: modifyFields(model, {

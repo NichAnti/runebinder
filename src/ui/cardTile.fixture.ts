@@ -30,6 +30,7 @@ export const view = (_model: Model, h: HtmlBuilder<Message>): Html =>
           maybeSubtitle: Option.some('Tester'),
           domains: ['Fury', 'Calm'],
           meta: '2 printings',
+          maybeHighlight: Option.none(),
         },
         h,
       ),

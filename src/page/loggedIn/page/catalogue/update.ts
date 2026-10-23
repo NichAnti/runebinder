@@ -1,9 +1,14 @@
-import { Effect, Option, Schema } from 'effect'
+import { Effect, Option, Record, Schema } from 'effect'
 import { Command, Update } from 'foldkit'
 import { replaceUrl } from 'foldkit/navigation'
 import { modifyFields } from 'foldkit/struct'
 
-import { CatalogueQuery, CatalogueSearch } from '../../../../domain'
+import {
+  CatalogueQuery,
+  CatalogueSearch,
+  Collection,
+  Printing,
+} from '../../../../domain'
 import { catalogueRouter } from '../../../../route'
 import {
   CatalogueIndex,
@@ -28,12 +33,21 @@ export const ReplaceQuery = Command.define('ReplaceQuery', {
 })
 
 export const SearchCatalogue = Command.define('SearchCatalogue', {
-  args: { query: CatalogueQuery.Query, limit: Schema.Int },
+  args: {
+    query: CatalogueQuery.Query,
+    limit: Schema.Int,
+    ownedPrintingIds: Schema.Array(Printing.PrintingId),
+  },
   messages: [Message.SucceededSearchCatalogue, Message.SkippedSearchCatalogue],
-  execute: ({ query, limit }) =>
+  execute: ({ query, limit, ownedPrintingIds }) =>
     Effect.gen(function* () {
       const index = yield* CatalogueIndexResource.get
-      const result = yield* CatalogueIndex.searchCards(index, query, limit)
+      const result = yield* CatalogueIndex.searchCards(
+        index,
+        query,
+        limit,
+        ownedPrintingIds,
+      )
       return Message.SucceededSearchCatalogue({ query, limit, result })
     }).pipe(
       Effect.catchTag('ResourceNotAvailable', () =>
@@ -44,10 +58,22 @@ export const SearchCatalogue = Command.define('SearchCatalogue', {
 
 // ROUTE
 
+const search = (
+  query: CatalogueQuery.Query,
+  limit: number,
+  maybeOwned: Option.Option<Collection.Owned>,
+) =>
+  query.ownership === 'All'
+    ? Option.some(SearchCatalogue({ query, limit, ownedPrintingIds: [] }))
+    : Option.map(maybeOwned, owned =>
+        SearchCatalogue({ query, limit, ownedPrintingIds: Record.keys(owned) }),
+      )
+
 export const enter = (
   model: Model,
   query: CatalogueQuery.Query,
   isIndexReady: boolean,
+  maybeOwned: Option.Option<Collection.Owned>,
 ): UpdateReturn => {
   const typedTerm = CatalogueQuery.withTerm(
     CatalogueQuery.empty,
@@ -63,7 +89,7 @@ export const enter = (
   return isIndexReady
     ? {
         model: nextModel,
-        commands: [SearchCatalogue({ query, limit: PAGE_SIZE })],
+        commands: Option.toArray(search(query, PAGE_SIZE, maybeOwned)),
       }
     : { model: nextModel }
 }
@@ -88,7 +114,8 @@ const foldCardPanel = Update.foldChild({
 })
 
 export const update =
-  (query: CatalogueQuery.Query) => (model: Model, message: Message) =>
+  (query: CatalogueQuery.Query, maybeOwned: Option.Option<Collection.Owned>) =>
+  (model: Model, message: Message) =>
     Message.match<
       Update.ReturnWithOutMessage<
         Model,
@@ -112,6 +139,12 @@ export const update =
       SelectedSort: ({ value }) =>
         replace(model, { ...query, sort: CatalogueQuery.parseSort(value) }),
 
+      SelectedOwnership: ({ value }) =>
+        replace(model, {
+          ...query,
+          ownership: CatalogueQuery.parseOwnership(value),
+        }),
+
       ClickedClearFilters: () =>
         replace(model, CatalogueQuery.clearFilters(query)),
 
@@ -120,7 +153,7 @@ export const update =
 
         return {
           model: modifyFields(model, { limit: () => nextLimit }),
-          commands: [SearchCatalogue({ query, limit: nextLimit })],
+          commands: Option.toArray(search(query, nextLimit, maybeOwned)),
         }
       },
 

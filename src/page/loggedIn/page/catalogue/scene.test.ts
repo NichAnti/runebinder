@@ -1,3 +1,4 @@
+import { Option } from 'effect'
 import {
   Command,
   click,
@@ -11,7 +12,7 @@ import {
 import { modifyFields } from 'foldkit/struct'
 import { describe, test } from 'vitest'
 
-import { CatalogueQuery } from '../../../../domain'
+import { CatalogueQuery, Collection, Printing } from '../../../../domain'
 import { allValues, searchResult } from '../../../../testing'
 import * as CollectionState from '../../collection'
 import { Message } from './message'
@@ -34,7 +35,7 @@ const showing = modifyFields(init(query), {
 describe('catalogue page', () => {
   test('shows the results with their count, each card opening its panel', () => {
     scene(
-      { update: update(query), view: sceneView() },
+      { update: update(query, Option.none()), view: sceneView() },
       given(showing),
       expect(text('1 card')).toExist(),
       expect(role('button', { name: /Test Unit/ })).toHaveAttr(
@@ -44,9 +45,33 @@ describe('catalogue page', () => {
     )
   })
 
+  test('each card shows how many copies are owned across its printings', () => {
+    const ownedView = withViewInputs(view, {
+      query,
+      allValues,
+      collection: CollectionState.Model.Ready({
+        owned: {
+          [Printing.PrintingId.make('tst-001-010')]:
+            Collection.OwnedQuantity.make(2),
+          [Printing.PrintingId.make('tst-001a-010')]:
+            Collection.OwnedQuantity.make(1),
+        },
+        saves: {},
+        nextRevision: 0,
+        refresh: CollectionState.Refresh.Idle(),
+      }),
+    })
+
+    scene(
+      { update: update(query, Option.none()), view: ownedView() },
+      given(showing),
+      expect(text('Owned 3')).toExist(),
+    )
+  })
+
   test('filter values show their counts and disable empty ones', () => {
     scene(
-      { update: update(query), view: sceneView() },
+      { update: update(query, Option.none()), view: sceneView() },
       given(showing),
       expect(role('button', { name: 'Fury 1' })).toHaveAttr(
         'aria-pressed',
@@ -58,7 +83,7 @@ describe('catalogue page', () => {
 
   test('no results offers to clear the filters', () => {
     scene(
-      { update: update(query), view: sceneView() },
+      { update: update(query, Option.none()), view: sceneView() },
       given(
         modifyFields(showing, {
           results: () =>
