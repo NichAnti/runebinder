@@ -26,10 +26,17 @@ describe('catalogue loading', () => {
           CatalogueState.Ready({ attempt: 0, allValues }),
         )
       }),
-      Command.expectExact(CataloguePage.SearchCatalogue),
+      Command.expectExact(
+        CataloguePage.SearchCatalogue,
+        CollectionState.LoadCollection,
+      ),
       Command.resolve(
         CataloguePage.SearchCatalogue,
         CataloguePage.Message.SkippedSearchCatalogue(),
+      ),
+      Command.resolve(
+        CollectionState.LoadCollection,
+        CollectionState.Message.SucceededLoadCollection({ items: [] }),
       ),
     )
   })

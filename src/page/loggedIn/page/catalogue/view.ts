@@ -3,10 +3,8 @@ import { Submodel } from 'foldkit'
 import type { Html, HtmlBuilder } from 'foldkit/html'
 
 import { CatalogueQuery, CatalogueSearch, Printing } from '../../../../domain'
-import { cardRouter } from '../../../../route'
 import {
   Button,
-  CardTile,
   Disclosure,
   FilterChip,
   Notice,
@@ -14,12 +12,15 @@ import {
   SearchField,
   Select,
 } from '../../../../ui'
+import * as CardPanel from '../../cardPanel'
+import * as CollectionState from '../../collection'
 import { Message } from './message'
 import { type Model, Results } from './model'
 
 export type ViewInputs = Readonly<{
   query: CatalogueQuery.Query
   allValues: CatalogueSearch.Facets
+  collection: CollectionState.Model
 }>
 
 const COLLAPSED_TAG_COUNT = 20
@@ -268,7 +269,11 @@ const sortView = (inputs: ViewInputs, h: HtmlBuilder<Message>): Html => {
   )
 }
 
-const resultsView = (model: Model, h: HtmlBuilder<Message>): Html =>
+const resultsView = (
+  model: Model,
+  collection: CollectionState.Model,
+  h: HtmlBuilder<Message>,
+): Html =>
   Results.match(model.results, {
     Waiting: () =>
       Notice.view(
@@ -312,27 +317,35 @@ const resultsView = (model: Model, h: HtmlBuilder<Message>): Html =>
                     card.id,
                     [],
                     [
-                      CardTile.view(
-                        {
-                          href: cardRouter({
-                            cardId: card.id,
-                            printing: Option.none(),
+                      h.submodel({
+                        slotId: `card-${card.id}`,
+                        model: model.cardPanel,
+                        view: CardPanel.tileView,
+                        viewInputs: {
+                          cardId: card.id,
+                          label: Option.match(card.maybeSubtitle, {
+                            onNone: () => card.name,
+                            onSome: subtitle => `${card.name}, ${subtitle}`,
                           }),
-                          imageUrl: card.imageUrl,
-                          imageAlt: Option.getOrElse(
-                            card.maybeAccessibilityText,
-                            () => card.name,
-                          ),
-                          title: card.name,
-                          maybeSubtitle: card.maybeSubtitle,
-                          domains: card.domains,
-                          meta:
-                            card.printingCount === 1
-                              ? '1 printing'
-                              : `${card.printingCount} printings`,
+                          tile: {
+                            imageUrl: card.imageUrl,
+                            imageAlt: Option.getOrElse(
+                              card.maybeAccessibilityText,
+                              () => card.name,
+                            ),
+                            title: card.name,
+                            maybeSubtitle: card.maybeSubtitle,
+                            domains: card.domains,
+                            meta:
+                              card.printingCount === 1
+                                ? '1 printing'
+                                : `${card.printingCount} printings`,
+                          },
+                          collection,
                         },
-                        h,
-                      ),
+                        toParentMessage: message =>
+                          Message.GotCardPanelMessage({ message }),
+                      }),
                     ],
                   ),
                 ),
@@ -437,7 +450,7 @@ export const view = Submodel.defineView<Model, Message, ViewInputs>(
                   ],
                 ),
                 activeFiltersView(inputs, h),
-                resultsView(model, h),
+                resultsView(model, inputs.collection, h),
               ],
             ),
           ],

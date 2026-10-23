@@ -2,6 +2,7 @@ import { Option, Schema } from 'effect'
 import { defineTaggedUnion } from 'foldkit/schema'
 
 import { CatalogueQuery, CatalogueSearch } from '../../../../domain'
+import * as CardPanel from '../../cardPanel'
 
 export const PAGE_SIZE = 60
 
@@ -21,6 +22,7 @@ export const Model = Schema.Struct({
   results: Results,
   isFiltersOpen: Schema.Boolean,
   isShowingAllTags: Schema.Boolean,
+  cardPanel: CardPanel.Model,
 })
 export type Model = typeof Model.Type
 
@@ -30,4 +32,5 @@ export const init = (query: CatalogueQuery.Query): Model => ({
   results: Results.Waiting(),
   isFiltersOpen: false,
   isShowingAllTags: false,
+  cardPanel: CardPanel.init(),
 })

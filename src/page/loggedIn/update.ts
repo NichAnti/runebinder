@@ -61,12 +61,20 @@ const foldCataloguePageEntry = Update.foldChild({
   toParentMessage: toCataloguePageMessage,
 })
 
+const foldCataloguePageOutMessage = CataloguePage.OutMessage.match<
+  Update.Step<Model, Message, ApiClient>
+>({
+  SteppedQuantity: stepped => stepQuantity(stepped),
+  RequestedCollectionRetry: () => refreshCollection,
+})
+
 const foldCataloguePage = (query: CatalogueQuery.Query) =>
   Update.foldChild({
     update: CataloguePage.update(query),
     read: readCataloguePage,
     write: writeCataloguePage,
     toParentMessage: toCataloguePageMessage,
+    foldOutMessage: foldCataloguePageOutMessage,
   })
 
 const foldCardPageEntry = Update.foldChild({
@@ -163,10 +171,16 @@ export const enterRoute = (
     withUpdateReturn,
     Match.tagsExhaustive({
       Catalogue: catalogueRoute =>
-        foldCataloguePageEntry(routed, {
-          query: queryOf(catalogueRoute),
-          isIndexReady,
-        }),
+        Update.combine<Model, Message, ApiClient | CatalogueIndexService>(
+          routed,
+          [
+            foldCataloguePageEntry({
+              query: queryOf(catalogueRoute),
+              isIndexReady,
+            }),
+            ensureCollection,
+          ],
+        ),
       Card: ({ cardId }) =>
         Update.combine<Model, Message, ApiClient | CatalogueIndexService>(
           routed,

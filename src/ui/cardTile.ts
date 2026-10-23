@@ -4,7 +4,6 @@ import type { Html, HtmlBuilder } from 'foldkit/html'
 import type { Printing } from '../domain'
 
 export type ViewConfig = Readonly<{
-  href: string
   imageUrl: string
   imageAlt: string
   title: string
@@ -24,9 +23,10 @@ const DOMAIN_DOT: Readonly<Record<Printing.Domain, string>> = {
 }
 
 const recipe = {
-  root: 'group flex flex-col gap-2 rounded-card focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus',
+  root: 'group flex flex-col gap-2',
   image:
     'aspect-[744/1039] w-full rounded-card bg-surface-raised object-cover shadow-raised transition-transform group-hover:-translate-y-0.5',
+  text: 'flex flex-col',
   title: 'text-sm font-semibold text-fg',
   subtitle: 'text-xs text-fg-muted',
   footer: 'flex items-center justify-between gap-2',
@@ -36,11 +36,11 @@ const recipe = {
 }
 
 export const view = <Message>(
-  { href, imageUrl, imageAlt, title, maybeSubtitle, domains, meta }: ViewConfig,
+  { imageUrl, imageAlt, title, maybeSubtitle, domains, meta }: ViewConfig,
   h: HtmlBuilder<Message>,
 ): Html =>
-  h.a(
-    [h.Href(href), h.DataAttribute('slot', 'card-tile'), h.Class(recipe.root)],
+  h.span(
+    [h.DataAttribute('slot', 'card-tile'), h.Class(recipe.root)],
     [
       h.img([
         h.Src(imageUrl),
@@ -49,24 +49,24 @@ export const view = <Message>(
         h.DataAttribute('slot', 'image'),
         h.Class(recipe.image),
       ]),
-      h.div(
-        [],
+      h.span(
+        [h.Class(recipe.text)],
         [
-          h.p(
+          h.span(
             [h.DataAttribute('slot', 'title'), h.Class(recipe.title)],
             [title],
           ),
           Option.match(maybeSubtitle, {
             onNone: () => h.empty,
             onSome: subtitle =>
-              h.p(
+              h.span(
                 [h.DataAttribute('slot', 'subtitle'), h.Class(recipe.subtitle)],
                 [subtitle],
               ),
           }),
         ],
       ),
-      h.div(
+      h.span(
         [h.Class(recipe.footer)],
         [
           h.span(

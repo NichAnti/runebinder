@@ -1,17 +1,14 @@
-import { expect, given, role, scene } from 'foldkit/scene'
+import { expect, given, role, scene, text } from 'foldkit/scene'
 import { describe, test } from 'vitest'
 
 import { initialModel, update, view } from './cardTile.fixture'
 
 describe('CardTile', () => {
-  test('links to the card and describes its image', () => {
+  test('shows the card name and describes its image', () => {
     scene(
       { update, view },
       given(initialModel),
-      expect(role('link', { name: /Test Unit/ })).toHaveAttr(
-        'href',
-        '/cards/test-unit',
-      ),
+      expect(text('Test Unit')).toExist(),
       expect(role('img', { name: 'Test Unit artwork' })).toHaveAttr(
         'loading',
         'lazy',

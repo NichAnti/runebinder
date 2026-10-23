@@ -13,13 +13,18 @@ import { describe, test } from 'vitest'
 
 import { CatalogueQuery } from '../../../../domain'
 import { allValues, searchResult } from '../../../../testing'
+import * as CollectionState from '../../collection'
 import { Message } from './message'
 import { PAGE_SIZE, Results, init } from './model'
 import { ReplaceQuery, update } from './update'
 import { view } from './view'
 
 const query = CatalogueQuery.empty
-const sceneView = withViewInputs(view, { query, allValues })
+const sceneView = withViewInputs(view, {
+  query,
+  allValues,
+  collection: CollectionState.init(),
+})
 
 const showing = modifyFields(init(query), {
   results: () =>
@@ -27,14 +32,14 @@ const showing = modifyFields(init(query), {
 })
 
 describe('catalogue page', () => {
-  test('shows the results with their count and links to each card', () => {
+  test('shows the results with their count, each card opening its panel', () => {
     scene(
       { update: update(query), view: sceneView() },
       given(showing),
       expect(text('1 card')).toExist(),
-      expect(role('link', { name: /Test Unit/ })).toHaveAttr(
-        'href',
-        '/cards/test-unit',
+      expect(role('button', { name: /Test Unit/ })).toHaveAttr(
+        'aria-haspopup',
+        'dialog',
       ),
     )
   })

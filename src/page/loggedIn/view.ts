@@ -69,7 +69,11 @@ export const view = Submodel.defineView<Model, Message>((model, h) =>
                   slotId: 'catalogue-page',
                   model: model.cataloguePage,
                   view: CataloguePage.view,
-                  viewInputs: { query: queryOf(catalogueRoute), allValues },
+                  viewInputs: {
+                    query: queryOf(catalogueRoute),
+                    allValues,
+                    collection: model.collection,
+                  },
                   toParentMessage: message =>
                     Message.GotCataloguePageMessage({ message }),
                 }),

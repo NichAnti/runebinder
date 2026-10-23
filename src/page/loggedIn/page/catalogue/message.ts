@@ -1,7 +1,9 @@
 import { Schema } from 'effect'
 import { defineMessageUnion } from 'foldkit/message'
 
-import { CatalogueQuery, CatalogueSearch } from '../../../../domain'
+import { CatalogueQuery, CatalogueSearch, Printing } from '../../../../domain'
+import * as CardPanel from '../../cardPanel'
+import { Step } from '../../collection'
 
 export const Message = defineMessageUnion({
   UpdatedSearch: { value: Schema.String },
@@ -23,5 +25,12 @@ export const Message = defineMessageUnion({
     result: CatalogueSearch.SearchResult,
   },
   SkippedSearchCatalogue: {},
+  GotCardPanelMessage: { message: CardPanel.Message },
 })
 export type Message = typeof Message.Type
+
+export const OutMessage = defineMessageUnion({
+  SteppedQuantity: { printingId: Printing.PrintingId, step: Step },
+  RequestedCollectionRetry: {},
+})
+export type OutMessage = typeof OutMessage.Type

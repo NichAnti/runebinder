@@ -1,5 +1,5 @@
 import { Effect, Option, Schema } from 'effect'
-import { Command, type Update } from 'foldkit'
+import { Command, Update } from 'foldkit'
 import { replaceUrl } from 'foldkit/navigation'
 import { modifyFields } from 'foldkit/struct'
 
@@ -10,7 +10,8 @@ import {
   CatalogueIndexResource,
   type CatalogueIndexService,
 } from '../../../../service'
-import { Message } from './message'
+import * as CardPanel from '../../cardPanel'
+import { Message, OutMessage } from './message'
 import { type Model, PAGE_SIZE, Results } from './model'
 
 type UpdateReturn = Update.Return<Model, Message, CatalogueIndexService>
@@ -74,10 +75,28 @@ const replace = (model: Model, query: CatalogueQuery.Query): UpdateReturn => ({
   commands: [ReplaceQuery({ query })],
 })
 
+const foldCardPanel = Update.foldChild({
+  update: CardPanel.update,
+  read: (model: Model) => Option.some(model.cardPanel),
+  write: (model: Model, nextCardPanel: CardPanel.Model): Model =>
+    modifyFields(model, { cardPanel: () => nextCardPanel }),
+  toParentMessage: message => Message.GotCardPanelMessage({ message }),
+  toParentOutMessage: CardPanel.OutMessage.match<OutMessage>({
+    SteppedQuantity: stepped => OutMessage.SteppedQuantity(stepped),
+    RequestedCollectionRetry: () => OutMessage.RequestedCollectionRetry(),
+  }),
+})
+
 export const update =
-  (query: CatalogueQuery.Query) =>
-  (model: Model, message: Message): UpdateReturn =>
-    Message.match<UpdateReturn>(message, {
+  (query: CatalogueQuery.Query) => (model: Model, message: Message) =>
+    Message.match<
+      Update.ReturnWithOutMessage<
+        Model,
+        Message,
+        OutMessage,
+        CatalogueIndexService
+      >
+    >(message, {
       UpdatedSearch: ({ value }) =>
         replace(
           modifyFields(model, { searchText: () => value }),
@@ -126,6 +145,8 @@ export const update =
           : { model },
 
       SkippedSearchCatalogue: () => ({ model }),
+
+      GotCardPanelMessage: ({ message }) => foldCardPanel(model, message),
     })
 
 export const currentResult = (

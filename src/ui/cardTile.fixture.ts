@@ -24,7 +24,6 @@ export const view = (_model: Model, h: HtmlBuilder<Message>): Html =>
     [
       CardTile.view(
         {
-          href: '/cards/test-unit',
           imageUrl: 'https://example.com/test.png',
           imageAlt: 'Test Unit artwork',
           title: 'Test Unit',
