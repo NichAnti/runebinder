@@ -24,6 +24,7 @@ erDiagram
   user ||--o{ collection_item : owns
   user ||--o{ deck : builds
   deck ||--o{ deck_card : contains
+  deck ||--o{ deck_additional_legend : brings
   user ||--o{ wishlist_item : wants
 
   user {
@@ -40,13 +41,21 @@ erDiagram
     text id PK
     text user_id FK
     text name
-    text chosen_champion "printing id, optional"
+    text legend_printing_id "optional while building"
+    text chosen_champion_printing_id "optional while building"
+    int created_at
+    int updated_at
   }
   deck_card {
     text deck_id PK, FK
-    text printing_id PK, FK
-    text section PK "main | sideboard"
-    int count
+    text zone PK "Main | Runes | Battlefields | Sideboard"
+    text printing_id PK
+    int count "1 or more"
+  }
+  deck_additional_legend {
+    text deck_id PK, FK
+    int position PK "order kept"
+    text printing_id
   }
   wishlist_item {
     text user_id PK, FK
@@ -57,7 +66,27 @@ erDiagram
 
 - `user`, `session`, `account` and `verification` are Better Auth's tables (`src/worker/schema/auth.ts`, generated). Only the relevant columns are shown.
 - `collection_item`, `deck`, `deck_card` and `wishlist_item` arrive in Phases 6 to 8; their exact columns are decided then. `printing_id` columns hold a `PrintingId` from the catalogue file (not a foreign key); the Backend checks it on every write against `catalogue/printingIds.json`, a list of every `PrintingId` that `catalogue:build` writes next to `catalogue.json`.
-- Deleting a user cascades to everything they own.
+- Deleting a user cascades to everything they own, and deleting a deck cascades to its cards and additional legends.
+
+### Decks
+
+A deck is stored part by part, the way the game describes it, not the way a deck code packs it:
+
+| Deck part           | Stored in                                             | In a deck code                                    |
+| ------------------- | ----------------------------------------------------- | ------------------------------------------------- |
+| Name                | `deck.name`                                           | not carried                                       |
+| Legend (1)          | `deck.legend_printing_id`                             | a card inside `mainDeck`                          |
+| Chosen champion (1) | `deck.chosen_champion_printing_id`, a copy of its own | `chosenChampion`, plus one copy inside `mainDeck` |
+| Main deck           | `deck_card`, zone `Main`                              | `mainDeck`                                        |
+| Runes               | `deck_card`, zone `Runes`                             | cards inside `mainDeck`                           |
+| Battlefields        | `deck_card`, zone `Battlefields`                      | cards inside `mainDeck`                           |
+| Sideboard           | `deck_card`, zone `Sideboard`                         | `sideboard`                                       |
+| Additional legends  | `deck_additional_legend`, in order                    | `additionalLegends`, in order                     |
+
+- The chosen champion is never also a `Main` row. Rules that count it (the main deck's minimum, the copy limit) add it in one place, the deck rules check.
+- The legend and the chosen champion are optional so a deck can be built step by step. The rules check reports what is missing or wrong; it never blocks saving.
+- Importing a code splits `mainDeck` by each card's type in the catalogue. A code that cannot be split, such as one with two starting legends or a champion that is not in its main deck, is rejected with a typed error. Exporting merges the parts back.
+- Deck codes are read and written with [`@piltoverarchive/riftbound-deck-codes`](https://www.npmjs.com/package/@piltoverarchive/riftbound-deck-codes), wrapped once so its exceptions become typed errors.
 
 ## Catalogue build
 
