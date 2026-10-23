@@ -257,7 +257,63 @@ describe('deck page', () => {
       Command.expectExact(LoadCardToAdd),
       Command.resolve(
         LoadCardToAdd,
-        Message.SucceededLoadCardToAdd({ card: testCard, tab: 'Unit' }),
+        Message.SucceededLoadCardToAdd({
+          card: testCard,
+          tab: 'Unit',
+          target: 'Deck',
+        }),
+      ),
+    )
+  })
+
+  test('a search result adds a copy to the sideboard too, within the limit', () => {
+    const twoCopies: Deck.Deck = {
+      ...deck,
+      contents: {
+        ...deck.contents,
+        main: [{ printingId: base, copies: Deck.Copies.make(2) }],
+      },
+    }
+    const sideboard = role('group', { name: 'In Sideboard: Test Unit, Tester' })
+
+    scene(
+      {
+        update: update(Option.some(twoCopies)),
+        view: withViewInputs(view, {
+          decks: DecksState.Model.Ready({
+            decks: [twoCopies],
+            saves: {},
+            nextRevision: 0,
+            creation: DecksState.Creation.Idle(),
+            removals: {},
+          }),
+          deckId: deck.id,
+          collection: CollectionState.init(),
+        })(),
+      },
+      given(modifyFields(loaded, { searchResults: () => searchResult.cards })),
+      expect(within(sideboard, role('status'))).toHaveText('0'),
+      click(within(sideboard, role('button', { name: 'Add one' }))),
+      Command.resolve(
+        LoadCardToAdd,
+        Message.SucceededLoadCardToAdd({
+          card: testCard,
+          tab: 'Unit',
+          target: 'Sideboard',
+        }),
+      ),
+      expectOutMessage(
+        OutMessage.EditedDeck({
+          deckId: deck.id,
+          edits: [
+            {
+              _tag: 'StepCopies',
+              zone: 'Sideboard',
+              printingId: base,
+              step: 1,
+            },
+          ],
+        }),
       ),
     )
   })

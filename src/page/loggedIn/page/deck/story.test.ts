@@ -33,7 +33,11 @@ describe('adding cards', () => {
     })
     const chosen = update(Option.some(deck))(
       onLegends,
-      Message.SucceededLoadCardToAdd({ card: testCard, tab: 'Legend' }),
+      Message.SucceededLoadCardToAdd({
+        card: testCard,
+        tab: 'Legend',
+        target: 'Deck',
+      }),
     ).model
     const entryId = Option.getOrThrow(
       Option.map(Array.head(chosen.toast.entries), ({ id }) => id),
@@ -43,7 +47,11 @@ describe('adding cards', () => {
       update(Option.some(deck)),
       given(onLegends),
       message(
-        Message.SucceededLoadCardToAdd({ card: testCard, tab: 'Legend' }),
+        Message.SucceededLoadCardToAdd({
+          card: testCard,
+          tab: 'Legend',
+          target: 'Deck',
+        }),
       ),
       model(next => {
         expect(next.addTab).toBe('Champion')
@@ -82,7 +90,11 @@ describe('adding cards', () => {
     })
     const added = update(Option.some(deck))(
       onUnits,
-      Message.SucceededLoadCardToAdd({ card: testCard, tab: 'Unit' }),
+      Message.SucceededLoadCardToAdd({
+        card: testCard,
+        tab: 'Unit',
+        target: 'Deck',
+      }),
     )
 
     expect(added.model.toast.entries).toStrictEqual([])

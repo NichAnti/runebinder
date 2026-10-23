@@ -788,7 +788,52 @@ const cardsOf = (
     Array.contains(card.printingIds, printingId),
   )
 
-const resultStepper = (
+const mostCopiesIn = (
+  card: CatalogueSearch.CardSummary,
+  inZone: ReadonlyArray<Deck.DeckCard>,
+): Printing.PrintingId =>
+  Option.match(
+    Array.reduce(inZone, Option.none<Deck.DeckCard>(), (most, deckCard) =>
+      Option.exists(most, ({ copies }) => copies >= deckCard.copies)
+        ? most
+        : Option.some(deckCard),
+    ),
+    {
+      onNone: () => Array.headNonEmpty(card.printingIds),
+      onSome: ({ printingId }) => printingId,
+    },
+  )
+
+const zoneStepper = (
+  card: CatalogueSearch.CardSummary,
+  zone: Deck.Zone,
+  inZone: ReadonlyArray<Deck.DeckCard>,
+  room: number,
+  label: string,
+  h: HtmlBuilder<Message>,
+): Html => {
+  const copies = Deck.copiesIn(inZone)
+
+  return QuantityStepper.view(
+    {
+      label,
+      quantity: copies,
+      max: copies + Number.max(0, room),
+      onDecrement: Message.ClickedStepLine({
+        zone,
+        printingId: mostCopiesIn(card, inZone),
+        step: -1,
+      }),
+      onIncrement: Message.ClickedAddCard({
+        cardId: card.id,
+        target: zone === 'Sideboard' ? 'Sideboard' : 'Deck',
+      }),
+    },
+    h,
+  )
+}
+
+const resultControls = (
   context: Context,
   card: CatalogueSearch.CardSummary,
   label: string,
@@ -797,45 +842,73 @@ const resultStepper = (
   const { contents } = context.deck
   const zone = zoneOfTab(context.model.addTab)
   const inZone = cardsOf(card, DeckEdit.cardsIn(contents, zone))
-  const copies = Deck.copiesIn(inZone)
-  const used =
-    zone === 'Main'
-      ? copies +
-        Deck.copiesIn(cardsOf(card, contents.sideboard)) +
-        (Option.exists(contents.maybeChosenChampion, printingId =>
-          Array.contains(card.printingIds, printingId),
-        )
-          ? 1
-          : 0)
-      : copies
-  const mostCopies = Array.reduce(
-    inZone,
-    Option.none<Deck.DeckCard>(),
-    (most, deckCard) =>
-      Option.exists(most, ({ copies }) => copies >= deckCard.copies)
-        ? most
-        : Option.some(deckCard),
-  )
+  const limitRoom = (used: number) =>
+    Option.match(card.maybeCopyLimit, {
+      onNone: () => Deck.MAX_COPIES,
+      onSome: limit => limit - used,
+    })
 
-  return QuantityStepper.view(
-    {
-      label: `In ${SECTION_LABELS[zone]}: ${label}`,
-      quantity: copies,
-      max: Option.match(card.maybeCopyLimit, {
-        onNone: () => Deck.MAX_COPIES,
-        onSome: limit => copies + Number.max(0, limit - used),
-      }),
-      onDecrement: Message.ClickedStepLine({
-        zone,
-        printingId: Option.match(mostCopies, {
-          onNone: () => Array.headNonEmpty(card.printingIds),
-          onSome: ({ printingId }) => printingId,
-        }),
-        step: -1,
-      }),
-      onIncrement: Message.ClickedAddCard({ cardId: card.id }),
-    },
-    h,
+  if (zone !== 'Main') {
+    return zoneStepper(
+      card,
+      zone,
+      inZone,
+      limitRoom(Deck.copiesIn(inZone)),
+      `In ${SECTION_LABELS[zone]}: ${label}`,
+      h,
+    )
+  }
+
+  const inSideboard = cardsOf(card, contents.sideboard)
+  const used =
+    Deck.copiesIn(inZone) +
+    Deck.copiesIn(inSideboard) +
+    (Option.exists(contents.maybeChosenChampion, printingId =>
+      Array.contains(card.printingIds, printingId),
+    )
+      ? 1
+      : 0)
+  const sideboardRoom =
+    DeckRules.MAX_SIDEBOARD - Deck.copiesIn(contents.sideboard)
+
+  return h.div(
+    [h.Class('flex flex-col items-center gap-1')],
+    [
+      h.div(
+        [h.Class('flex items-center gap-2')],
+        [
+          h.span(
+            [h.AriaHidden(true), h.Class('w-8 text-xs text-fg-muted')],
+            ['Main'],
+          ),
+          zoneStepper(
+            card,
+            'Main',
+            inZone,
+            limitRoom(used),
+            `In Main deck: ${label}`,
+            h,
+          ),
+        ],
+      ),
+      h.div(
+        [h.Class('flex items-center gap-2')],
+        [
+          h.span(
+            [h.AriaHidden(true), h.Class('w-8 text-xs text-fg-muted')],
+            ['Side'],
+          ),
+          zoneStepper(
+            card,
+            'Sideboard',
+            inSideboard,
+            Number.min(limitRoom(used), sideboardRoom),
+            `In Sideboard: ${label}`,
+            h,
+          ),
+        ],
+      ),
+    ],
   )
 }
 
@@ -880,11 +953,14 @@ const resultView = (
                 tab === 'AdditionalLegend' ? `Add ${label}` : `Choose ${label}`,
               ],
               variant: 'Secondary',
-              onClick: Message.ClickedAddCard({ cardId: card.id }),
+              onClick: Message.ClickedAddCard({
+                cardId: card.id,
+                target: 'Deck',
+              }),
             },
             h,
           )
-        : resultStepper(context, card, label, h),
+        : resultControls(context, card, label, h),
     ],
   )
 }
@@ -902,7 +978,7 @@ const addPanelView = (context: Context, h: HtmlBuilder<Message>): Html => {
     [
       h.AriaLabel('Add cards'),
       h.Class(
-        'flex flex-col gap-3 rounded-card border border-border bg-surface p-4 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto',
+        'flex flex-col gap-3 rounded-card border border-border bg-surface p-4 lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto',
       ),
     ],
     [

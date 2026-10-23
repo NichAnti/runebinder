@@ -39,6 +39,7 @@ import { cardsByPrinting, nameOf } from './lines'
 import { Message, OutMessage } from './message'
 import {
   AddTab,
+  AddTarget,
   Export,
   type Model,
   TAB_FOR_SECTION,
@@ -149,14 +150,15 @@ export const LoadCardToAdd = Command.define('LoadCardToAdd', {
   args: {
     cardId: Printing.CardId,
     tab: AddTab,
+    target: AddTarget,
   },
   messages: [Message.SucceededLoadCardToAdd, Message.SkippedLoadCatalogue],
-  execute: ({ cardId, tab }) =>
+  execute: ({ cardId, tab, target }) =>
     Effect.gen(function* () {
       const index = yield* CatalogueIndexResource.get
       return Option.match(CatalogueIndex.cardById(index, cardId), {
         onNone: () => Message.SkippedLoadCatalogue(),
-        onSome: card => Message.SucceededLoadCardToAdd({ card, tab }),
+        onSome: card => Message.SucceededLoadCardToAdd({ card, tab, target }),
       })
     }).pipe(
       Effect.catchTag('ResourceNotAvailable', () =>
@@ -428,8 +430,21 @@ const edited = (
       }),
   })
 
-const editFor = (tab: AddTab, card: Printing.Card): DeckEdit.DeckEdit => {
+const editFor = (
+  tab: AddTab,
+  target: AddTarget,
+  card: Printing.Card,
+): DeckEdit.DeckEdit => {
   const base = Printing.basePrinting(card)
+
+  if (target === 'Sideboard') {
+    return {
+      _tag: 'StepCopies',
+      zone: 'Sideboard',
+      printingId: base.id,
+      step: 1,
+    }
+  }
 
   return Match.value(tab).pipe(
     Match.withReturnType<DeckEdit.DeckEdit>(),
@@ -578,12 +593,12 @@ export const update =
           ? { model: modifyFields(model, { searchResults: () => cards }) }
           : { model },
 
-      ClickedAddCard: ({ cardId }) => ({
+      ClickedAddCard: ({ cardId, target }) => ({
         model,
-        commands: [LoadCardToAdd({ cardId, tab: model.addTab })],
+        commands: [LoadCardToAdd({ cardId, tab: model.addTab, target })],
       }),
 
-      SucceededLoadCardToAdd: ({ card, tab }) => {
+      SucceededLoadCardToAdd: ({ card, tab, target }) => {
         const nextTab = tabAfter(tab, maybeDeck)
         const stored: Model = modifyFields(model, {
           cards: cards => Record.set(cards, card.id, card),
@@ -597,7 +612,7 @@ export const update =
             })
           : { model: stored }
         const edit = edited(toastShow.model, maybeDeck, () => [
-          editFor(tab, card),
+          editFor(tab, target, card),
         ])
 
         return {

@@ -12,7 +12,7 @@ import {
 } from '../../../../domain'
 import { Toast } from '../../../../ui'
 import * as CardPanel from '../../cardPanel'
-import { AddTab, Layout } from './model'
+import { AddTab, AddTarget, Layout } from './model'
 
 export const Message = defineMessageUnion({
   UpdatedName: { value: Schema.String },
@@ -27,8 +27,12 @@ export const Message = defineMessageUnion({
     tab: AddTab,
     cards: Schema.Array(CatalogueSearch.CardSummary),
   },
-  ClickedAddCard: { cardId: Printing.CardId },
-  SucceededLoadCardToAdd: { card: Printing.Card, tab: AddTab },
+  ClickedAddCard: { cardId: Printing.CardId, target: AddTarget },
+  SucceededLoadCardToAdd: {
+    card: Printing.Card,
+    tab: AddTab,
+    target: AddTarget,
+  },
   ClickedStepLine: {
     zone: Deck.Zone,
     printingId: Printing.PrintingId,

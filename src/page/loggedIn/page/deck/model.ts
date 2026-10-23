@@ -33,6 +33,9 @@ export const AddTab = Schema.Literals([
 ])
 export type AddTab = typeof AddTab.Type
 
+export const AddTarget = Schema.Literals(['Deck', 'Sideboard'])
+export type AddTarget = typeof AddTarget.Type
+
 export const TAB_FOR_SECTION: Readonly<Record<DeckRules.Section, AddTab>> = {
   Legend: 'Legend',
   ChosenChampion: 'Champion',
