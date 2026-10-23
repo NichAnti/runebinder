@@ -1,23 +1,36 @@
-import { Context, Effect, HashSet, Layer, Schema } from 'effect'
+import { Context, Effect, Layer, Option, Record, Schema } from 'effect'
 
-import printingIdsJson from '../../../catalogue/printingIds.json'
-import { Catalogue, type Printing } from '../../domain'
+import printingTypesJson from '../../../catalogue/printingTypes.json'
+import { Catalogue, type DeckCode, type Printing } from '../../domain'
 
 export class PrintingCatalogue extends Context.Service<
   PrintingCatalogue,
-  { readonly has: (id: Printing.PrintingId) => boolean }
+  {
+    readonly find: (
+      id: Printing.PrintingId,
+    ) => Option.Option<DeckCode.KnownPrinting>
+    readonly has: (id: Printing.PrintingId) => boolean
+  }
 >()('cardtrader/worker/PrintingCatalogue') {
-  static readonly layerFrom = (ids: ReadonlyArray<string>) =>
+  static readonly layerFrom = (json: unknown) =>
     Layer.effect(
       PrintingCatalogue,
       Effect.gen(function* () {
-        const known = HashSet.fromIterable(
-          yield* Schema.decodeEffect(Catalogue.PrintingIds)(ids),
-        )
+        const types = yield* Schema.decodeUnknownEffect(
+          Catalogue.PrintingTypes,
+        )(json)
+        const find = (id: Printing.PrintingId) =>
+          Option.map(Record.get(types, id), maybeType => ({
+            printingId: id,
+            maybeType,
+          }))
 
-        return PrintingCatalogue.of({ has: id => HashSet.has(known, id) })
+        return PrintingCatalogue.of({
+          find,
+          has: id => Option.isSome(find(id)),
+        })
       }).pipe(Effect.orDie),
     )
 
-  static readonly layer = PrintingCatalogue.layerFrom(printingIdsJson)
+  static readonly layer = PrintingCatalogue.layerFrom(printingTypesJson)
 }

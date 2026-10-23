@@ -34,7 +34,9 @@ const makeClient = HttpApiTest.groups(Api, ['collection'])
 
 const handlersFor = (user: User.User) =>
   CollectionLive.pipe(
-    Layer.provide(PrintingCatalogue.layerFrom([vi, viAlternateArt])),
+    Layer.provide(
+      PrintingCatalogue.layerFrom({ [vi]: 'Unit', [viAlternateArt]: 'Unit' }),
+    ),
     Layer.provideMerge(SignedInAs(user)),
   )
 
