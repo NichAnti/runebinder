@@ -1,11 +1,10 @@
-import * as Cloudflare from 'alchemy/Cloudflare'
 import { drizzle } from 'drizzle-orm/d1'
 import { Context, Effect, Layer } from 'effect'
 
 import { BetterAuth } from '@alchemy.run/better-auth'
 import { Drizzle } from '@alchemy.run/better-auth/Drizzle'
 
-import { AppDb } from './database'
+import { AppDatabase } from './database'
 import * as schema from './schema'
 
 export const AUTH_BASE_PATH = '/api/auth'
@@ -23,7 +22,7 @@ export class Auth extends Context.Service<
 
 const AuthDatabase = Layer.unwrap(
   Effect.gen(function* () {
-    const d1 = yield* Cloudflare.D1.QueryDatabase(AppDb)
+    const d1 = yield* AppDatabase
 
     return Drizzle(
       Effect.map(d1.raw, binding =>
@@ -32,7 +31,7 @@ const AuthDatabase = Layer.unwrap(
       { provider: 'sqlite', schema },
     )
   }),
-).pipe(Layer.provide(Cloudflare.D1.QueryDatabaseBinding))
+)
 
 export const AuthLive = Layer.effect(Auth, makeAuth).pipe(
   Layer.provide(AuthDatabase),

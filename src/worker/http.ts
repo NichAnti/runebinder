@@ -4,6 +4,9 @@ import { HttpApiBuilder } from 'effect/http-api'
 
 import { Api, CurrentUser, Health } from '../api'
 import { AuthenticationLive } from './authentication'
+import { PrintingCatalogue } from './catalogue/printingCatalogue'
+import { CollectionLive } from './collection/http'
+import { CollectionRepository } from './collection/repository'
 
 export const SystemLive = HttpApiBuilder.group(Api, 'system', handlers =>
   handlers.handle('health', () => Effect.succeed(Health.make({ ok: true }))),
@@ -18,7 +21,11 @@ export const AccountLive = HttpApiBuilder.group(Api, 'account', handlers =>
 )
 
 export const HttpLive = HttpApiBuilder.layer(Api).pipe(
-  Layer.provide([SystemLive, AccountLive]),
-  Layer.provide(AuthenticationLive),
+  Layer.provide([SystemLive, AccountLive, CollectionLive]),
+  Layer.provide([
+    AuthenticationLive,
+    CollectionRepository.layer,
+    PrintingCatalogue.layer,
+  ]),
   Layer.provide(Http.Platform),
 )

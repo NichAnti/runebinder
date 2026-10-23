@@ -1,5 +1,6 @@
 export { Account } from './account'
 export { Api } from './api'
+export { Collection, SetQuantity, UnknownPrinting } from './collection'
 export {
   Authentication,
   AuthenticationUnavailable,

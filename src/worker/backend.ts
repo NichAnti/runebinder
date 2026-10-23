@@ -1,8 +1,9 @@
 import * as Cloudflare from 'alchemy/Cloudflare'
-import { Effect } from 'effect'
+import { Effect, Layer } from 'effect'
 import { HttpRouter, HttpServerRequest } from 'effect/http'
 
 import { AUTH_BASE_PATH, Auth, AuthLive } from './auth'
+import { AppDatabase } from './database'
 import { HttpLive } from './http'
 
 export const isAuthPath = (pathname: string): boolean =>
@@ -31,5 +32,5 @@ export default class Backend extends Cloudflare.Worker<Backend>()(
         }
       }),
     }
-  }).pipe(Effect.provide(AuthLive)),
+  }).pipe(Effect.provide(AuthLive.pipe(Layer.provideMerge(AppDatabase.layer)))),
 ) {}
