@@ -5,21 +5,25 @@ import type { Html, HtmlBuilder } from 'foldkit/html'
 import { Printing } from '../../../domain'
 import { cardRouter } from '../../../route'
 import { Button, CardTile, HoverCard, Link } from '../../../ui'
-import * as CollectionState from '../collection'
+import * as Printings from '../printings'
 import { Message } from './message'
 import { type Model, PanelCard } from './model'
 import { AnchorCardPanel } from './mount'
 
+export type Trigger =
+  | Readonly<{ _tag: 'Tile'; tile: CardTile.ViewConfig }>
+  | Readonly<{ _tag: 'Line'; content: ReadonlyArray<string> }>
+
 export type ViewInputs = Readonly<{
   cardId: Printing.CardId
   label: string
-  tile: CardTile.ViewConfig
-  collection: CollectionState.Model
+  trigger: Trigger
+  counts: Printings.Counts
 }>
 
 const contentView = (
   panelCard: PanelCard,
-  { cardId, label, collection }: ViewInputs,
+  { cardId, label, counts }: ViewInputs,
   h: HtmlBuilder<Message>,
 ): ReadonlyArray<Html> => [
   h.div(
@@ -51,10 +55,10 @@ const contentView = (
       h.div(
         [h.Class('flex flex-col gap-3')],
         [
-          CollectionState.printingsView(
+          Printings.printingsView(
             {
               card,
-              collection,
+              counts,
               selected: Printing.basePrinting(card).id,
               hrefFor: ({ id }) =>
                 cardRouter({ cardId, printing: Option.some(id) }),
@@ -96,7 +100,10 @@ export const tileView = Submodel.defineView<Model, Message, ViewInputs>(
         hoverIntent: model.hoverIntent,
         toHoverIntentMessage: message =>
           Message.GotHoverIntentMessage({ cardId: viewInputs.cardId, message }),
-        trigger: [CardTile.view(viewInputs.tile, h)],
+        trigger:
+          viewInputs.trigger._tag === 'Tile'
+            ? [CardTile.view(viewInputs.trigger.tile, h)]
+            : viewInputs.trigger.content,
         onClick: Message.ClickedTrigger({ cardId: viewInputs.cardId }),
         isOpen: Option.isSome(maybeOpen),
         isPinned,

@@ -38,16 +38,19 @@ const collection = CollectionState.Model.Ready({
 const sceneView = withViewInputs(tileView, {
   cardId: testCard.id,
   label: 'Test Unit',
-  tile: {
-    imageUrl: 'https://example.com/test-unit.png',
-    imageAlt: 'Test Unit artwork',
-    title: 'Test Unit',
-    maybeSubtitle: Option.none(),
-    domains: ['Fury'],
-    meta: '2 printings',
-    maybeHighlight: Option.none(),
+  trigger: {
+    _tag: 'Tile',
+    tile: {
+      imageUrl: 'https://example.com/test-unit.png',
+      imageAlt: 'Test Unit artwork',
+      title: 'Test Unit',
+      maybeSubtitle: Option.none(),
+      domains: ['Fury'],
+      meta: '2 printings',
+      maybeHighlight: Option.none(),
+    },
   },
-  collection,
+  counts: CollectionState.countsOf(collection),
 })
 
 const tile = role('button', { name: 'Test Unit' })

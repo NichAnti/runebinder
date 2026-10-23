@@ -6,6 +6,7 @@ import { Printing } from '../../../../domain'
 import { type CardRoute, cardRouter, catalogueHome } from '../../../../route'
 import { Badge, Link, Notice } from '../../../../ui'
 import * as CollectionState from '../../collection'
+import * as Printings from '../../printings'
 import { Message } from './message'
 import { CardState, type Model } from './model'
 import * as TextView from './textView'
@@ -152,10 +153,10 @@ const foundView = (
           detailsView(printing, h),
         ],
       ),
-      CollectionState.printingsView(
+      Printings.printingsView(
         {
           card,
-          collection,
+          counts: CollectionState.countsOf(collection),
           selected: printing.id,
           hrefFor: ({ id }) =>
             cardRouter({ cardId: card.id, printing: Option.some(id) }),

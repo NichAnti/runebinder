@@ -410,22 +410,25 @@ const resultsView = (
                             onNone: () => card.name,
                             onSome: subtitle => `${card.name}, ${subtitle}`,
                           }),
-                          tile: {
-                            imageUrl: card.imageUrl,
-                            imageAlt: Option.getOrElse(
-                              card.maybeAccessibilityText,
-                              () => card.name,
-                            ),
-                            title: card.name,
-                            maybeSubtitle: card.maybeSubtitle,
-                            domains: card.domains,
-                            meta: printingCountText(card.printingIds),
-                            maybeHighlight: ownedText(
-                              inputs.collection,
-                              card.printingIds,
-                            ),
+                          trigger: {
+                            _tag: 'Tile',
+                            tile: {
+                              imageUrl: card.imageUrl,
+                              imageAlt: Option.getOrElse(
+                                card.maybeAccessibilityText,
+                                () => card.name,
+                              ),
+                              title: card.name,
+                              maybeSubtitle: card.maybeSubtitle,
+                              domains: card.domains,
+                              meta: printingCountText(card.printingIds),
+                              maybeHighlight: ownedText(
+                                inputs.collection,
+                                card.printingIds,
+                              ),
+                            },
                           },
-                          collection: inputs.collection,
+                          counts: CollectionState.countsOf(inputs.collection),
                         },
                         toParentMessage: message =>
                           Message.GotCardPanelMessage({ message }),

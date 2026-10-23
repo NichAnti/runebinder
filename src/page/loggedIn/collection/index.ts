@@ -16,4 +16,4 @@ export {
   update,
 } from './update'
 export { view } from './view'
-export { VARIANT_LABELS, printingsView } from './printingsView'
+export { countsOf } from './counts'
