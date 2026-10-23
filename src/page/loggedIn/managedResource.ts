@@ -18,7 +18,10 @@ export const managedResources = ManagedResource.make<Model, Message>()(
       acquire: () => loadCatalogueIndex,
       release: () => Effect.void,
       onAcquired: index =>
-        Message.AcquiredCatalogueIndex({ allValues: index.allValues }),
+        Message.AcquiredCatalogueIndex({
+          allValues: index.allValues,
+          printingSets: index.printingSets,
+        }),
       onReleased: () => Message.ReleasedCatalogueIndex(),
       onAcquireError: error =>
         Message.FailedAcquireCatalogueIndex({ reason: String(error) }),

@@ -190,6 +190,7 @@ export const enterRoute = (model: Model, route: AppRoute): UpdateReturn =>
             'Catalogue',
             'Card',
             'CardTrader',
+            'Collection',
             'NotFound',
             (route: LoggedInRoute) => foldLoggedInRoute(model, route),
           ),

@@ -2,7 +2,6 @@ import { Match } from 'effect'
 import { Submodel } from 'foldkit'
 import type { Html, HtmlBuilder } from 'foldkit/html'
 
-import { CatalogueSearch } from '../../domain'
 import { catalogueHome } from '../../route'
 import { Button, Notice } from '../../ui'
 import * as NotFound from '../notFound'
@@ -12,11 +11,12 @@ import { CatalogueState, type Model } from './model'
 import * as CardPage from './page/card'
 import * as CardTraderPage from './page/cardTrader'
 import * as CataloguePage from './page/catalogue'
-import { queryOf } from './update'
+import * as CollectionPage from './page/collection'
+import { contextOf } from './update'
 
 const catalogueGate = (
   model: Model,
-  whenReady: (allValues: CatalogueSearch.Facets) => Html,
+  whenReady: (ready: typeof CatalogueState.Ready.Type) => Html,
   h: HtmlBuilder<Message>,
 ): Html =>
   CatalogueState.match(model.catalogue, {
@@ -46,7 +46,7 @@ const catalogueGate = (
         },
         h,
       ),
-    Ready: ({ allValues }) => whenReady(allValues),
+    Ready: whenReady,
   })
 
 export const view = Submodel.defineView<Model, Message>((model, h) =>
@@ -64,19 +64,51 @@ export const view = Submodel.defineView<Model, Message>((model, h) =>
           Catalogue: catalogueRoute =>
             catalogueGate(
               model,
-              allValues =>
+              ({ allValues }) =>
                 h.submodel({
                   slotId: 'catalogue-page',
                   model: model.cataloguePage,
                   view: CataloguePage.view,
                   viewInputs: {
-                    query: queryOf(catalogueRoute),
+                    ...contextOf(catalogueRoute, model.collection),
                     allValues,
                     collection: model.collection,
                   },
                   toParentMessage: message =>
                     Message.GotCataloguePageMessage({ message }),
                 }),
+              h,
+            ),
+          Collection: collectionRoute =>
+            catalogueGate(
+              model,
+              ({ allValues, printingSets }) =>
+                h.div(
+                  [h.Class('flex flex-col gap-8')],
+                  [
+                    h.h1([h.Class('text-2xl font-semibold')], ['Collection']),
+                    CollectionPage.summaryView(
+                      {
+                        collection: model.collection,
+                        printingSets,
+                        onRefresh: Message.ClickedRefreshCollection(),
+                      },
+                      h,
+                    ),
+                    h.submodel({
+                      slotId: 'collection-page',
+                      model: model.collectionPage,
+                      view: CataloguePage.view,
+                      viewInputs: {
+                        ...contextOf(collectionRoute, model.collection),
+                        allValues,
+                        collection: model.collection,
+                      },
+                      toParentMessage: message =>
+                        Message.GotCollectionPageMessage({ message }),
+                    }),
+                  ],
+                ),
               h,
             ),
           Card: cardRoute =>

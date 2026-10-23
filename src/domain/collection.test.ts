@@ -9,11 +9,12 @@ import {
   adjust,
   fromItems,
   quantityOf,
+  summarize,
   toOwned,
   totalOf,
   withQuantity,
 } from './collection'
-import { PrintingId } from './printing'
+import { PrintingId, SetCode } from './printing'
 
 const vi = PrintingId.make('ogn-066-298')
 const viAlternateArt = PrintingId.make('ogn-066a-298')
@@ -60,5 +61,29 @@ describe('owned printings', () => {
 
   test('the total adds every listed printing', () => {
     expect(totalOf(owned, [vi, viAlternateArt])).toBe(2)
+  })
+})
+
+describe('summary', () => {
+  test('counts copies, printings and each set’s progress in release order', () => {
+    const jinx = PrintingId.make('unl-001-219')
+    const printingSets = {
+      [vi]: SetCode.make('OGN'),
+      [viAlternateArt]: SetCode.make('OGN'),
+      [jinx]: SetCode.make('UNL'),
+    }
+    const owned = fromItems([
+      { printingId: vi, quantity: OwnedQuantity.make(3) },
+      { printingId: jinx, quantity: OwnedQuantity.make(1) },
+    ])
+
+    expect(summarize(owned, printingSets)).toStrictEqual({
+      copies: 4,
+      printings: 2,
+      sets: [
+        { set: 'OGN', ownedPrintings: 1, totalPrintings: 2 },
+        { set: 'UNL', ownedPrintings: 1, totalPrintings: 1 },
+      ],
+    })
   })
 })

@@ -7,23 +7,37 @@ import { CatalogueQuery, Collection, Printing } from '../../../../domain'
 import { searchResult } from '../../../../testing'
 import { Message } from './message'
 import { PAGE_SIZE, Results, init } from './model'
-import { ReplaceQuery, SearchCatalogue, enter, update } from './update'
+import {
+  type Context,
+  ReplaceQuery,
+  SearchCatalogue,
+  enter,
+  update,
+} from './update'
 
 const query = CatalogueQuery.empty
+
+const inCatalogue = (
+  query: CatalogueQuery.Query,
+  maybeOwned: Option.Option<Collection.Owned> = Option.none(),
+): Context => ({ scope: 'Catalogue', query, maybeOwned })
 const vi = Printing.PrintingId.make('ogn-066-298')
 const searching = modifyFields(init(query), {})
 
 describe('changes go through the URL', () => {
   test('typing replaces the URL with the trimmed search', () => {
     story(
-      update(query, Option.none()),
+      update(inCatalogue(query)),
       given(searching),
       message(Message.UpdatedSearch({ value: 'vi ' })),
       model(next => {
         expect(next.searchText).toBe('vi ')
       }),
       Command.expectHas(
-        ReplaceQuery({ query: { ...query, q: Option.some('vi') } }),
+        ReplaceQuery({
+          scope: 'Catalogue',
+          query: { ...query, q: Option.some('vi') },
+        }),
       ),
       Command.resolve(ReplaceQuery, Message.CompletedReplaceQuery()),
     )
@@ -31,11 +45,14 @@ describe('changes go through the URL', () => {
 
   test('toggling a filter replaces the URL with that filter', () => {
     story(
-      update(query, Option.none()),
+      update(inCatalogue(query)),
       given(searching),
       message(Message.ToggledFilter({ facet: 'domain', value: 'Fury' })),
       Command.expectHas(
-        ReplaceQuery({ query: { ...query, domain: ['Fury'] } }),
+        ReplaceQuery({
+          scope: 'Catalogue',
+          query: { ...query, domain: ['Fury'] },
+        }),
       ),
       Command.resolve(ReplaceQuery, Message.CompletedReplaceQuery()),
     )
@@ -46,12 +63,15 @@ describe('searching', () => {
   test('the ownership filter waits for the collection, then sends it', () => {
     const ownedQuery: CatalogueQuery.Query = { ...query, ownership: 'Owned' }
     const owned = { [vi]: Collection.OwnedQuantity.make(1) }
-    const waiting = enter(init(ownedQuery), ownedQuery, true, Option.none())
+    const waiting = enter(
+      init(ownedQuery),
+      inCatalogue(ownedQuery, Option.none()),
+      true,
+    )
     const searching = enter(
       init(ownedQuery),
-      ownedQuery,
+      inCatalogue(ownedQuery, Option.some(owned)),
       true,
-      Option.some(owned),
     )
 
     expect(waiting.commands).toStrictEqual([])
@@ -67,30 +87,33 @@ describe('searching', () => {
 
   test('choosing what to show replaces the URL', () => {
     story(
-      update(query, Option.none()),
+      update(inCatalogue(query)),
       given(searching),
       message(Message.SelectedOwnership({ value: 'NotOwned' })),
       Command.expectHas(
-        ReplaceQuery({ query: { ...query, ownership: 'NotOwned' } }),
+        ReplaceQuery({
+          scope: 'Catalogue',
+          query: { ...query, ownership: 'NotOwned' },
+        }),
       ),
       Command.resolve(ReplaceQuery, Message.CompletedReplaceQuery()),
     )
   })
 
   test('entering the page searches once the index is ready', () => {
-    const entered = enter(init(query), query, true, Option.none())
+    const entered = enter(init(query), inCatalogue(query, Option.none()), true)
     expect(entered.commands?.length).toBe(1)
   })
 
   test('entering before the index is ready waits', () => {
     expect(
-      enter(init(query), query, false, Option.none()).commands,
+      enter(init(query), inCatalogue(query, Option.none()), false).commands,
     ).toBeUndefined()
   })
 
   test('a result for an older query is ignored', () => {
     story(
-      update({ ...query, q: Option.some('vi') }, Option.none()),
+      update(inCatalogue({ ...query, q: Option.some('vi') })),
       given(searching),
       message(
         Message.SucceededSearchCatalogue({
@@ -107,7 +130,7 @@ describe('searching', () => {
 
   test('show more asks for the next page', () => {
     story(
-      update(query, Option.none()),
+      update(inCatalogue(query)),
       given(searching),
       message(Message.ClickedShowMore()),
       model(next => {

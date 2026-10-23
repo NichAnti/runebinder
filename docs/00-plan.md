@@ -59,7 +59,7 @@ Its structure is agreed before any code is written.
 - [x] 6.4 Card page: owned amount per printing with − / +
 - [x] 6.5 Card panel: hovering (pointer) or tapping a card tile opens a panel with every printing of the card, owned amounts and − / +, and a link to the card page; it stays open while the pointer is on the tile or the panel and closes on leave or Esc
 - [x] 6.6 Catalogue: "Owned n" on each card (all printings combined) and an All / Owned / Not owned filter
-- [ ] 6.7 Collection page `/collection`: summary (copies, printings owned per set out of the set's total), the owned cards with the catalogue's search and filters, Refresh
+- [x] 6.7 Collection page `/collection`: summary (copies, printings owned per set out of the set's total), the owned cards with the catalogue's search and filters, Refresh
 
 ## Phase 7: Decks
 

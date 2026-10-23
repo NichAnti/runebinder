@@ -9,7 +9,7 @@ import {
   Collection,
   Printing,
 } from '../../../../domain'
-import { catalogueRouter } from '../../../../route'
+import { catalogueRouter, collectionRouter } from '../../../../route'
 import {
   CatalogueIndex,
   CatalogueIndexResource,
@@ -17,19 +17,28 @@ import {
 } from '../../../../service'
 import * as CardPanel from '../../cardPanel'
 import { Message, OutMessage } from './message'
-import { type Model, PAGE_SIZE, Results } from './model'
+import { type Model, PAGE_SIZE, Results, Scope } from './model'
 
 type UpdateReturn = Update.Return<Model, Message, CatalogueIndexService>
+
+export type Context = Readonly<{
+  scope: Scope
+  query: CatalogueQuery.Query
+  maybeOwned: Option.Option<Collection.Owned>
+}>
+
+const searchQueryOf = ({ scope, query }: Context): CatalogueQuery.Query =>
+  scope === 'Collection' ? { ...query, ownership: 'Owned' } : query
 
 // COMMAND
 
 export const ReplaceQuery = Command.define('ReplaceQuery', {
-  args: { query: CatalogueQuery.Query },
+  args: { scope: Scope, query: CatalogueQuery.Query },
   messages: [Message.CompletedReplaceQuery],
-  execute: ({ query }) =>
-    replaceUrl(catalogueRouter(query)).pipe(
-      Effect.as(Message.CompletedReplaceQuery()),
-    ),
+  execute: ({ scope, query }) =>
+    replaceUrl(
+      scope === 'Collection' ? collectionRouter(query) : catalogueRouter(query),
+    ).pipe(Effect.as(Message.CompletedReplaceQuery())),
 })
 
 export const SearchCatalogue = Command.define('SearchCatalogue', {
@@ -58,23 +67,22 @@ export const SearchCatalogue = Command.define('SearchCatalogue', {
 
 // ROUTE
 
-const search = (
-  query: CatalogueQuery.Query,
-  limit: number,
-  maybeOwned: Option.Option<Collection.Owned>,
-) =>
-  query.ownership === 'All'
+const search = (context: Context, limit: number) => {
+  const query = searchQueryOf(context)
+
+  return query.ownership === 'All'
     ? Option.some(SearchCatalogue({ query, limit, ownedPrintingIds: [] }))
-    : Option.map(maybeOwned, owned =>
+    : Option.map(context.maybeOwned, owned =>
         SearchCatalogue({ query, limit, ownedPrintingIds: Record.keys(owned) }),
       )
+}
 
 export const enter = (
   model: Model,
-  query: CatalogueQuery.Query,
+  context: Context,
   isIndexReady: boolean,
-  maybeOwned: Option.Option<Collection.Owned>,
 ): UpdateReturn => {
+  const { query } = context
   const typedTerm = CatalogueQuery.withTerm(
     CatalogueQuery.empty,
     model.searchText,
@@ -89,17 +97,19 @@ export const enter = (
   return isIndexReady
     ? {
         model: nextModel,
-        commands: Option.toArray(search(query, PAGE_SIZE, maybeOwned)),
+        commands: Option.toArray(search(context, PAGE_SIZE)),
       }
     : { model: nextModel }
 }
 
 // UPDATE
 
-const replace = (model: Model, query: CatalogueQuery.Query): UpdateReturn => ({
-  model,
-  commands: [ReplaceQuery({ query })],
-})
+const replace =
+  (scope: Scope) =>
+  (model: Model, query: CatalogueQuery.Query): UpdateReturn => ({
+    model,
+    commands: [ReplaceQuery({ scope, query })],
+  })
 
 const foldCardPanel = Update.foldChild({
   update: CardPanel.update,
@@ -113,9 +123,11 @@ const foldCardPanel = Update.foldChild({
   }),
 })
 
-export const update =
-  (query: CatalogueQuery.Query, maybeOwned: Option.Option<Collection.Owned>) =>
-  (model: Model, message: Message) =>
+export const update = (context: Context) => {
+  const { query } = context
+  const replaceWith = replace(context.scope)
+
+  return (model: Model, message: Message) =>
     Message.match<
       Update.ReturnWithOutMessage<
         Model,
@@ -125,35 +137,38 @@ export const update =
       >
     >(message, {
       UpdatedSearch: ({ value }) =>
-        replace(
+        replaceWith(
           modifyFields(model, { searchText: () => value }),
           CatalogueQuery.withTerm(query, value),
         ),
 
       ToggledFilter: ({ facet, value }) =>
-        replace(model, CatalogueQuery.toggleFacet(query, facet, value)),
+        replaceWith(model, CatalogueQuery.toggleFacet(query, facet, value)),
 
       ChangedRange: ({ field, bound, value }) =>
-        replace(model, CatalogueQuery.withBound(query, field, bound, value)),
+        replaceWith(
+          model,
+          CatalogueQuery.withBound(query, field, bound, value),
+        ),
 
       SelectedSort: ({ value }) =>
-        replace(model, { ...query, sort: CatalogueQuery.parseSort(value) }),
+        replaceWith(model, { ...query, sort: CatalogueQuery.parseSort(value) }),
 
       SelectedOwnership: ({ value }) =>
-        replace(model, {
+        replaceWith(model, {
           ...query,
           ownership: CatalogueQuery.parseOwnership(value),
         }),
 
       ClickedClearFilters: () =>
-        replace(model, CatalogueQuery.clearFilters(query)),
+        replaceWith(model, CatalogueQuery.clearFilters(query)),
 
       ClickedShowMore: () => {
         const nextLimit = model.limit + PAGE_SIZE
 
         return {
           model: modifyFields(model, { limit: () => nextLimit }),
-          commands: Option.toArray(search(query, nextLimit, maybeOwned)),
+          commands: Option.toArray(search(context, nextLimit)),
         }
       },
 
@@ -168,7 +183,8 @@ export const update =
       CompletedReplaceQuery: () => ({ model }),
 
       SucceededSearchCatalogue: ({ query: resultQuery, limit, result }) =>
-        CatalogueQuery.isSameQuery(resultQuery, query) && limit === model.limit
+        CatalogueQuery.isSameQuery(resultQuery, searchQueryOf(context)) &&
+        limit === model.limit
           ? {
               model: modifyFields(model, {
                 results: () =>
@@ -181,6 +197,7 @@ export const update =
 
       GotCardPanelMessage: ({ message }) => foldCardPanel(model, message),
     })
+}
 
 export const currentResult = (
   model: Model,

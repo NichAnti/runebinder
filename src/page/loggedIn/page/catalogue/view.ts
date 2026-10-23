@@ -8,10 +8,12 @@ import {
   Collection,
   Printing,
 } from '../../../../domain'
+import { catalogueHome } from '../../../../route'
 import {
   Button,
   Disclosure,
   FilterChip,
+  Link,
   Notice,
   RangeFilter,
   SearchField,
@@ -20,9 +22,10 @@ import {
 import * as CardPanel from '../../cardPanel'
 import * as CollectionState from '../../collection'
 import { Message } from './message'
-import { type Model, Results } from './model'
+import { type Model, Results, type Scope } from './model'
 
 export type ViewInputs = Readonly<{
+  scope: Scope
   query: CatalogueQuery.Query
   allValues: CatalogueSearch.Facets
   collection: CollectionState.Model
@@ -325,9 +328,49 @@ const sortView = (inputs: ViewInputs, h: HtmlBuilder<Message>): Html => {
   )
 }
 
+const isUnfiltered = (query: CatalogueQuery.Query): boolean =>
+  Option.isNone(query.q) && CatalogueQuery.activeFilterCount(query) === 0
+
+const noResultsView = (
+  { scope, query }: ViewInputs,
+  h: HtmlBuilder<Message>,
+): Html =>
+  scope === 'Collection' && isUnfiltered(query)
+    ? Notice.view(
+        {
+          title: 'Your collection is empty',
+          description: [
+            'Open a card in the catalogue and use + on the printings you own.',
+          ],
+          actions: [
+            Link.view(
+              { href: catalogueHome(), content: ['Go to the catalogue'] },
+              h,
+            ),
+          ],
+        },
+        h,
+      )
+    : Notice.view(
+        {
+          title: 'No cards match',
+          description: ['Try a different search or remove some filters.'],
+          actions: [
+            Button.view(
+              {
+                content: ['Clear filters'],
+                onClick: Message.ClickedClearFilters(),
+              },
+              h,
+            ),
+          ],
+        },
+        h,
+      )
+
 const resultsView = (
   model: Model,
-  collection: CollectionState.Model,
+  inputs: ViewInputs,
   h: HtmlBuilder<Message>,
 ): Html =>
   Results.match(model.results, {
@@ -341,23 +384,7 @@ const resultsView = (
       ),
     Showing: ({ result }) =>
       Array.match(result.cards, {
-        onEmpty: () =>
-          Notice.view(
-            {
-              title: 'No cards match',
-              description: ['Try a different search or remove some filters.'],
-              actions: [
-                Button.view(
-                  {
-                    content: ['Clear filters'],
-                    onClick: Message.ClickedClearFilters(),
-                  },
-                  h,
-                ),
-              ],
-            },
-            h,
-          ),
+        onEmpty: () => noResultsView(inputs, h),
         onNonEmpty: cards =>
           h.div(
             [h.Class('flex flex-col gap-6')],
@@ -394,11 +421,11 @@ const resultsView = (
                             domains: card.domains,
                             meta: printingCountText(card.printingIds),
                             maybeHighlight: ownedText(
-                              collection,
+                              inputs.collection,
                               card.printingIds,
                             ),
                           },
-                          collection,
+                          collection: inputs.collection,
                         },
                         toParentMessage: message =>
                           Message.GotCardPanelMessage({ message }),
@@ -444,7 +471,9 @@ export const view = Submodel.defineView<Model, Message, ViewInputs>(
         h.div(
           [h.Class('flex flex-col gap-3')],
           [
-            h.h1([h.Class('text-2xl font-semibold')], ['Catalogue']),
+            inputs.scope === 'Catalogue'
+              ? h.h1([h.Class('text-2xl font-semibold')], ['Catalogue'])
+              : h.h2([h.Class('text-lg font-semibold')], ['Your cards']),
             SearchField.view(
               {
                 id: 'catalogue-search',
@@ -505,12 +534,17 @@ export const view = Submodel.defineView<Model, Message, ViewInputs>(
                     ),
                     h.div(
                       [h.Class('flex flex-wrap items-center gap-3')],
-                      [ownershipView(inputs, h), sortView(inputs, h)],
+                      [
+                        ...(inputs.scope === 'Catalogue'
+                          ? [ownershipView(inputs, h)]
+                          : []),
+                        sortView(inputs, h),
+                      ],
                     ),
                   ],
                 ),
                 activeFiltersView(inputs, h),
-                resultsView(model, inputs.collection, h),
+                resultsView(model, inputs, h),
               ],
             ),
           ],

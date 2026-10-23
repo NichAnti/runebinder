@@ -2,7 +2,13 @@ import { Array, Effect, Match, Option, Record, Result, pipe } from 'effect'
 
 import { create, insertMultiple, search } from '@orama/orama'
 
-import { CardText, CatalogueQuery, CatalogueSearch, Printing } from '../domain'
+import {
+  CardText,
+  CatalogueQuery,
+  CatalogueSearch,
+  Collection,
+  Printing,
+} from '../domain'
 
 // DATABASE
 
@@ -39,6 +45,7 @@ export type CatalogueIndex = Readonly<{
   database: Database
   cards: ReadonlyMap<string, Printing.Card>
   cardIdByPrinting: ReadonlyMap<string, Printing.CardId>
+  printingSets: Collection.PrintingSets
   allValues: CatalogueSearch.Facets
 }>
 
@@ -336,6 +343,9 @@ export const build = (printings: ReadonlyArray<Printing.Printing>) =>
             ({ id }): readonly [string, Printing.CardId] => [id, card.id],
           ),
         ),
+      ),
+      printingSets: Record.fromEntries(
+        Array.map(printings, ({ id, set }) => [id, set]),
       ),
       allValues,
     } satisfies CatalogueIndex

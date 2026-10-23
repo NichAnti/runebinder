@@ -3,7 +3,7 @@ import { Command, given, message, model, story } from 'foldkit/story'
 import { modifyFields } from 'foldkit/struct'
 import { describe, expect, test } from 'vitest'
 
-import { CatalogueQuery, Printing } from '../../domain'
+import { CatalogueQuery, Collection, Printing } from '../../domain'
 import { AppRoute } from '../../route'
 import { ada, allValues, testCard } from '../../testing'
 import * as CollectionState from './collection'
@@ -20,10 +20,10 @@ describe('catalogue loading', () => {
     story(
       update,
       given(onCatalogue),
-      message(Message.AcquiredCatalogueIndex({ allValues })),
+      message(Message.AcquiredCatalogueIndex({ allValues, printingSets: {} })),
       model(next => {
         expect(next.catalogue).toStrictEqual(
-          CatalogueState.Ready({ attempt: 0, allValues }),
+          CatalogueState.Ready({ attempt: 0, allValues, printingSets: {} }),
         )
       }),
       Command.expectExact(
@@ -77,7 +77,10 @@ describe('catalogue loading', () => {
 describe('collection on the card page', () => {
   const onCard = modifyFields(
     init(AppRoute.Card({ cardId: testCard.id, printing: Option.none() }), ada),
-    { catalogue: () => CatalogueState.Ready({ attempt: 0, allValues }) },
+    {
+      catalogue: () =>
+        CatalogueState.Ready({ attempt: 0, allValues, printingSets: {} }),
+    },
   )
   const printingId = Printing.PrintingId.make('tst-001-010')
 
@@ -145,7 +148,8 @@ describe('collection and the ownership filter', () => {
       ownership: 'Owned',
     })
     const onOwned = modifyFields(init(ownedRoute, ada), {
-      catalogue: () => CatalogueState.Ready({ attempt: 0, allValues }),
+      catalogue: () =>
+        CatalogueState.Ready({ attempt: 0, allValues, printingSets: {} }),
     })
     const entered = enterRoute(onOwned, ownedRoute)
 
@@ -168,6 +172,73 @@ describe('collection and the ownership filter', () => {
         CataloguePage.SearchCatalogue,
         CataloguePage.Message.SkippedSearchCatalogue(),
       ),
+    )
+  })
+})
+
+describe('collection page', () => {
+  test('entering loads the collection, then searches only owned cards', () => {
+    const collectionRoute = AppRoute.Collection(CatalogueQuery.empty)
+    const onCollection = modifyFields(init(collectionRoute, ada), {
+      catalogue: () =>
+        CatalogueState.Ready({ attempt: 0, allValues, printingSets: {} }),
+    })
+    const entered = enterRoute(onCollection, collectionRoute)
+    const printingId = Printing.PrintingId.make('tst-001-010')
+
+    expect(entered.commands?.map(({ name }) => name)).toStrictEqual([
+      CollectionState.LoadCollection.name,
+    ])
+
+    story(
+      update,
+      given(entered.model),
+      message(
+        Message.GotCollectionMessage({
+          message: CollectionState.Message.SucceededLoadCollection({
+            items: [{ printingId, quantity: Collection.OwnedQuantity.make(1) }],
+          }),
+        }),
+      ),
+      Command.expectHas(
+        CataloguePage.SearchCatalogue({
+          query: { ...CatalogueQuery.empty, ownership: 'Owned' },
+          limit: CataloguePage.PAGE_SIZE,
+          ownedPrintingIds: [printingId],
+        }),
+      ),
+      Command.resolve(
+        CataloguePage.SearchCatalogue,
+        CataloguePage.Message.SkippedSearchCatalogue(),
+      ),
+    )
+  })
+
+  test('Refresh reloads the collection', () => {
+    story(
+      update,
+      given(
+        modifyFields(init(AppRoute.Collection(CatalogueQuery.empty), ada), {
+          collection: () =>
+            CollectionState.Model.Ready({
+              owned: {},
+              saves: {},
+              nextRevision: 0,
+              refresh: CollectionState.Refresh.Idle(),
+            }),
+        }),
+      ),
+      message(Message.ClickedRefreshCollection()),
+      Command.expectExact(CollectionState.LoadCollection),
+      Command.resolve(
+        CollectionState.LoadCollection,
+        CollectionState.Message.FailedLoadCollection(),
+      ),
+      model(next => {
+        expect(
+          next.collection._tag === 'Ready' && next.collection.refresh,
+        ).toStrictEqual(CollectionState.Refresh.Failed())
+      }),
     )
   })
 })

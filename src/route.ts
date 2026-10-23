@@ -13,11 +13,13 @@ export const AppRoute = defineRouteUnion({
     printing: Schema.Option(Printing.PrintingId),
   },
   CardTrader: {},
+  Collection: CatalogueQuery.Query.fields,
   NotFound: { path: Schema.String },
 })
 export type AppRoute = typeof AppRoute.Type
 export type CatalogueRoute = typeof AppRoute.Catalogue.Type
 export type CardRoute = typeof AppRoute.Card.Type
+export type CollectionRoute = typeof AppRoute.Collection.Type
 
 export const LoggedOutRoute = AppRoute.subset(['SignIn', 'SignUp', 'NotFound'])
 export type LoggedOutRoute = typeof LoggedOutRoute.Type
@@ -26,6 +28,7 @@ export const LoggedInRoute = AppRoute.subset([
   'Catalogue',
   'Card',
   'CardTrader',
+  'Collection',
   'NotFound',
 ])
 export type LoggedInRoute = typeof LoggedInRoute.Type
@@ -58,6 +61,11 @@ export const cardTraderRouter = pipe(
   literal('cardtrader'),
   Route.mapTo(AppRoute.CardTrader),
 )
+export const collectionRouter = pipe(
+  literal('collection'),
+  Route.query(CatalogueQuery.QueryParams),
+  Route.mapTo(AppRoute.Collection),
+)
 export const catalogueRouter = pipe(
   Route.root,
   Route.query(CatalogueQuery.QueryParams),
@@ -77,6 +85,7 @@ const routeParser = Route.oneOf(
   signUpRouter,
   cardRouter,
   cardTraderRouter,
+  collectionRouter,
   catalogueRouter,
 )
 

@@ -1,6 +1,6 @@
-import { Array, Number, Option, Record, Schema, pipe } from 'effect'
+import { Array, Number, Option, Order, Record, Schema, pipe } from 'effect'
 
-import { PrintingId } from './printing'
+import { PrintingId, SetCode, setReleaseRank } from './printing'
 
 export const MAX_QUANTITY = 999
 
@@ -59,3 +59,49 @@ export const adjust = (quantity: Quantity, step: -1 | 1): Quantity =>
     Schema.decodeOption(Quantity)(quantity + step),
     () => quantity,
   )
+
+// SUMMARY
+
+export const PrintingSets = Schema.Record(PrintingId, SetCode)
+export type PrintingSets = typeof PrintingSets.Type
+
+export type SetProgress = Readonly<{
+  set: SetCode
+  ownedPrintings: number
+  totalPrintings: number
+}>
+
+export type Summary = Readonly<{
+  copies: number
+  printings: number
+  sets: ReadonlyArray<SetProgress>
+}>
+
+const bySetRelease = Order.mapInput(Order.Number, ({ set }: SetProgress) =>
+  setReleaseRank(set),
+)
+
+export const summarize = (
+  owned: Owned,
+  printingSets: PrintingSets,
+): Summary => {
+  const bySet = Array.groupBy(Record.toEntries(printingSets), ([, set]) => set)
+
+  return {
+    copies: Number.sumAll(Record.values(owned)),
+    printings: Record.size(owned),
+    sets: pipe(
+      Record.toEntries(bySet),
+      Array.map(([set, entries]) => ({
+        set: SetCode.make(set),
+        ownedPrintings: Array.length(
+          Array.filter(entries, ([printingId]) =>
+            Record.has(owned, printingId),
+          ),
+        ),
+        totalPrintings: Array.length(entries),
+      })),
+      Array.sort(bySetRelease),
+    ),
+  }
+}
