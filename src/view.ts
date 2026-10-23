@@ -26,7 +26,7 @@ const title = (route: AppRoute): string =>
     Collection: () => `Collection | ${APP_NAME}`,
     Decks: () => `Decks | ${APP_NAME}`,
     Deck: () => `Deck | ${APP_NAME}`,
-    Wishlist: () => `Wishlist | ${APP_NAME}`,
+    Wishlist: () => `Wishlists | ${APP_NAME}`,
     NotFound: () => `Not found | ${APP_NAME}`,
   })
 
@@ -78,7 +78,7 @@ const navView = (loggedIn: LoggedIn.Model, h: HtmlBuilder<Message>): Html =>
       Link.view(
         {
           href: wishlistRouter(),
-          content: ['Wishlist'],
+          content: ['Wishlists'],
           variant: 'Nav',
           isCurrent: loggedIn.route._tag === 'Wishlist',
         },
