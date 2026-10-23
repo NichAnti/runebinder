@@ -261,6 +261,22 @@ describe('deck page', () => {
     )
   })
 
+  test('the main deck is grouped by type under its energy curve', () => {
+    scene(
+      { update: update(Option.some(deck)), view: sceneView() },
+      given(loaded),
+      expect(
+        within(mainDeck, role('list', { name: 'Energy curve' })),
+      ).toExist(),
+      expect(
+        within(mainDeck, role('listitem', { name: '3 energy: 3 cards' })),
+      ).toExist(),
+      expect(within(mainDeck, role('group', { name: 'Units' }))).toContainText(
+        'Test Unit',
+      ),
+    )
+  })
+
   test('grid tiles offer the same actions as the list', () => {
     scene(
       { update: update(Option.some(deck)), view: sceneView() },

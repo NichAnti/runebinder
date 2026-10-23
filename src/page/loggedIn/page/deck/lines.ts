@@ -1,4 +1,13 @@
-import { Array, Number, Option, Order, Record, pipe } from 'effect'
+import {
+  Array,
+  Number,
+  Option,
+  Order,
+  Record,
+  Result,
+  Schema,
+  pipe,
+} from 'effect'
 
 import { type Deck, Printing } from '../../../../domain'
 
@@ -80,3 +89,68 @@ export const isChampionUnit = (card: Printing.Card): boolean => {
     Array.contains(base.supertypes, 'Champion')
   )
 }
+
+const energyOf = ({ maybeCard }: Line): number =>
+  Option.getOrElse(
+    Option.flatMap(maybeCard, card => Printing.basePrinting(card).maybeEnergy),
+    () => 0,
+  )
+
+const byEnergy = Order.mapInput(Order.Number, energyOf)
+
+export const byEnergyThenLabel: Order.Order<Line> = Order.combine(
+  byEnergy,
+  byLabel,
+)
+
+export const TypeGroup = Schema.Literals(['Unit', 'Spell', 'Gear', 'Other'])
+export type TypeGroup = typeof TypeGroup.Type
+
+const groupOf = ({ maybeCard }: Line): TypeGroup =>
+  Option.match(
+    Option.flatMap(maybeCard, card => Printing.basePrinting(card).maybeType),
+    {
+      onNone: () => 'Other',
+      onSome: type =>
+        type === 'Unit' || type === 'Spell' || type === 'Gear' ? type : 'Other',
+    },
+  )
+
+export type TypeGroupLines = Readonly<{
+  group: TypeGroup
+  lines: Array.NonEmptyReadonlyArray<Line>
+}>
+
+export const groupsOf = (
+  lines: ReadonlyArray<Line>,
+): ReadonlyArray<TypeGroupLines> =>
+  Array.filterMap(TypeGroup.literals, group =>
+    Array.match(
+      Array.sort(
+        Array.filter(lines, line => groupOf(line) === group),
+        byEnergyThenLabel,
+      ),
+      {
+        onEmpty: () => Result.failVoid,
+        onNonEmpty: groupLines => Result.succeed({ group, lines: groupLines }),
+      },
+    ),
+  )
+
+export const CURVE_TOP = 7
+
+export const energyCurveOf = (
+  lines: ReadonlyArray<Line>,
+): ReadonlyArray<number> =>
+  Array.makeBy(CURVE_TOP + 1, energy =>
+    Number.sumAll(
+      Array.map(
+        Array.filter(lines, line =>
+          energy === CURVE_TOP
+            ? energyOf(line) >= CURVE_TOP
+            : energyOf(line) === energy,
+        ),
+        ({ copies }) => copies,
+      ),
+    ),
+  )

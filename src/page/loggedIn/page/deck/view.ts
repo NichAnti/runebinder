@@ -17,6 +17,7 @@ import {
   Button,
   CardTile,
   Checkbox,
+  ColumnChart,
   Link,
   Notice,
   ProgressChip,
@@ -32,8 +33,12 @@ import * as DecksState from '../../decks'
 import * as Printings from '../../printings'
 import { problemText } from '../deckList/view'
 import {
+  CURVE_TOP,
   type Line,
+  type TypeGroup,
   cardsByPrinting,
+  energyCurveOf,
+  groupsOf,
   isChampionUnit,
   linesOf,
   nameOf,
@@ -385,20 +390,101 @@ const zoneView = (
         onEmpty: () =>
           h.p([h.Class('text-sm text-fg-muted')], ['Nothing here yet.']),
         onNonEmpty: lines =>
-          context.model.layout === 'Grid'
-            ? h.ul(
-                [
-                  h.Class(
-                    'grid grid-cols-3 gap-3 sm:grid-cols-4 xl:grid-cols-5',
-                  ),
-                ],
-                Array.map(lines, line => gridLineView(context, zone, line, h)),
-              )
-            : h.ul(
-                [h.Class('flex flex-col gap-2')],
-                Array.map(lines, line => listLineView(context, zone, line, h)),
-              ),
+          zone === 'Main'
+            ? mainLinesView(context, lines, h)
+            : linesView(context, zone, lines, h),
       }),
+    ],
+  )
+
+const linesView = (
+  context: Context,
+  zone: Deck.Zone,
+  lines: ReadonlyArray<Line>,
+  h: HtmlBuilder<Message>,
+): Html =>
+  context.model.layout === 'Grid'
+    ? h.ul(
+        [h.Class('grid grid-cols-3 gap-3 sm:grid-cols-4 xl:grid-cols-5')],
+        Array.map(lines, line => gridLineView(context, zone, line, h)),
+      )
+    : h.ul(
+        [h.Class('flex flex-col gap-2')],
+        Array.map(lines, line => listLineView(context, zone, line, h)),
+      )
+
+const GROUP_LABELS: Readonly<Record<TypeGroup, string>> = {
+  Unit: 'Units',
+  Spell: 'Spells',
+  Gear: 'Gear',
+  Other: 'Other',
+}
+
+const curveLabel = (energy: number): string =>
+  energy === CURVE_TOP ? `${CURVE_TOP}+` : `${energy}`
+
+const curveView = (
+  context: Context,
+  lines: ReadonlyArray<Line>,
+  h: HtmlBuilder<Message>,
+): Html => {
+  const championLines = linesOf(
+    Array.map(
+      Option.toArray(context.deck.contents.maybeChosenChampion),
+      printingId => ({ printingId, copies: Deck.Copies.make(1) }),
+    ),
+    context.byPrinting,
+  )
+
+  return ColumnChart.view(
+    {
+      title: 'Energy curve',
+      columns: Array.map(
+        energyCurveOf([...championLines, ...lines]),
+        (copies, energy) => ({
+          label: curveLabel(energy),
+          value: copies,
+          description: `${curveLabel(energy)} energy: ${copies === 1 ? '1 card' : `${copies} cards`}`,
+        }),
+      ),
+    },
+    h,
+  )
+}
+
+const mainLinesView = (
+  context: Context,
+  lines: ReadonlyArray<Line>,
+  h: HtmlBuilder<Message>,
+): Html =>
+  h.div(
+    [h.Class('flex flex-col gap-5')],
+    [
+      curveView(context, lines, h),
+      ...Array.map(groupsOf(lines), ({ group, lines: groupLines }) =>
+        h.div(
+          [
+            h.AriaLabel(GROUP_LABELS[group]),
+            h.Role('group'),
+            h.Class('flex flex-col gap-2'),
+          ],
+          [
+            h.h3(
+              [h.Class('flex items-baseline gap-2 text-sm font-semibold')],
+              [
+                GROUP_LABELS[group],
+                h.span(
+                  [h.Class('font-normal tabular-nums text-fg-muted')],
+                  [
+                    `${Number.sumAll(Array.map(groupLines, ({ copies }) => copies))}`,
+                  ],
+                ),
+              ],
+            ),
+            linesView(context, 'Main', groupLines, h),
+          ],
+        ),
+      ),
     ],
   )
 
