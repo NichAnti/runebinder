@@ -1,9 +1,14 @@
 import { Effect, Layer, Option, Redacted, Ref } from 'effect'
-import { HttpClient, HttpClientResponse } from 'effect/http'
+import {
+  HttpClient,
+  type HttpClientRequest,
+  HttpClientResponse,
+} from 'effect/http'
 import { describe, expect, test } from 'vitest'
 
 import { assert, layer } from '@effect/vitest'
 
+import { Printing, Wishlist } from '../domain'
 import {
   CardTraderClient,
   CardTraderError,
@@ -19,12 +24,18 @@ const tokenOrThrow = () => Option.getOrThrow(parseToken(TOKEN))
 const fakeCardTrader = (status: number, body: unknown) =>
   Effect.gen(function* () {
     const seenAuthorization = yield* Ref.make(Option.none<string>())
+    const seenRequest = yield* Ref.make(
+      Option.none<HttpClientRequest.HttpClientRequest>(),
+    )
 
     const client = HttpClient.make(request =>
-      Ref.set(
-        seenAuthorization,
-        Option.fromNullishOr(request.headers['authorization']),
-      ).pipe(
+      Effect.all([
+        Ref.set(
+          seenAuthorization,
+          Option.fromNullishOr(request.headers['authorization']),
+        ),
+        Ref.set(seenRequest, Option.some(request)),
+      ]).pipe(
         Effect.as(
           HttpClientResponse.fromWeb(
             request,
@@ -36,6 +47,7 @@ const fakeCardTrader = (status: number, body: unknown) =>
 
     return {
       seenAuthorization,
+      seenRequest,
       layer: CardTraderClient.layerWith.pipe(
         Layer.provide(Layer.succeed(HttpClient.HttpClient, client)),
       ),
@@ -131,4 +143,58 @@ layer(TokenStore.layer)('TokenStore', it => {
       assert.deepStrictEqual(yield* store.read, Option.none())
     }),
   )
+})
+
+const bodyOf = (request: HttpClientRequest.HttpClientRequest): unknown =>
+  request.body._tag === 'Uint8Array'
+    ? JSON.parse(new TextDecoder().decode(request.body.body))
+    : undefined
+
+describe('CardTraderClient wishlists', () => {
+  test('a new wishlist is private, for Riftbound, one line per blueprint', () =>
+    Effect.runPromise(
+      Effect.gen(function* () {
+        const fake = yield* fakeCardTrader(201, { id: 3572164, items: [] })
+        const id = yield* Effect.gen(function* () {
+          const client = yield* CardTraderClient
+          return yield* client.createWishlist(tokenOrThrow(), {
+            name: 'Riftbound decks',
+            lines: [
+              {
+                blueprintId: Printing.CardTraderBlueprintId.make(345245),
+                quantity: 2,
+              },
+            ],
+          })
+        }).pipe(Effect.provide(fake.layer))
+        const request = yield* Ref.get(fake.seenRequest)
+
+        expect(id).toBe(3572164)
+        expect(Option.map(request, bodyOf)).toStrictEqual(
+          Option.some({
+            deck: {
+              game_id: Wishlist.CARDTRADER_GAME_ID,
+              name: 'Riftbound decks',
+              public: false,
+              deck_items_attributes: [{ blueprint_id: 345245, quantity: 2 }],
+            },
+          }),
+        )
+      }),
+    ))
+
+  test('deleting a wishlist that is already gone is fine', () =>
+    Effect.runPromise(
+      Effect.gen(function* () {
+        const fake = yield* fakeCardTrader(404, { error_code: 'not_found' })
+
+        yield* Effect.gen(function* () {
+          const client = yield* CardTraderClient
+          yield* client.deleteWishlist(
+            tokenOrThrow(),
+            Wishlist.CardTraderWishlistId.make(3572164),
+          )
+        }).pipe(Effect.provide(fake.layer))
+      }),
+    ))
 })

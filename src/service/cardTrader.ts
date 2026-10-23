@@ -1,8 +1,10 @@
-import { Context, Effect, Layer, Option, Redacted, Schema } from 'effect'
+import { Array, Context, Effect, Layer, Option, Redacted, Schema } from 'effect'
 import { FetchHttpClient, HttpClient, HttpClientRequest } from 'effect/http'
 import { KeyValueStore } from 'effect/persistence'
 
 import { BrowserKeyValueStore } from '@effect/platform-browser'
+
+import { Wishlist } from '../domain'
 
 const API_BASE_URL = 'https://api.cardtrader.com/api/v2'
 const TOKEN_STORAGE_KEY = 'cardtrader-token'
@@ -129,12 +131,43 @@ export const failureForStatus = (status: number): CardTraderFailure => {
   }
 }
 
+const CreatedWishlist = Schema.Struct({
+  id: Wishlist.CardTraderWishlistId,
+})
+
+export type NewWishlist = Readonly<{
+  name: string
+  lines: Array.NonEmptyReadonlyArray<Wishlist.CardTraderLine>
+}>
+
+const wishlistBody = ({ name, lines }: NewWishlist) => ({
+  deck: {
+    game_id: Wishlist.CARDTRADER_GAME_ID,
+    name,
+    public: false,
+    deck_items_attributes: Array.map(lines, ({ blueprintId, quantity }) => ({
+      blueprint_id: blueprintId,
+      quantity,
+    })),
+  },
+})
+
+const HTTP_NOT_FOUND = 404
+
 export class CardTraderClient extends Context.Service<
   CardTraderClient,
   {
     readonly info: (
       token: Redacted.Redacted<CardTraderToken>,
     ) => Effect.Effect<AppInfo, CardTraderError>
+    readonly createWishlist: (
+      token: Redacted.Redacted<CardTraderToken>,
+      wishlist: NewWishlist,
+    ) => Effect.Effect<Wishlist.CardTraderWishlistId, CardTraderError>
+    readonly deleteWishlist: (
+      token: Redacted.Redacted<CardTraderToken>,
+      wishlistId: Wishlist.CardTraderWishlistId,
+    ) => Effect.Effect<void, CardTraderError>
   }
 >()('cardtrader/service/CardTraderClient') {
   static readonly layerWith = Layer.effect(
@@ -142,10 +175,15 @@ export class CardTraderClient extends Context.Service<
     Effect.gen(function* () {
       const client = yield* HttpClient.HttpClient
 
-      const get = (path: string, token: Redacted.Redacted<CardTraderToken>) =>
+      const unavailable = () => new CardTraderError({ reason: 'Unavailable' })
+
+      const send = (
+        request: HttpClientRequest.HttpClientRequest,
+        token: Redacted.Redacted<CardTraderToken>,
+      ) =>
         client
           .execute(
-            HttpClientRequest.get(`${API_BASE_URL}${path}`).pipe(
+            request.pipe(
               HttpClientRequest.bearerToken(token),
               HttpClientRequest.acceptJson,
             ),
@@ -165,7 +203,59 @@ export class CardTraderClient extends Context.Service<
             ),
           )
 
+      const get = (path: string, token: Redacted.Redacted<CardTraderToken>) =>
+        send(HttpClientRequest.get(`${API_BASE_URL}${path}`), token)
+
+      const createWishlist = Effect.fn('CardTraderClient.createWishlist')(
+        function* (
+          token: Redacted.Redacted<CardTraderToken>,
+          wishlist: NewWishlist,
+        ) {
+          const request = yield* HttpClientRequest.post(
+            `${API_BASE_URL}/wishlists`,
+          ).pipe(
+            HttpClientRequest.bodyJson(wishlistBody(wishlist)),
+            Effect.mapError(unavailable),
+          )
+          const response = yield* send(request, token)
+          const body = yield* response.json.pipe(Effect.mapError(unavailable))
+          const created = yield* Schema.decodeUnknownEffect(CreatedWishlist)(
+            body,
+          ).pipe(Effect.mapError(unavailable))
+          return created.id
+        },
+      )
+
+      const deleteWishlist = Effect.fn('CardTraderClient.deleteWishlist')(
+        function* (
+          token: Redacted.Redacted<CardTraderToken>,
+          wishlistId: Wishlist.CardTraderWishlistId,
+        ) {
+          const response = yield* client
+            .execute(
+              HttpClientRequest.delete(
+                `${API_BASE_URL}/wishlists/${wishlistId}`,
+              ).pipe(
+                HttpClientRequest.bearerToken(token),
+                HttpClientRequest.acceptJson,
+              ),
+            )
+            .pipe(Effect.mapError(unavailable))
+
+          if (
+            response.status !== HTTP_NOT_FOUND &&
+            (response.status < 200 || response.status >= 300)
+          ) {
+            return yield* new CardTraderError({
+              reason: failureForStatus(response.status),
+            })
+          }
+        },
+      )
+
       return CardTraderClient.of({
+        createWishlist,
+        deleteWishlist,
         info: Effect.fn('CardTraderClient.info')(function* (token) {
           const response = yield* get('/info', token)
           const body = yield* response.json.pipe(
