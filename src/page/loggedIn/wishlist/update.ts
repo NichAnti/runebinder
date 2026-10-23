@@ -244,6 +244,36 @@ export const update = (model: Model, message: Message) =>
           : { model },
       ),
 
+    ClickedRetryItemSaves: () =>
+      whenReady(model, ready => {
+        const retries = Array.map(
+          Record.keys(
+            Record.filter(ready.saves, save => save._tag === 'Failed'),
+          ),
+          (printingId, index) => ({
+            printingId,
+            revision: ready.nextRevision + index,
+          }),
+        )
+
+        return {
+          model: modifyFields(ready, {
+            saves: saves =>
+              Array.reduce(retries, saves, (next, { printingId, revision }) =>
+                Record.set(next, printingId, Save.Saving({ revision })),
+              ),
+            nextRevision: revision => revision + Array.length(retries),
+          }),
+          commands: Array.map(retries, ({ printingId, revision }) =>
+            SaveItem({
+              printingId,
+              quantity: Collection.quantityOf(ready.added, printingId),
+              revision,
+            }),
+          ),
+        }
+      }),
+
     SucceededSendWishlist: ({ wishlistId, isPreviousDeleted }) =>
       whenReady(model, ready => ({
         model: modifyFields(ready, {
@@ -261,6 +291,11 @@ export const update = (model: Model, message: Message) =>
   })
 
 // QUERY
+
+export const failedSaveCount = (model: Model): number =>
+  model._tag === 'Ready'
+    ? Record.size(Record.filter(model.saves, save => save._tag === 'Failed'))
+    : 0
 
 export const maybeAdded = (model: Model): Option.Option<Collection.Owned> =>
   model._tag === 'Ready' ? Option.some(model.added) : Option.none()

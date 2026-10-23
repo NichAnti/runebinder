@@ -8,9 +8,11 @@ export {
   type Stepped,
   WaitToSaveItem,
   ensureLoaded,
+  failedSaveCount,
   maybeAdded,
   retry,
   send,
   step,
   update,
 } from './update'
+export { view } from './view'

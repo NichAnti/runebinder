@@ -13,6 +13,7 @@ export const Message = defineMessageUnion({
   },
   SucceededSaveItem: { printingId: Printing.PrintingId, revision: Schema.Int },
   FailedSaveItem: { printingId: Printing.PrintingId, revision: Schema.Int },
+  ClickedRetryItemSaves: {},
   SucceededSendWishlist: {
     wishlistId: Wishlist.CardTraderWishlistId,
     isPreviousDeleted: Schema.Boolean,

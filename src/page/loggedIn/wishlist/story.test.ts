@@ -5,7 +5,14 @@ import { describe, expect, test } from 'vitest'
 import { Collection, Printing, Wishlist } from '../../../domain'
 import { Message } from './message'
 import { Model, Sending } from './model'
-import { SaveItem, SendWishlist, send, step, update } from './update'
+import {
+  SaveItem,
+  SendWishlist,
+  failedSaveCount,
+  send,
+  step,
+  update,
+} from './update'
 
 const vi = Printing.PrintingId.make('ogn-066-298')
 const ready = Model.Ready({
@@ -39,6 +46,31 @@ describe('wishlist', () => {
         expect(next._tag === 'Ready' && next.added).toStrictEqual({
           [vi]: Collection.OwnedQuantity.make(2),
         })
+      }),
+    )
+  })
+
+  test('a failed save is kept and can be retried', () => {
+    const stepped = step(ready, { printingId: vi, step: 1 })
+
+    story(
+      update,
+      given(stepped.model),
+      message(Message.ElapsedSaveItemDelay({ printingId: vi, revision: 0 })),
+      Command.resolve(
+        SaveItem,
+        Message.FailedSaveItem({ printingId: vi, revision: 0 }),
+      ),
+      model(next => {
+        expect(failedSaveCount(next)).toBe(1)
+      }),
+      message(Message.ClickedRetryItemSaves()),
+      Command.resolve(
+        SaveItem,
+        Message.SucceededSaveItem({ printingId: vi, revision: 1 }),
+      ),
+      model(next => {
+        expect(failedSaveCount(next)).toBe(0)
       }),
     )
   })

@@ -17,6 +17,7 @@ import * as DeckPage from './page/deck'
 import * as DeckListPage from './page/deckList'
 import * as WishlistPage from './page/wishlist'
 import { contextOf, wishlistContextOf } from './update'
+import * as WishlistState from './wishlist'
 
 const catalogueGate = (
   model: Model,
@@ -68,6 +69,12 @@ export const view = Submodel.defineView<Model, Message>((model, h) =>
         model: model.decks,
         view: DecksState.view,
         toParentMessage: message => Message.GotDecksMessage({ message }),
+      }),
+      h.submodel({
+        slotId: 'wishlist-status',
+        model: model.wishlist,
+        view: WishlistState.view,
+        toParentMessage: message => Message.GotWishlistMessage({ message }),
       }),
       Match.value(model.route).pipe(
         Match.tagsExhaustive({
