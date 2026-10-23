@@ -8,7 +8,7 @@ import * as CollectionState from '../../collection'
 export type SummaryConfig<Message> = Readonly<{
   collection: CollectionState.Model
   printingSets: Collection.PrintingSets
-  onRefresh: Message
+  onRetry: Message
 }>
 
 const statView = <Message>(
@@ -47,43 +47,27 @@ const setsView = <Message>(
 
 const readyView = <Message>(
   ready: typeof CollectionState.Model.Ready.Type,
-  { printingSets, onRefresh }: SummaryConfig<Message>,
+  { printingSets }: SummaryConfig<Message>,
   h: HtmlBuilder<Message>,
 ): Html => {
   const summary = Collection.summarize(ready.owned, printingSets)
-  const isRefreshing = ready.refresh._tag === 'Refreshing'
 
   return h.section(
-    [h.AriaLabel('Summary'), h.Class('flex flex-col gap-4')],
     [
-      h.div(
-        [h.Class('flex flex-wrap items-end justify-between gap-4')],
+      h.AriaLabel('Collection summary'),
+      h.Class(
+        'flex flex-col gap-4 rounded-card border border-border bg-surface p-4',
+      ),
+    ],
+    [
+      h.dl(
+        [h.Class('flex gap-8')],
         [
-          h.dl(
-            [h.Class('flex gap-8')],
-            [
-              statView('Copies', summary.copies, h),
-              statView('Printings', summary.printings, h),
-            ],
-          ),
-          Button.view(
-            {
-              content: [isRefreshing ? 'Refreshing…' : 'Refresh'],
-              variant: 'Secondary',
-              onClick: onRefresh,
-              isDisabled: isRefreshing,
-            },
-            h,
-          ),
+          statView('Copies', summary.copies, h),
+          statView('Printings', summary.printings, h),
         ],
       ),
       setsView(summary.sets, h),
-      ready.refresh._tag === 'Failed'
-        ? h.p(
-            [h.Role('alert'), h.Class('text-sm text-danger')],
-            ['Your collection could not be refreshed. Try again.'],
-          )
-        : h.empty,
     ],
   )
 }
@@ -104,10 +88,7 @@ export const summaryView = <Message>(
           description: ['Check your connection and try again.'],
           variant: 'Error',
           actions: [
-            Button.view(
-              { content: ['Try again'], onClick: config.onRefresh },
-              h,
-            ),
+            Button.view({ content: ['Try again'], onClick: config.onRetry }, h),
           ],
         },
         h,

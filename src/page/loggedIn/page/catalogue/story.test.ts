@@ -20,7 +20,7 @@ const query = CatalogueQuery.empty
 const inCatalogue = (
   query: CatalogueQuery.Query,
   maybeOwned: Option.Option<Collection.Owned> = Option.none(),
-): Context => ({ scope: 'Catalogue', query, maybeOwned })
+): Context => ({ query, maybeOwned, maybeWanted: Option.none() })
 const vi = Printing.PrintingId.make('ogn-066-298')
 const searching = modifyFields(init(query), {})
 
@@ -35,7 +35,6 @@ describe('changes go through the URL', () => {
       }),
       Command.expectHas(
         ReplaceQuery({
-          scope: 'Catalogue',
           query: { ...query, q: Option.some('vi') },
         }),
       ),
@@ -50,7 +49,6 @@ describe('changes go through the URL', () => {
       message(Message.ToggledFilter({ facet: 'domain', value: 'Fury' })),
       Command.expectHas(
         ReplaceQuery({
-          scope: 'Catalogue',
           query: { ...query, domain: ['Fury'] },
         }),
       ),
@@ -80,7 +78,7 @@ describe('searching', () => {
     ).toStrictEqual([
       {
         name: SearchCatalogue.name,
-        args: { query: ownedQuery, limit: PAGE_SIZE, ownedPrintingIds: [vi] },
+        args: { query: ownedQuery, limit: PAGE_SIZE, viewPrintingIds: [vi] },
       },
     ])
   })
@@ -89,11 +87,10 @@ describe('searching', () => {
     story(
       update(inCatalogue(query)),
       given(searching),
-      message(Message.SelectedOwnership({ value: 'NotOwned' })),
+      message(Message.SelectedOwnership({ value: 'Wanted' })),
       Command.expectHas(
         ReplaceQuery({
-          scope: 'Catalogue',
-          query: { ...query, ownership: 'NotOwned' },
+          query: { ...query, ownership: 'Wanted' },
         }),
       ),
       Command.resolve(ReplaceQuery, Message.CompletedReplaceQuery()),
@@ -140,7 +137,7 @@ describe('searching', () => {
         SearchCatalogue({
           query,
           limit: PAGE_SIZE * 2,
-          ownedPrintingIds: [],
+          viewPrintingIds: [],
         }),
       ),
       Command.resolve(SearchCatalogue, Message.SkippedSearchCatalogue()),

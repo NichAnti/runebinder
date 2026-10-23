@@ -3,38 +3,52 @@ import { describe, expect, test } from 'vitest'
 
 import { printing } from '../testing'
 import { OwnedQuantity } from './collection'
+import { Copies, type Deck, DeckId, DeckName, empty } from './deck'
 import {
   CardId,
   CardTraderBlueprintId,
+  CardTraderExpansionCode,
+  CardTraderSlug,
   type Printing,
   PrintingId,
   SetCode,
 } from './printing'
-import { cardTraderLinesOf, linesOf } from './wishlist'
+import {
+  cardTraderLinesOf,
+  linesOf,
+  wantedCopiesOf,
+  wantedOf,
+} from './wishlist'
 
 const id = PrintingId.make
 const vi = id('ogn-066-298')
 const viAlternate = id('ogn-066a-298')
 const jinx = id('ogn-001-298')
 
+const blueprint = (id: number) => ({
+  id: CardTraderBlueprintId.make(id),
+  metaName: CardTraderSlug.make('vi-destructive'),
+  expansionCode: CardTraderExpansionCode.make('ogn'),
+})
+
 const printings: ReadonlyArray<Printing> = [
   printing({
     id: vi,
     cardId: CardId.make('vi'),
     set: SetCode.make('OGN'),
-    maybeCardTraderBlueprintId: Option.some(CardTraderBlueprintId.make(10)),
+    maybeCardTrader: Option.some(blueprint(10)),
   }),
   printing({
     id: viAlternate,
     cardId: CardId.make('vi'),
     set: SetCode.make('OGN'),
-    maybeCardTraderBlueprintId: Option.some(CardTraderBlueprintId.make(11)),
+    maybeCardTrader: Option.some(blueprint(11)),
   }),
   printing({
     id: jinx,
     cardId: CardId.make('jinx'),
     set: SetCode.make('OGN'),
-    maybeCardTraderBlueprintId: Option.none(),
+    maybeCardTrader: Option.none(),
   }),
 ]
 const find = (printingId: PrintingId) =>
@@ -70,5 +84,37 @@ describe('wishlist lines', () => {
       lines: [{ blueprintId: 10, quantity: 3 }],
       notOnCardTrader: [jinx],
     })
+  })
+})
+
+describe('wanted cards', () => {
+  const deck: Deck = {
+    id: DeckId.make('7b0f2a7e-2a9c-4c6e-9d2b-6a6f1c9d2e11'),
+    name: DeckName.make('Vi aggro'),
+    contents: {
+      ...empty,
+      main: [{ printingId: vi, copies: Copies.make(3) }],
+    },
+  }
+
+  test('decks want what they miss and the custom wishlist adds on top', () => {
+    const wanted = wantedOf(
+      [deck],
+      { [vi]: OwnedQuantity.make(1), [jinx]: OwnedQuantity.make(4) },
+      { [jinx]: OwnedQuantity.make(1) },
+    )
+
+    expect(wanted).toStrictEqual({
+      copies: { [vi]: 2, [jinx]: 1 },
+      fromDecks: 2,
+      fromCustom: 1,
+    })
+    expect(wantedCopiesOf(wanted, [vi, viAlternate])).toBe(2)
+  })
+
+  test('nothing is wanted when the collection covers every deck', () => {
+    expect(
+      wantedOf([deck], { [vi]: OwnedQuantity.make(3) }, {}).copies,
+    ).toStrictEqual({})
   })
 })

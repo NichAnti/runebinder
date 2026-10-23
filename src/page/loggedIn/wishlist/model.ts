@@ -1,7 +1,7 @@
 import { Schema } from 'effect'
 import { defineTaggedUnion } from 'foldkit/schema'
 
-import { Collection, Deck, Printing, Wishlist } from '../../../domain'
+import { Collection, Printing, Wishlist } from '../../../domain'
 
 export const Save = defineTaggedUnion({
   Waiting: { revision: Schema.Int },
@@ -10,40 +10,23 @@ export const Save = defineTaggedUnion({
 })
 export type Save = typeof Save.Type
 
-export const SendFailure = Schema.Literals([
+export const Action = Schema.Literals(['Create', 'Sync', 'Delete'])
+export type Action = typeof Action.Type
+
+export const Failure = Schema.Literals([
   'NotConnected',
   'InvalidToken',
   'RateLimited',
   'Unavailable',
+  'NotSaved',
 ])
-export type SendFailure = typeof SendFailure.Type
+export type Failure = typeof Failure.Type
 
-export const Sending = defineTaggedUnion({
-  Idle: {},
-  Sending: {},
-  Sent: {
-    wishlistId: Wishlist.CardTraderWishlistId,
-    isPreviousDeleted: Schema.Boolean,
-  },
-  Failed: { reason: SendFailure },
+export const Operation = defineTaggedUnion({
+  Working: { action: Action },
+  Failed: { action: Action, reason: Failure },
 })
-export type Sending = typeof Sending.Type
-
-export const SendTarget = Schema.Union([
-  Schema.TaggedStruct('Custom', {}),
-  Schema.TaggedStruct('Deck', { deckId: Deck.DeckId, deckName: Schema.String }),
-])
-export type SendTarget = typeof SendTarget.Type
-
-export const CUSTOM_KEY = 'custom'
-
-export const targetKey = (target: SendTarget): string =>
-  target._tag === 'Custom' ? CUSTOM_KEY : target.deckId
-
-export const wishlistNameOf = (target: SendTarget): string =>
-  target._tag === 'Custom'
-    ? 'Custom wishlist (cardtrader app)'
-    : `${target.deckName} (cardtrader app)`
+export type Operation = typeof Operation.Type
 
 export const Model = defineTaggedUnion({
   NotLoaded: {},
@@ -51,10 +34,10 @@ export const Model = defineTaggedUnion({
   Failed: {},
   Ready: {
     added: Collection.Owned,
-    maybeSentWishlistId: Schema.Option(Wishlist.CardTraderWishlistId),
+    links: Schema.Record(Schema.String, Wishlist.CardTraderWishlistId),
     saves: Schema.Record(Printing.PrintingId, Save),
     nextRevision: Schema.Int,
-    sendings: Schema.Record(Schema.String, Sending),
+    operations: Schema.Record(Schema.String, Operation),
   },
 })
 export type Model = typeof Model.Type

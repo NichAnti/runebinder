@@ -11,7 +11,7 @@ import {
   Printing,
   Wishlist,
 } from '../../../../domain'
-import { decksRouter } from '../../../../route'
+import { deckWishlistRouter, decksRouter } from '../../../../route'
 import {
   Button,
   CardTile,
@@ -28,7 +28,6 @@ import * as CardPanel from '../../cardPanel'
 import * as CollectionState from '../../collection'
 import * as DecksState from '../../decks'
 import * as Printings from '../../printings'
-import * as WishlistState from '../../wishlist'
 import { problemText } from '../deckList/view'
 import {
   type Line,
@@ -46,14 +45,12 @@ export type ViewInputs = Readonly<{
   decks: DecksState.Model
   deckId: Deck.DeckId
   collection: CollectionState.Model
-  sending: WishlistState.Sending
 }>
 
 type Context = Readonly<{
   model: Model
   deck: Deck.Deck
   collection: CollectionState.Model
-  sending: WishlistState.Sending
   byPrinting: ReadonlyMap<string, Printing.Card>
   problems: Option.Option<ReadonlyArray<DeckRules.RuleProblem>>
   maybeLegend: Option.Option<Printing.Printing>
@@ -143,7 +140,7 @@ const tileOf = (
     maybeSubtitle: printing.maybeSubtitle,
     domains: printing.domains,
     meta: Option.getOrElse(printing.maybeType, () => ''),
-    maybeHighlight,
+    highlights: Option.toArray(maybeHighlight),
   }
 }
 
@@ -636,7 +633,9 @@ const resultView = (
           maybeSubtitle: card.maybeSubtitle,
           domains: card.domains,
           meta: '',
-          maybeHighlight: inDeckText(tab, context.deck.contents, card),
+          highlights: Option.toArray(
+            inDeckText(tab, context.deck.contents, card),
+          ),
         },
         h,
       ),
@@ -822,13 +821,11 @@ const missingView = (context: Context, h: HtmlBuilder<Message>): Html =>
   Option.match(CollectionState.maybeOwned(context.collection), {
     onNone: () => h.empty,
     onSome: owned => {
-      const lines = Wishlist.linesOf(Missing.needs([context.deck], owned), {})
-      const cardTrader = Wishlist.cardTraderLinesOf(
-        lines,
-        printingFinder(context.byPrinting),
-      )
       const missing = Number.sumAll(
-        Array.map(lines, ({ quantity }) => quantity),
+        Array.map(
+          Wishlist.linesOf(Missing.needs([context.deck], owned), {}),
+          ({ quantity }) => quantity,
+        ),
       )
 
       return h.div(
@@ -842,45 +839,17 @@ const missingView = (context: Context, h: HtmlBuilder<Message>): Html =>
                 : `${missing} copies missing from your collection.`,
             ],
           ),
-          ...Array.match(cardTrader.lines, {
-            onEmpty: () => [],
-            onNonEmpty: nonEmpty => [
-              Button.view(
-                {
-                  content: [
-                    context.sending._tag === 'Sending'
-                      ? 'Sending…'
-                      : 'Send missing cards to CardTrader',
-                  ],
-                  variant: 'Secondary',
-                  onClick: Message.ClickedSendMissing({ lines: nonEmpty }),
-                  isDisabled: context.sending._tag === 'Sending',
-                },
-                h,
-              ),
-            ],
-          }),
-          WishlistState.Sending.match(context.sending, {
-            Idle: () => h.empty,
-            Sending: () => h.empty,
-            Sent: ({ wishlistId }) =>
-              Link.view(
-                {
-                  href: Wishlist.cardTraderWishlistUrl(wishlistId),
-                  content: ['Open it on CardTrader'],
-                },
-                h,
-              ),
-            Failed: ({ reason }) =>
-              h.span(
-                [h.Role('alert'), h.Class('text-sm text-danger')],
-                [
-                  reason === 'NotConnected'
-                    ? 'Connect your CardTrader account first.'
-                    : 'The wishlist could not be sent. Try again.',
-                ],
-              ),
-          }),
+          ...(missing === 0
+            ? []
+            : [
+                Link.view(
+                  {
+                    href: deckWishlistRouter({ deckId: context.deck.id }),
+                    content: ['Open its wishlist'],
+                  },
+                  h,
+                ),
+              ]),
         ],
       )
     },
@@ -920,7 +889,7 @@ const deckView = (
   model: Model,
   deck: Deck.Deck,
   removal: Option.Option<DecksState.Removal>,
-  { collection, sending }: ViewInputs,
+  { collection }: ViewInputs,
   h: HtmlBuilder<Message>,
 ): Html => {
   const byPrinting = cardsByPrinting(model.cards)
@@ -931,7 +900,6 @@ const deckView = (
     model,
     deck,
     collection,
-    sending,
     byPrinting,
     problems:
       rules._tag === 'Checked' ? Option.some(rules.problems) : Option.none(),

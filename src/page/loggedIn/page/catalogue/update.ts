@@ -1,4 +1,4 @@
-import { Effect, Option, Record, Schema } from 'effect'
+import { Effect, Match, Option, Record, Schema } from 'effect'
 import { Command, Update } from 'foldkit'
 import { replaceUrl } from 'foldkit/navigation'
 import { modifyFields } from 'foldkit/struct'
@@ -8,8 +8,9 @@ import {
   CatalogueSearch,
   Collection,
   Printing,
+  Wishlist,
 } from '../../../../domain'
-import { catalogueRouter, collectionRouter } from '../../../../route'
+import { catalogueRouter } from '../../../../route'
 import {
   CatalogueIndex,
   CatalogueIndexResource,
@@ -17,45 +18,42 @@ import {
 } from '../../../../service'
 import * as CardPanel from '../../cardPanel'
 import { Message, OutMessage } from './message'
-import { type Model, PAGE_SIZE, Results, Scope } from './model'
+import { type Model, PAGE_SIZE, Results } from './model'
 
 type UpdateReturn = Update.Return<Model, Message, CatalogueIndexService>
 
 export type Context = Readonly<{
-  scope: Scope
   query: CatalogueQuery.Query
   maybeOwned: Option.Option<Collection.Owned>
+  maybeWanted: Option.Option<Wishlist.Wanted>
 }>
-
-const searchQueryOf = ({ scope, query }: Context): CatalogueQuery.Query =>
-  scope === 'Collection' ? { ...query, ownership: 'Owned' } : query
 
 // COMMAND
 
 export const ReplaceQuery = Command.define('ReplaceQuery', {
-  args: { scope: Scope, query: CatalogueQuery.Query },
+  args: { query: CatalogueQuery.Query },
   messages: [Message.CompletedReplaceQuery],
-  execute: ({ scope, query }) =>
-    replaceUrl(
-      scope === 'Collection' ? collectionRouter(query) : catalogueRouter(query),
-    ).pipe(Effect.as(Message.CompletedReplaceQuery())),
+  execute: ({ query }) =>
+    replaceUrl(catalogueRouter(query)).pipe(
+      Effect.as(Message.CompletedReplaceQuery()),
+    ),
 })
 
 export const SearchCatalogue = Command.define('SearchCatalogue', {
   args: {
     query: CatalogueQuery.Query,
     limit: Schema.Int,
-    ownedPrintingIds: Schema.Array(Printing.PrintingId),
+    viewPrintingIds: Schema.Array(Printing.PrintingId),
   },
   messages: [Message.SucceededSearchCatalogue, Message.SkippedSearchCatalogue],
-  execute: ({ query, limit, ownedPrintingIds }) =>
+  execute: ({ query, limit, viewPrintingIds }) =>
     Effect.gen(function* () {
       const index = yield* CatalogueIndexResource.get
       const result = yield* CatalogueIndex.searchCards(
         index,
         query,
         limit,
-        ownedPrintingIds,
+        viewPrintingIds,
       )
       return Message.SucceededSearchCatalogue({ query, limit, result })
     }).pipe(
@@ -67,15 +65,25 @@ export const SearchCatalogue = Command.define('SearchCatalogue', {
 
 // ROUTE
 
-const search = (context: Context, limit: number) => {
-  const query = searchQueryOf(context)
+const viewPrintingIdsOf = ({
+  query,
+  maybeOwned,
+  maybeWanted,
+}: Context): Option.Option<ReadonlyArray<Printing.PrintingId>> =>
+  Match.value(query.ownership).pipe(
+    Match.withReturnType<Option.Option<ReadonlyArray<Printing.PrintingId>>>(),
+    Match.when('All', () => Option.some([])),
+    Match.when('Owned', () => Option.map(maybeOwned, Record.keys)),
+    Match.when('Wanted', () =>
+      Option.map(maybeWanted, ({ copies }) => Record.keys(copies)),
+    ),
+    Match.exhaustive,
+  )
 
-  return query.ownership === 'All'
-    ? Option.some(SearchCatalogue({ query, limit, ownedPrintingIds: [] }))
-    : Option.map(context.maybeOwned, owned =>
-        SearchCatalogue({ query, limit, ownedPrintingIds: Record.keys(owned) }),
-      )
-}
+const search = (context: Context, limit: number) =>
+  Option.map(viewPrintingIdsOf(context), viewPrintingIds =>
+    SearchCatalogue({ query: context.query, limit, viewPrintingIds }),
+  )
 
 export const enter = (
   model: Model,
@@ -104,12 +112,13 @@ export const enter = (
 
 // UPDATE
 
-const replace =
-  (scope: Scope) =>
-  (model: Model, query: CatalogueQuery.Query): UpdateReturn => ({
-    model,
-    commands: [ReplaceQuery({ scope, query })],
-  })
+const replaceWith = (
+  model: Model,
+  query: CatalogueQuery.Query,
+): UpdateReturn => ({
+  model,
+  commands: [ReplaceQuery({ query })],
+})
 
 const foldCardPanel = Update.foldChild({
   update: CardPanel.update,
@@ -125,7 +134,6 @@ const foldCardPanel = Update.foldChild({
 
 export const update = (context: Context) => {
   const { query } = context
-  const replaceWith = replace(context.scope)
 
   return (model: Model, message: Message) =>
     Message.match<
@@ -180,11 +188,15 @@ export const update = (context: Context) => {
         model: modifyFields(model, { isShowingAllTags: () => true }),
       }),
 
+      ClickedRetryCollection: () => ({
+        model,
+        outMessage: OutMessage.RequestedCollectionRetry(),
+      }),
+
       CompletedReplaceQuery: () => ({ model }),
 
       SucceededSearchCatalogue: ({ query: resultQuery, limit, result }) =>
-        CatalogueQuery.isSameQuery(resultQuery, searchQueryOf(context)) &&
-        limit === model.limit
+        CatalogueQuery.isSameQuery(resultQuery, query) && limit === model.limit
           ? {
               model: modifyFields(model, {
                 results: () =>

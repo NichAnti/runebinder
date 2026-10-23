@@ -17,12 +17,17 @@ import {
   CatalogueIndexResource,
   type CatalogueIndexService,
 } from '../../../../service'
-import { Toast } from '../../../../ui'
-import * as WishlistState from '../../wishlist'
+import { Dialog, Toast } from '../../../../ui'
 import { cardsByPrinting } from '../deck/lines'
 import { Message, OutMessage } from './message'
-import type { Model } from './model'
-import { type Context, printingIdsOf, sectionsOf } from './sections'
+import { type Model, Pending } from './model'
+import {
+  type Context,
+  type Section,
+  cardTraderNameOf,
+  printingIdsOf,
+  sectionOf,
+} from './sections'
 
 type UpdateReturn = Update.ReturnWithOutMessage<
   Model,
@@ -117,6 +122,35 @@ const showToast = Update.foldChild({
   ...toastFold,
 })
 
+// CONFIRM DIALOG
+
+const confirmFold = {
+  read: (model: Model) => Option.some(model.confirmDialog),
+  write: (model: Model, nextDialog: Dialog.Model): Model =>
+    modifyFields(model, { confirmDialog: () => nextDialog }),
+  toParentMessage: (message: Dialog.Message) =>
+    Message.GotConfirmDialogMessage({ message }),
+  foldOutMessage: Dialog.OutMessage.match<Update.Step<Model, Message>>({
+    Opened: () => stepModel => ({ model: stepModel }),
+    Closed: () => stepModel => ({
+      model: modifyFields(stepModel, { maybePending: () => Option.none() }),
+    }),
+  }),
+}
+
+const foldConfirm = Update.foldChild({ update: Dialog.update, ...confirmFold })
+const openConfirm = Update.foldChildStep({
+  update: Dialog.open,
+  ...confirmFold,
+})
+const closeConfirm = Update.foldChildStep({
+  update: Dialog.close,
+  ...confirmFold,
+})
+
+const confirming = (model: Model, pending: Pending): UpdateReturn =>
+  openConfirm(modifyFields(model, { maybePending: () => Option.some(pending) }))
+
 // LINES
 
 export const finderOf = (model: Model) => {
@@ -127,6 +161,24 @@ export const finderOf = (model: Model) => {
       Array.findFirst(card.printings, ({ id }) => id === printingId),
     )
 }
+
+export const cardTraderLinesOf = (model: Model, section: Section) =>
+  Wishlist.cardTraderLinesOf(section.lines, finderOf(model))
+
+const outgoingOf = (
+  model: Model,
+  context: Context,
+  wishlist: Wishlist.WishlistRef,
+) =>
+  Option.flatMap(sectionOf(context, wishlist), section =>
+    Option.map(
+      Array.match(cardTraderLinesOf(model, section).lines, {
+        onEmpty: () => Option.none(),
+        onNonEmpty: Option.some,
+      }),
+      lines => ({ wishlist, name: cardTraderNameOf(section), lines }),
+    ),
+  )
 
 // ROUTE
 
@@ -237,29 +289,72 @@ export const update = (context: Context) => (model: Model, message: Message) =>
       }
     },
 
-    ClickedSend: ({ target }) =>
-      Option.match(
-        Array.findFirst(
-          sectionsOf(context),
-          section =>
-            WishlistState.targetKey(section.target) ===
-            WishlistState.targetKey(target),
-        ),
-        {
-          onNone: () => ({ model }),
-          onSome: section =>
-            Array.match(
-              Wishlist.cardTraderLinesOf(section.lines, finderOf(model)).lines,
-              {
-                onEmpty: () => ({ model }),
-                onNonEmpty: lines => ({
-                  model,
-                  outMessage: OutMessage.RequestedSend({ target, lines }),
-                }),
-              },
-            ),
+    ClickedCreate: ({ wishlist }) =>
+      Option.match(outgoingOf(model, context, wishlist), {
+        onNone: () => ({ model }),
+        onSome: outgoing => ({
+          model,
+          outMessage: OutMessage.RequestedCreate(outgoing),
+        }),
+      }),
+
+    ClickedSync: ({ wishlist }) =>
+      Option.match(sectionOf(context, wishlist), {
+        onNone: () => ({ model }),
+        onSome: ({ title }) =>
+          confirming(model, Pending.Sync({ wishlist, title })),
+      }),
+
+    ClickedDelete: ({ wishlist }) =>
+      Option.match(sectionOf(context, wishlist), {
+        onNone: () => ({ model }),
+        onSome: ({ title }) =>
+          confirming(model, Pending.DeleteLinked({ wishlist, title })),
+      }),
+
+    ClickedDeleteRemote: ({ wishlistId, name }) =>
+      confirming(model, Pending.DeleteRemote({ wishlistId, name })),
+
+    ClickedConfirm: () =>
+      Option.match(model.maybePending, {
+        onNone: () => ({ model }),
+        onSome: pending => {
+          const closed = closeConfirm(
+            modifyFields(model, { maybePending: () => Option.none() }),
+          )
+          const maybeOutMessage = Pending.match<Option.Option<OutMessage>>(
+            pending,
+            {
+              Sync: ({ wishlist }) =>
+                Option.map(
+                  outgoingOf(model, context, wishlist),
+                  OutMessage.RequestedSync,
+                ),
+              DeleteLinked: ({ wishlist }) =>
+                Option.some(OutMessage.RequestedDelete({ wishlist })),
+              DeleteRemote: ({ wishlistId }) =>
+                Option.some(OutMessage.RequestedDeleteRemote({ wishlistId })),
+            },
+          )
+
+          return Option.match(maybeOutMessage, {
+            onNone: () => closed,
+            onSome: outMessage => ({ ...closed, outMessage }),
+          })
         },
-      ),
+      }),
+
+    ClickedConnect: () => ({
+      model,
+      outMessage: OutMessage.RequestedConnect(),
+    }),
+
+    ClickedRefreshRemote: () => ({
+      model,
+      outMessage: OutMessage.RequestedRefreshRemote(),
+    }),
+
+    GotConfirmDialogMessage: ({ message }) => foldConfirm(model, message),
 
     ClickedRetry: () => ({ model, outMessage: OutMessage.RequestedRetry() }),
 

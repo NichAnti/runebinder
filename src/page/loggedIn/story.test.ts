@@ -3,13 +3,21 @@ import { Command, given, message, model, story } from 'foldkit/story'
 import { modifyFields } from 'foldkit/struct'
 import { describe, expect, test } from 'vitest'
 
-import { CatalogueQuery, Collection, Deck, Printing } from '../../domain'
-import { AppRoute } from '../../route'
+import {
+  CatalogueQuery,
+  Collection,
+  Deck,
+  Printing,
+  type User,
+} from '../../domain'
+import { AppRoute, type LoggedInRoute } from '../../route'
 import { ada, allValues, testCard } from '../../testing'
+import * as CardTraderState from './cardTrader'
+import * as CardTraderWishlists from './cardTraderWishlists'
 import * as CollectionState from './collection'
 import * as DecksState from './decks'
 import { Message } from './message'
-import { CatalogueState, init } from './model'
+import { CatalogueState, type Model, init as initModel } from './model'
 import * as CardPage from './page/card'
 import * as CataloguePage from './page/catalogue'
 import * as DeckPage from './page/deck'
@@ -17,6 +25,15 @@ import * as DeckListPage from './page/deckList'
 import * as WishlistPage from './page/wishlist'
 import { OpenDeck, enterRoute, update } from './update'
 import * as WishlistState from './wishlist'
+
+const init = (route: LoggedInRoute, user: User.User): Model =>
+  modifyFields(initModel(route, user), {
+    cardTrader: cardTrader =>
+      modifyFields(cardTrader, {
+        connection: () =>
+          CardTraderState.Connection.Disconnected({ wasRejected: false }),
+      }),
+  })
 
 const onCatalogue = init(AppRoute.Catalogue(CatalogueQuery.empty), ada)
 
@@ -34,6 +51,8 @@ describe('catalogue loading', () => {
       Command.expectExact(
         CataloguePage.SearchCatalogue,
         CollectionState.LoadCollection,
+        DecksState.LoadDecks,
+        WishlistState.LoadWishlist,
       ),
       Command.resolve(
         CataloguePage.SearchCatalogue,
@@ -42,6 +61,14 @@ describe('catalogue loading', () => {
       Command.resolve(
         CollectionState.LoadCollection,
         CollectionState.Message.SucceededLoadCollection({ items: [] }),
+      ),
+      Command.resolve(
+        DecksState.LoadDecks,
+        DecksState.Message.FailedLoadDecks(),
+      ),
+      Command.resolve(
+        WishlistState.LoadWishlist,
+        WishlistState.Message.FailedLoadWishlist(),
       ),
     )
   })
@@ -113,7 +140,6 @@ describe('collection on the card page', () => {
               owned: {},
               saves: {},
               nextRevision: 0,
-              refresh: CollectionState.Refresh.Idle(),
             }),
         }),
       ),
@@ -160,6 +186,8 @@ describe('collection and the ownership filter', () => {
 
     expect(entered.commands?.map(({ name }) => name)).toStrictEqual([
       CollectionState.LoadCollection.name,
+      DecksState.LoadDecks.name,
+      WishlistState.LoadWishlist.name,
     ])
 
     story(
@@ -181,18 +209,23 @@ describe('collection and the ownership filter', () => {
   })
 })
 
-describe('collection page', () => {
+describe('my collection on the cards page', () => {
   test('entering loads the collection, then searches only owned cards', () => {
-    const collectionRoute = AppRoute.Collection(CatalogueQuery.empty)
-    const onCollection = modifyFields(init(collectionRoute, ada), {
+    const ownedRoute = AppRoute.Catalogue({
+      ...CatalogueQuery.empty,
+      ownership: 'Owned',
+    })
+    const onOwned = modifyFields(init(ownedRoute, ada), {
       catalogue: () =>
         CatalogueState.Ready({ attempt: 0, allValues, printingSets: {} }),
     })
-    const entered = enterRoute(onCollection, collectionRoute)
+    const entered = enterRoute(onOwned, ownedRoute)
     const printingId = Printing.PrintingId.make('tst-001-010')
 
     expect(entered.commands?.map(({ name }) => name)).toStrictEqual([
       CollectionState.LoadCollection.name,
+      DecksState.LoadDecks.name,
+      WishlistState.LoadWishlist.name,
     ])
 
     story(
@@ -209,7 +242,7 @@ describe('collection page', () => {
         CataloguePage.SearchCatalogue({
           query: { ...CatalogueQuery.empty, ownership: 'Owned' },
           limit: CataloguePage.PAGE_SIZE,
-          ownedPrintingIds: [printingId],
+          viewPrintingIds: [printingId],
         }),
       ),
       Command.resolve(
@@ -218,32 +251,59 @@ describe('collection page', () => {
       ),
     )
   })
+})
 
-  test('Refresh reloads the collection', () => {
+describe('wanted cards on the cards page', () => {
+  test('the Wanted view searches once decks, collection and wishlist are loaded', () => {
+    const wantedRoute = AppRoute.Catalogue({
+      ...CatalogueQuery.empty,
+      ownership: 'Wanted',
+    })
+    const vi = Printing.PrintingId.make('tst-001-010')
+    const onWanted = modifyFields(init(wantedRoute, ada), {
+      catalogue: () =>
+        CatalogueState.Ready({ attempt: 0, allValues, printingSets: {} }),
+      collection: () =>
+        CollectionState.Model.Ready({ owned: {}, saves: {}, nextRevision: 0 }),
+      decks: () =>
+        DecksState.Model.Ready({
+          decks: [],
+          saves: {},
+          nextRevision: 0,
+          creation: DecksState.Creation.Idle(),
+          removals: {},
+        }),
+      wishlist: () => WishlistState.Model.Loading(),
+    })
+
+    expect(enterRoute(onWanted, wantedRoute).commands ?? []).toStrictEqual([])
+
     story(
       update,
-      given(
-        modifyFields(init(AppRoute.Collection(CatalogueQuery.empty), ada), {
-          collection: () =>
-            CollectionState.Model.Ready({
-              owned: {},
-              saves: {},
-              nextRevision: 0,
-              refresh: CollectionState.Refresh.Idle(),
-            }),
+      given(onWanted),
+      message(
+        Message.GotWishlistMessage({
+          message: WishlistState.Message.SucceededLoadWishlist({
+            wishlist: {
+              items: [
+                { printingId: vi, quantity: Collection.OwnedQuantity.make(2) },
+              ],
+              cardTraderLinks: [],
+            },
+          }),
         }),
       ),
-      message(Message.ClickedRefreshCollection()),
-      Command.expectExact(CollectionState.LoadCollection),
-      Command.resolve(
-        CollectionState.LoadCollection,
-        CollectionState.Message.FailedLoadCollection(),
+      Command.expectHas(
+        CataloguePage.SearchCatalogue({
+          query: { ...CatalogueQuery.empty, ownership: 'Wanted' },
+          limit: CataloguePage.PAGE_SIZE,
+          viewPrintingIds: [vi],
+        }),
       ),
-      model(next => {
-        expect(
-          next.collection._tag === 'Ready' && next.collection.refresh,
-        ).toStrictEqual(CollectionState.Refresh.Failed())
-      }),
+      Command.resolve(
+        CataloguePage.SearchCatalogue,
+        CataloguePage.Message.SkippedSearchCatalogue(),
+      ),
     )
   })
 })
@@ -335,8 +395,8 @@ describe('decks', () => {
 describe('wishlist', () => {
   test('opening the wishlist loads decks, collection and wishlist once', () => {
     const entered = enterRoute(
-      init(AppRoute.Wishlist(), ada),
-      AppRoute.Wishlist(),
+      init(AppRoute.Wishlists(), ada),
+      AppRoute.Wishlists(),
     )
 
     expect(entered.commands?.map(({ name }) => name)).toStrictEqual([
@@ -347,11 +407,76 @@ describe('wishlist', () => {
   })
 })
 
+describe('CardTrader connection', () => {
+  test('the first page reads the stored token once, without calling CardTrader', () => {
+    const route = AppRoute.Decks()
+    const entered = enterRoute(initModel(route, ada), route)
+    const again = enterRoute(entered.model, route)
+
+    expect(entered.commands?.map(({ name }) => name)).toStrictEqual([
+      CardTraderState.ReadStoredToken.name,
+      DecksState.LoadDecks.name,
+    ])
+    expect(again.commands ?? []).toStrictEqual([])
+  })
+
+  test('connecting on the wishlists page lists the CardTrader wishlists', () => {
+    const connected = update(
+      init(AppRoute.Wishlists(), ada),
+      Message.GotCardTraderMessage({
+        message: CardTraderState.Message.SucceededConnectCardTrader({
+          appName: 'Deck app',
+          isRemembered: false,
+        }),
+      }),
+    )
+
+    expect(connected.commands?.map(({ name }) => name)).toContain(
+      CardTraderWishlists.ListWishlists.name,
+    )
+  })
+
+  test('a token CardTrader rejects disconnects and forgets the listing', () => {
+    const connected = modifyFields(init(AppRoute.Wishlists(), ada), {
+      cardTrader: cardTrader =>
+        modifyFields(cardTrader, {
+          connection: () =>
+            CardTraderState.Connection.Connected({
+              isRemembered: false,
+              maybeAppName: Option.none(),
+            }),
+        }),
+      cardTraderWishlists: remote =>
+        modifyFields(remote, {
+          listing: () => CardTraderWishlists.Listing.Loading(),
+        }),
+    })
+    const rejected = update(
+      connected,
+      Message.GotCardTraderWishlistsMessage({
+        message: CardTraderWishlists.Message.FailedListWishlists({
+          reason: 'InvalidToken',
+        }),
+      }),
+    )
+
+    expect(rejected.model.cardTrader.connection).toStrictEqual(
+      CardTraderState.Connection.Disconnected({ wasRejected: true }),
+    )
+    expect(rejected.model.cardTraderWishlists.listing).toStrictEqual(
+      CardTraderWishlists.Listing.NotLoaded(),
+    )
+    expect(rejected.commands?.map(({ name }) => name)).toStrictEqual([
+      CardTraderState.ForgetCardTraderToken.name,
+    ])
+  })
+})
+
 describe('marking wishlist cards as bought', () => {
   test('adds the version that arrived and lowers the custom wishlist', () => {
     const wanted = Printing.PrintingId.make('tst-001a-010')
     const arrived = Printing.PrintingId.make('tst-001-010')
-    const onWishlist = modifyFields(init(AppRoute.Wishlist(), ada), {
+    const onWishlist = modifyFields(init(AppRoute.Wishlists(), ada), {
       catalogue: () =>
         CatalogueState.Ready({ attempt: 0, allValues, printingSets: {} }),
       decks: () =>
@@ -367,15 +492,14 @@ describe('marking wishlist cards as bought', () => {
           owned: { [arrived]: Collection.OwnedQuantity.make(1) },
           saves: {},
           nextRevision: 0,
-          refresh: CollectionState.Refresh.Idle(),
         }),
       wishlist: () =>
         WishlistState.Model.Ready({
           added: { [wanted]: Collection.OwnedQuantity.make(3) },
-          maybeSentWishlistId: Option.none(),
+          links: {},
           saves: {},
           nextRevision: 0,
-          sendings: {},
+          operations: {},
         }),
     })
     const marked = update(

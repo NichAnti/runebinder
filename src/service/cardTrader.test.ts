@@ -223,3 +223,49 @@ describe('CardTraderClient wishlist list', () => {
       }),
     ))
 })
+
+describe('CardTraderClient wishlist detail', () => {
+  test('reads the card, set and quantity of each line', () =>
+    Effect.runPromise(
+      Effect.gen(function* () {
+        // The shape recorded in catalogue/recordings/cardtrader/wishlist-with-blueprint.json
+        const fake = yield* fakeCardTrader(200, {
+          id: 3572164,
+          game_id: 22,
+          name: 'Probe from cardtrader app (delete me)',
+          public: false,
+          created_at: '2026-10-23T02:38:13.000Z',
+          updated_at: '2026-10-23T02:38:13.000Z',
+          items: [
+            {
+              quantity: 1,
+              meta_name: 'ahri-alluring',
+              expansion_code: 'ogn',
+              collector_number: null,
+              language: null,
+              condition: null,
+            },
+          ],
+        })
+        const wishlist = yield* Effect.gen(function* () {
+          const client = yield* CardTraderClient
+          return yield* client.showWishlist(
+            tokenOrThrow(),
+            Wishlist.CardTraderWishlistId.make(3572164),
+          )
+        }).pipe(Effect.provide(fake.layer))
+        const request = yield* Ref.get(fake.seenRequest)
+
+        expect(wishlist).toStrictEqual({
+          id: 3572164,
+          name: 'Probe from cardtrader app (delete me)',
+          items: [
+            { quantity: 1, metaName: 'ahri-alluring', expansionCode: 'ogn' },
+          ],
+        })
+        expect(Option.map(request, ({ url }) => url)).toStrictEqual(
+          Option.some('https://api.cardtrader.com/api/v2/wishlists/3572164'),
+        )
+      }),
+    ))
+})

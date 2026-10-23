@@ -3,7 +3,12 @@ import { Array, Effect, FileSystem, Option, Schema } from 'effect'
 import { NodeServices } from '@effect/platform-node'
 import { assert, layer } from '@effect/vitest'
 
-import { Catalogue, CatalogueQuery, Printing } from '../domain'
+import {
+  CardTraderImport,
+  Catalogue,
+  CatalogueQuery,
+  Printing,
+} from '../domain'
 import * as CatalogueIndex from './catalogueIndex'
 
 const LIMIT = 2000
@@ -24,6 +29,28 @@ const cardOf = (index: CatalogueIndex.CatalogueIndex, id: string) =>
   Option.getOrThrow(CatalogueIndex.cardById(index, Printing.CardId.make(id)))
 
 layer(NodeServices.layer)('the catalogue index', it => {
+  it.effect('a recorded CardTrader wishlist line finds its card', () =>
+    Effect.gen(function* () {
+      const index = yield* loadIndex
+      // From catalogue/recordings/cardtrader/wishlist-with-blueprint.json
+      const lines = CardTraderImport.importLinesOf(
+        [{ quantity: 1, metaName: 'ahri-alluring', expansionCode: 'ogn' }],
+        key => CatalogueIndex.printingsForCardTrader(index, key),
+      )
+
+      assert.deepStrictEqual(
+        Array.map(lines, ({ match }) => match),
+        [
+          {
+            _tag: 'Matched',
+            cardId: Printing.CardId.make('ahri-alluring'),
+            printingId: Printing.PrintingId.make('ogn-066-298'),
+          },
+        ],
+      )
+    }),
+  )
+
   it.effect('an empty query returns every card', () =>
     Effect.gen(function* () {
       const index = yield* loadIndex
@@ -62,23 +89,23 @@ layer(NodeServices.layer)('the catalogue index', it => {
     }),
   )
 
-  it.effect('the ownership filter keeps owned or not owned cards', () =>
+  it.effect('a view keeps only the cards of its printings', () =>
     Effect.gen(function* () {
       const index = yield* loadIndex
       const vi = cardOf(index, 'vi-destructive')
-      const ownedPrintingIds = Array.map(vi.printings, ({ id }) => id)
+      const viewPrintingIds = Array.map(vi.printings, ({ id }) => id)
 
       const owned = yield* CatalogueIndex.searchCards(
         index,
         query({ ownership: 'Owned' }),
         LIMIT,
-        ownedPrintingIds,
+        viewPrintingIds,
       )
-      const notOwned = yield* CatalogueIndex.searchCards(
+      const wanted = yield* CatalogueIndex.searchCards(
         index,
-        query({ ownership: 'NotOwned' }),
+        query({ ownership: 'Wanted' }),
         LIMIT,
-        ownedPrintingIds,
+        viewPrintingIds,
       )
       const nothingOwned = yield* CatalogueIndex.searchCards(
         index,
@@ -91,7 +118,10 @@ layer(NodeServices.layer)('the catalogue index', it => {
         Array.map(owned.cards, ({ id }) => id),
         [vi.id],
       )
-      assert.strictEqual(notOwned.total, index.cards.size - 1)
+      assert.deepStrictEqual(
+        Array.map(wanted.cards, ({ id }) => id),
+        [vi.id],
+      )
       assert.strictEqual(nothingOwned.total, 0)
     }),
   )

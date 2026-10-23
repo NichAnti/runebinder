@@ -1,4 +1,5 @@
 export * as CardCode from './cardCode'
+export * as CardTraderImport from './cardTraderImport'
 export * as CardText from './cardText'
 export * as Catalogue from './catalogue'
 export * as CatalogueQuery from './catalogueQuery'

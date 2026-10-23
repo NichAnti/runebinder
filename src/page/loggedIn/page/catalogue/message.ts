@@ -19,6 +19,7 @@ export const Message = defineMessageUnion({
   ClickedShowMore: {},
   ToggledFiltersPanel: { isOpen: Schema.Boolean },
   ClickedShowAllTags: {},
+  ClickedRetryCollection: {},
   CompletedReplaceQuery: {},
   SucceededSearchCatalogue: {
     query: CatalogueQuery.Query,

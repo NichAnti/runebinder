@@ -25,11 +25,14 @@ const query = CatalogueQuery.empty
 const inCatalogue = (
   query: CatalogueQuery.Query,
   maybeOwned: Option.Option<Collection.Owned> = Option.none(),
-): Context => ({ scope: 'Catalogue', query, maybeOwned })
+): Context => ({ query, maybeOwned, maybeWanted: Option.none() })
+const vi = Printing.PrintingId.make('tst-001-010')
+const printingSets = { [vi]: Printing.SetCode.make('TST') }
 const sceneView = withViewInputs(view, {
-  scope: 'Catalogue',
   query,
   allValues,
+  printingSets,
+  maybeWanted: Option.none(),
   collection: CollectionState.init(),
 })
 
@@ -48,15 +51,88 @@ describe('catalogue page', () => {
         'aria-haspopup',
         'dialog',
       ),
-      expect(role('combobox', { name: 'Show' })).toExist(),
+      expect(role('heading', { name: 'Cards' })).toExist(),
+      expect(role('button', { name: 'All cards', pressed: true })).toExist(),
+      expect(role('region', { name: 'Collection summary' })).not.toExist(),
+    )
+  })
+
+  test('the switch chooses between all cards, the collection and missing ones', () => {
+    scene(
+      { update: update(inCatalogue(query)), view: sceneView() },
+      given(showing),
+      click(role('button', { name: 'My collection' })),
+      Command.expectHas(
+        ReplaceQuery({ query: { ...query, ownership: 'Owned' } }),
+      ),
+      Command.resolve(ReplaceQuery, Message.CompletedReplaceQuery()),
+    )
+  })
+
+  test('my collection shows its summary', () => {
+    const ownedQuery: CatalogueQuery.Query = { ...query, ownership: 'Owned' }
+
+    scene(
+      {
+        update: update(inCatalogue(ownedQuery)),
+        view: withViewInputs(view, {
+          query: ownedQuery,
+          allValues,
+          printingSets,
+          maybeWanted: Option.none(),
+          collection: CollectionState.Model.Ready({
+            owned: { [vi]: Collection.OwnedQuantity.make(2) },
+            saves: {},
+            nextRevision: 0,
+          }),
+        })(),
+      },
+      given(showing),
+      expect(role('region', { name: 'Collection summary' })).toContainText(
+        'TST 1 / 1',
+      ),
+      expect(role('button', { name: 'Refresh' })).not.toExist(),
+    )
+  })
+
+  test('Wanted shows what is needed and each card says how many', () => {
+    const wantedQuery: CatalogueQuery.Query = { ...query, ownership: 'Wanted' }
+
+    scene(
+      {
+        update: update(inCatalogue(wantedQuery)),
+        view: withViewInputs(view, {
+          query: wantedQuery,
+          allValues,
+          printingSets,
+          collection: CollectionState.Model.Ready({
+            owned: { [vi]: Collection.OwnedQuantity.make(1) },
+            saves: {},
+            nextRevision: 0,
+          }),
+          maybeWanted: Option.some({
+            copies: { [vi]: 2 },
+            fromDecks: 2,
+            fromCustom: 0,
+          }),
+        })(),
+      },
+      given(showing),
+      expect(role('region', { name: 'Wanted summary' })).toContainText(
+        'Missing from decks',
+      ),
+      expect(text('Owned 1')).toExist(),
+      expect(text('Need 2')).toExist(),
+      expect(role('button', { name: 'Not owned' })).not.toExist(),
     )
   })
 
   test('each card shows how many copies are owned across its printings', () => {
     const ownedView = withViewInputs(view, {
-      scope: 'Catalogue',
       query,
       allValues,
+      printingSets,
+      maybeWanted: Option.none(),
       collection: CollectionState.Model.Ready({
         owned: {
           [Printing.PrintingId.make('tst-001-010')]:
@@ -66,7 +142,6 @@ describe('catalogue page', () => {
         },
         saves: {},
         nextRevision: 0,
-        refresh: CollectionState.Refresh.Idle(),
       }),
     })
 
@@ -77,21 +152,23 @@ describe('catalogue page', () => {
     )
   })
 
-  test('an empty collection points to the catalogue', () => {
+  test('an empty collection offers to show all cards', () => {
+    const ownedQuery: CatalogueQuery.Query = { ...query, ownership: 'Owned' }
     const collectionView = withViewInputs(view, {
-      scope: 'Collection',
-      query,
+      query: ownedQuery,
       allValues,
-      collection: CollectionState.init(),
+      printingSets,
+      maybeWanted: Option.none(),
+      collection: CollectionState.Model.Ready({
+        owned: {},
+        saves: {},
+        nextRevision: 0,
+      }),
     })
 
     scene(
       {
-        update: update({
-          scope: 'Collection',
-          query,
-          maybeOwned: Option.none(),
-        }),
+        update: update(inCatalogue(ownedQuery, Option.some({}))),
         view: collectionView(),
       },
       given(
@@ -104,12 +181,12 @@ describe('catalogue page', () => {
             }),
         }),
       ),
-      expect(role('status')).toContainText('Your collection is empty'),
-      expect(role('link', { name: 'Go to the catalogue' })).toHaveAttr(
-        'href',
-        '/',
+      expect(text('Your collection is empty')).toExist(),
+      click(role('button', { name: 'Show all cards' })),
+      Command.expectHas(
+        ReplaceQuery({ query: { ...ownedQuery, ownership: 'All' } }),
       ),
-      expect(role('combobox', { name: 'Show' })).not.toExist(),
+      Command.resolve(ReplaceQuery, Message.CompletedReplaceQuery()),
     )
   })
 

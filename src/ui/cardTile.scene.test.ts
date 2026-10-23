@@ -17,6 +17,18 @@ describe('CardTile', () => {
   })
 })
 
+describe('CardTile highlight', () => {
+  test('every highlight and the meta are shown', () => {
+    scene(
+      { update, view },
+      given(initialModel),
+      expect(text('Owned 3')).toExist(),
+      expect(text('Need 1')).toExist(),
+      expect(text('1 printing')).toExist(),
+    )
+  })
+})
+
 describe('Notice', () => {
   test('an informational notice is a status, an error is an alert', () => {
     scene(

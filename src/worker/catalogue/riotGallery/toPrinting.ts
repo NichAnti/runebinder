@@ -213,6 +213,6 @@ export const toPrinting = (
         card.cardImage.accessibilityText,
       ),
       orientation: toOrientation(card.orientation),
-      maybeCardTraderBlueprintId: Option.none(),
+      maybeCardTrader: Option.none(),
     })
   })

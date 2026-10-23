@@ -13,7 +13,7 @@ import {
 } from 'foldkit/scene'
 import { describe, test } from 'vitest'
 
-import { Collection, Deck, Printing } from '../../../../domain'
+import { Collection, Deck, Printing, Wishlist } from '../../../../domain'
 import { AppRoute } from '../../../../route'
 import { testCard } from '../../../../testing'
 import * as CollectionState from '../../collection'
@@ -39,7 +39,6 @@ const ready = CollectionState.Model.Ready({
   },
   saves: {},
   nextRevision: 0,
-  refresh: CollectionState.Refresh.Idle(),
 })
 
 describe('card page', () => {
@@ -141,6 +140,46 @@ describe('card page', () => {
       expect(
         within(role('link', { name: /Standard/ }), selector('img')),
       ).toHaveAttr('src', 'https://example.com/test-unit.png'),
+    )
+  })
+
+  test('each printing on CardTrader links to it in a new tab', () => {
+    const blueprintId = Printing.CardTraderBlueprintId.make(345244)
+    const [base, ...rest] = testCard.printings
+    const onCardTrader: Printing.Card = {
+      ...testCard,
+      printings: [
+        {
+          ...base,
+          maybeCardTrader: Option.some({
+            id: blueprintId,
+            metaName: Printing.CardTraderSlug.make('test-unit-tester'),
+            expansionCode: Printing.CardTraderExpansionCode.make('tst'),
+          }),
+        },
+        ...rest,
+      ],
+    }
+    const link = role('link', {
+      name: 'Open Standard TST-001/010 on CardTrader',
+    })
+
+    scene(
+      {
+        update,
+        view: withViewInputs(view, {
+          wishlist: WishlistState.init(),
+          decks: DecksState.init(),
+          collection,
+          route: routeFor(Option.none()),
+        })(),
+      },
+      given({ state: CardState.Found({ card: onCardTrader }) }),
+      expect(link).toHaveAttr('href', Wishlist.cardTraderCardUrl(blueprintId)),
+      expect(link).toHaveAttr('target', '_blank'),
+      expect(
+        role('link', { name: /Alternate art .* on CardTrader/ }),
+      ).not.toExist(),
     )
   })
 

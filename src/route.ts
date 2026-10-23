@@ -2,7 +2,7 @@ import { Option, Schema, SchemaTransformation, pipe } from 'effect'
 import { Route } from 'foldkit'
 import { defineRouteUnion, literal, schemaSegment, slash } from 'foldkit/route'
 
-import { CatalogueQuery, Deck, Printing } from './domain'
+import { CatalogueQuery, Deck, Printing, Wishlist } from './domain'
 
 export const AppRoute = defineRouteUnion({
   SignIn: {},
@@ -13,16 +13,17 @@ export const AppRoute = defineRouteUnion({
     printing: Schema.Option(Printing.PrintingId),
   },
   CardTrader: {},
-  Collection: CatalogueQuery.Query.fields,
   Decks: {},
   Deck: { deckId: Deck.DeckId },
-  Wishlist: {},
+  Wishlists: {},
+  CustomWishlist: {},
+  DeckWishlist: { deckId: Deck.DeckId },
+  CardTraderWishlist: { wishlistId: Wishlist.CardTraderWishlistId },
   NotFound: { path: Schema.String },
 })
 export type AppRoute = typeof AppRoute.Type
 export type CatalogueRoute = typeof AppRoute.Catalogue.Type
 export type CardRoute = typeof AppRoute.Card.Type
-export type CollectionRoute = typeof AppRoute.Collection.Type
 export type DeckRoute = typeof AppRoute.Deck.Type
 
 export const LoggedOutRoute = AppRoute.subset(['SignIn', 'SignUp', 'NotFound'])
@@ -32,10 +33,12 @@ export const LoggedInRoute = AppRoute.subset([
   'Catalogue',
   'Card',
   'CardTrader',
-  'Collection',
   'Decks',
   'Deck',
-  'Wishlist',
+  'Wishlists',
+  'CustomWishlist',
+  'DeckWishlist',
+  'CardTraderWishlist',
   'NotFound',
 ])
 export type LoggedInRoute = typeof LoggedInRoute.Type
@@ -68,20 +71,43 @@ export const cardTraderRouter = pipe(
   literal('cardtrader'),
   Route.mapTo(AppRoute.CardTrader),
 )
-export const wishlistRouter = pipe(
-  literal('wishlist'),
-  Route.mapTo(AppRoute.Wishlist),
+export const wishlistsRouter = pipe(
+  literal('wishlists'),
+  Route.mapTo(AppRoute.Wishlists),
 )
+export const customWishlistRouter = pipe(
+  literal('wishlists'),
+  slash(literal('custom')),
+  Route.mapTo(AppRoute.CustomWishlist),
+)
+export const deckWishlistRouter = pipe(
+  literal('wishlists'),
+  slash(schemaSegment('deckId', Deck.DeckId)),
+  Route.mapTo(AppRoute.DeckWishlist),
+)
+export const cardTraderWishlistRouter = pipe(
+  literal('cardtrader'),
+  slash(literal('wishlists')),
+  slash(
+    schemaSegment(
+      'wishlistId',
+      Schema.FiniteFromString.pipe(
+        Schema.decodeTo(Wishlist.CardTraderWishlistId),
+      ),
+    ),
+  ),
+  Route.mapTo(AppRoute.CardTraderWishlist),
+)
+
+export const wishlistHref = (ref: Wishlist.WishlistRef): string =>
+  ref._tag === 'Custom'
+    ? customWishlistRouter()
+    : deckWishlistRouter({ deckId: ref.deckId })
 export const decksRouter = pipe(literal('decks'), Route.mapTo(AppRoute.Decks))
 export const deckRouter = pipe(
   literal('decks'),
   slash(schemaSegment('deckId', Deck.DeckId)),
   Route.mapTo(AppRoute.Deck),
-)
-export const collectionRouter = pipe(
-  literal('collection'),
-  Route.query(CatalogueQuery.QueryParams),
-  Route.mapTo(AppRoute.Collection),
 )
 export const catalogueRouter = pipe(
   Route.root,
@@ -101,11 +127,13 @@ const routeParser = Route.oneOf(
   signInRouter,
   signUpRouter,
   cardRouter,
+  cardTraderWishlistRouter,
   cardTraderRouter,
-  collectionRouter,
   deckRouter,
   decksRouter,
-  wishlistRouter,
+  customWishlistRouter,
+  deckWishlistRouter,
+  wishlistsRouter,
   catalogueRouter,
 )
 

@@ -7,6 +7,7 @@ export type ViewConfig = Readonly<{
   content: ReadonlyArray<Html | string>
   variant?: Variant
   isCurrent?: boolean
+  isExternal?: boolean
 }>
 
 const recipe = {
@@ -26,6 +27,7 @@ export const view = <Message>(
     content,
     variant = recipe.defaults.variant,
     isCurrent = false,
+    isExternal = false,
   }: ViewConfig,
   h: HtmlBuilder<Message>,
 ): Html =>
@@ -33,6 +35,7 @@ export const view = <Message>(
     [
       h.Href(href),
       ...(isCurrent ? [h.AriaCurrent('page')] : []),
+      ...(isExternal ? [h.Target('_blank'), h.Rel('noopener noreferrer')] : []),
       h.DataAttribute('slot', 'link'),
       h.Class(`${recipe.base} ${recipe.variants[variant]}`),
     ],

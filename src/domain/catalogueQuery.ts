@@ -58,7 +58,7 @@ export const isAnyRange = (range: Range): boolean =>
 
 // OWNERSHIP
 
-export const Ownership = Schema.Literals(['All', 'Owned', 'NotOwned'])
+export const Ownership = Schema.Literals(['All', 'Owned', 'Wanted'])
 export type Ownership = typeof Ownership.Type
 
 // QUERY
@@ -114,12 +114,12 @@ export const activeFilterCount = (query: Query): number =>
       [query.energy, query.might, query.power],
       range => !isAnyRange(range),
     ),
-  ) +
-  (query.ownership === 'All' ? 0 : 1)
+  )
 
 export const clearFilters = (query: Query): Query => ({
   ...empty,
   q: query.q,
+  ownership: query.ownership,
   sort: query.sort,
 })
 
@@ -294,7 +294,7 @@ const sortParam = optionalParam.pipe(
 const OWNERSHIP_PARAMS: Readonly<Record<Ownership, string>> = {
   All: 'all',
   Owned: 'owned',
-  NotOwned: 'not-owned',
+  Wanted: 'wanted',
 }
 
 const ownershipParam = optionalParam.pipe(

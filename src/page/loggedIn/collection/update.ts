@@ -5,7 +5,7 @@ import { modifyFields } from 'foldkit/struct'
 import { Collection, Printing } from '../../../domain'
 import { ApiClient } from '../../../service'
 import { Message } from './message'
-import { Model, type Ready, Refresh, Save } from './model'
+import { Model, type Ready, Save } from './model'
 
 type UpdateReturn = Update.Return<Model, Message, ApiClient>
 
@@ -68,19 +68,8 @@ const whenReady = (
 export const ensureLoaded = (model: Model): UpdateReturn =>
   model._tag === 'NotLoaded' ? loading() : { model }
 
-export const refresh = (model: Model): UpdateReturn =>
-  Model.match<UpdateReturn>(model, {
-    NotLoaded: loading,
-    Failed: loading,
-    Loading: () => ({ model }),
-    Ready: ready =>
-      ready.refresh._tag === 'Refreshing'
-        ? { model }
-        : {
-            model: modifyFields(ready, { refresh: () => Refresh.Refreshing() }),
-            commands: [LoadCollection()],
-          },
-  })
+export const retry = (model: Model): UpdateReturn =>
+  model._tag === 'Failed' ? loading() : { model }
 
 export type Change = Readonly<{
   printingId: Printing.PrintingId
@@ -143,15 +132,6 @@ const isWaiting = (
     save => save._tag === 'Waiting' && save.revision === revision,
   )
 
-const keepUnsaved = (ready: Ready, fresh: Collection.Owned): Collection.Owned =>
-  Record.reduce(ready.saves, fresh, (owned, _save, printingId) =>
-    Collection.withQuantity(
-      owned,
-      printingId,
-      Collection.quantityOf(ready.owned, printingId),
-    ),
-  )
-
 const saveNow = (
   ready: Ready,
   printingId: Printing.PrintingId,
@@ -165,32 +145,21 @@ const saveNow = (
 
 export const update = (model: Model, message: Message) =>
   Message.match<UpdateReturn>(message, {
-    SucceededLoadCollection: ({ items }) => {
-      const fresh = Collection.fromItems(items)
-
-      return model._tag === 'Ready'
+    SucceededLoadCollection: ({ items }) =>
+      model._tag === 'Loading'
         ? {
-            model: modifyFields(model, {
-              owned: () => keepUnsaved(model, fresh),
-              refresh: () => Refresh.Idle(),
-            }),
-          }
-        : {
             model: Model.Ready({
-              owned: fresh,
+              owned: Collection.fromItems(items),
               saves: {},
               nextRevision: 0,
-              refresh: Refresh.Idle(),
             }),
           }
-    },
+        : { model },
 
     FailedLoadCollection: () =>
-      model._tag === 'Ready'
-        ? { model: modifyFields(model, { refresh: () => Refresh.Failed() }) }
-        : { model: Model.Failed() },
+      model._tag === 'Loading' ? { model: Model.Failed() } : { model },
 
-    ClickedRetryLoadCollection: () => refresh(model),
+    ClickedRetryLoadCollection: () => retry(model),
 
     ElapsedSaveDelay: ({ printingId, revision }) =>
       whenReady(model, ready =>

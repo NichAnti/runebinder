@@ -1,5 +1,6 @@
 import { Option } from 'effect'
 import { Command, given, message, model, story } from 'foldkit/story'
+import { modifyFields } from 'foldkit/struct'
 import { fromString } from 'foldkit/url'
 import { describe, expect, test } from 'vitest'
 
@@ -29,7 +30,16 @@ const loggedOut = Model.make({
 })
 
 const loggedIn = Model.make({
-  auth: LoggedIn.init(AppRoute.Catalogue(CatalogueQuery.empty), ada),
+  auth: modifyFields(
+    LoggedIn.init(AppRoute.Catalogue(CatalogueQuery.empty), ada),
+    {
+      cardTrader: cardTrader =>
+        modifyFields(cardTrader, {
+          connection: () =>
+            LoggedIn.CardTraderConnection.Disconnected({ wasRejected: false }),
+        }),
+    },
+  ),
   themePreference: 'System',
   systemTheme: 'Light',
 })

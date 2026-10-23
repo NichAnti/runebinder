@@ -26,5 +26,13 @@ export const view = (_model: Model, h: HtmlBuilder<Message>): Html =>
         h,
       ),
       Link.view({ href: '/about', content: ['About'], variant: 'Nav' }, h),
+      Link.view(
+        {
+          href: 'https://www.cardtrader.com',
+          content: ['CardTrader'],
+          isExternal: true,
+        },
+        h,
+      ),
     ],
   )

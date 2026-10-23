@@ -1,4 +1,4 @@
-import { Array, Option, Record, Result, String, pipe } from 'effect'
+import { Array, Option, Record, Result, Schema, String, pipe } from 'effect'
 
 import { Printing } from '../../../domain'
 import { CatalogueIssue } from '../issue'
@@ -100,28 +100,86 @@ export type MatchReport = Readonly<{
   unmatched: ReadonlyArray<Printing.PrintingId>
 }>
 
+const decodeSlug = Schema.decodeOption(Printing.CardTraderSlug)
+const decodeExpansionCode = Schema.decodeOption(
+  Printing.CardTraderExpansionCode,
+)
+
+export const cardTraderBlueprintOf = (
+  blueprint: Blueprint,
+  expansionCodes: Readonly<Record<string, string>>,
+): Option.Option<Printing.CardTraderBlueprint> =>
+  Option.all({
+    id: Option.some(Printing.CardTraderBlueprintId.make(blueprint.id)),
+    metaName: decodeSlug(Printing.slugify(blueprint.name)),
+    expansionCode: Option.flatMap(
+      Option.fromNullishOr(expansionCodes[`${blueprint.expansion_id}`]),
+      decodeExpansionCode,
+    ),
+  })
+
+type Resolved =
+  | Readonly<{ _tag: 'Found'; blueprint: Printing.CardTraderBlueprint }>
+  | Readonly<{ _tag: 'NotFound' }>
+  | Readonly<{ _tag: 'Problem'; issue: CatalogueIssue }>
+
 export const withBlueprints = (
   printings: ReadonlyArray<Printing.Printing>,
   blueprintsBySet: Readonly<Record<string, ReadonlyArray<Blueprint>>>,
+  expansionCodes: Readonly<Record<string, string>>,
 ): Result.Result<MatchReport, Array.NonEmptyReadonlyArray<CatalogueIssue>> => {
   const indexes = Record.map(blueprintsBySet, indexBlueprints)
+  const blueprintsById = new Map(
+    Array.map(
+      Array.flatten(Record.values(blueprintsBySet)),
+      (blueprint): readonly [number, Blueprint] => [blueprint.id, blueprint],
+    ),
+  )
 
-  const outcomes = Array.map(printings, printing => ({
-    printing,
-    outcome: Option.match(Option.fromNullishOr(indexes[printing.set]), {
+  const resolve = (printing: Printing.Printing): Resolved => {
+    const outcome = Option.match(Option.fromNullishOr(indexes[printing.set]), {
       onNone: (): MatchOutcome => ({ _tag: 'Unmatched' }),
       onSome: index => matchPrinting(index, printing),
-    }),
+    })
+
+    if (outcome._tag === 'Unmatched') {
+      return { _tag: 'NotFound' }
+    } else if (outcome._tag === 'Ambiguous') {
+      return {
+        _tag: 'Problem',
+        issue: CatalogueIssue.cases.AmbiguousCardTraderBlueprint.make({
+          id: printing.id,
+          blueprintIds: Array.fromIterable(outcome.blueprintIds),
+        }),
+      }
+    } else {
+      return Option.match(
+        Option.flatMap(
+          Option.fromNullishOr(blueprintsById.get(outcome.blueprintId)),
+          blueprint => cardTraderBlueprintOf(blueprint, expansionCodes),
+        ),
+        {
+          onNone: (): Resolved => ({
+            _tag: 'Problem',
+            issue: CatalogueIssue.cases.UnnamedCardTraderBlueprint.make({
+              id: printing.id,
+              blueprintId: outcome.blueprintId,
+            }),
+          }),
+          onSome: blueprint => ({ _tag: 'Found', blueprint }),
+        },
+      )
+    }
+  }
+
+  const resolved = Array.map(printings, printing => ({
+    printing,
+    resolved: resolve(printing),
   }))
 
-  const issues = Array.filterMap(outcomes, ({ printing, outcome }) =>
-    outcome._tag === 'Ambiguous'
-      ? Result.succeed(
-          CatalogueIssue.cases.AmbiguousCardTraderBlueprint.make({
-            id: printing.id,
-            blueprintIds: Array.fromIterable(outcome.blueprintIds),
-          }),
-        )
+  const issues = Array.filterMap(resolved, ({ resolved }) =>
+    resolved._tag === 'Problem'
+      ? Result.succeed(resolved.issue)
       : Result.failVoid,
   )
 
@@ -129,15 +187,15 @@ export const withBlueprints = (
     return Result.fail(issues)
   } else {
     return Result.succeed({
-      printings: Array.map(outcomes, ({ printing, outcome }) => ({
+      printings: Array.map(resolved, ({ printing, resolved }) => ({
         ...printing,
-        maybeCardTraderBlueprintId:
-          outcome._tag === 'Matched'
-            ? Option.some(outcome.blueprintId)
+        maybeCardTrader:
+          resolved._tag === 'Found'
+            ? Option.some(resolved.blueprint)
             : Option.none(),
       })),
-      unmatched: Array.filterMap(outcomes, ({ printing, outcome }) =>
-        outcome._tag === 'Unmatched'
+      unmatched: Array.filterMap(resolved, ({ printing, resolved }) =>
+        resolved._tag === 'NotFound'
           ? Result.succeed(printing.id)
           : Result.failVoid,
       ),

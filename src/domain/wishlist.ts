@@ -6,12 +6,19 @@ import {
   Record,
   Result,
   Schema,
+  String,
   pipe,
 } from 'effect'
 
 import { type Owned, OwnedQuantity, quantityOf } from './collection'
-import type { Need } from './missing'
-import { CardTraderBlueprintId, type Printing, PrintingId } from './printing'
+import { type Deck, DeckId } from './deck'
+import { type Need, needs } from './missing'
+import {
+  CardTraderBlueprintId,
+  type Printing,
+  PrintingId,
+  cardTraderKey,
+} from './printing'
 
 export const CardTraderWishlistId = Schema.Int.check(
   Schema.isGreaterThan(0),
@@ -24,11 +31,45 @@ export const WishlistItem = Schema.Struct({
 })
 export type WishlistItem = typeof WishlistItem.Type
 
+export const WishlistRef = Schema.Union([
+  Schema.TaggedStruct('Custom', {}),
+  Schema.TaggedStruct('Deck', { deckId: DeckId }),
+])
+export type WishlistRef = typeof WishlistRef.Type
+
+export const CUSTOM: WishlistRef = { _tag: 'Custom' }
+
+export const deckWishlist = (deckId: DeckId): WishlistRef => ({
+  _tag: 'Deck',
+  deckId,
+})
+
+const CUSTOM_KEY = 'custom'
+
+export const refKey = (ref: WishlistRef): string =>
+  ref._tag === 'Custom' ? CUSTOM_KEY : ref.deckId
+
+export const CardTraderLink = Schema.Struct({
+  wishlist: WishlistRef,
+  cardTraderWishlistId: CardTraderWishlistId,
+})
+export type CardTraderLink = typeof CardTraderLink.Type
+
 export const Wishlist = Schema.Struct({
   items: Schema.Array(WishlistItem),
-  maybeCardTraderWishlistId: Schema.Option(CardTraderWishlistId),
+  cardTraderLinks: Schema.Array(CardTraderLink),
 })
 export type Wishlist = typeof Wishlist.Type
+
+const APP_NAME_SUFFIX = ' (cardtrader app)'
+
+export const cardTraderNameOf = (ref: WishlistRef, deckName: string): string =>
+  ref._tag === 'Custom'
+    ? `Custom wishlist${APP_NAME_SUFFIX}`
+    : `${deckName}${APP_NAME_SUFFIX}`
+
+export const isNamedByApp: (name: string) => boolean =
+  String.endsWith(APP_NAME_SUFFIX)
 
 export type Line = Readonly<{
   printingId: PrintingId
@@ -76,6 +117,44 @@ export const linesOf = (
   )
 }
 
+export type Wanted = Readonly<{
+  copies: Readonly<Record<PrintingId, number>>
+  fromDecks: number
+  fromCustom: number
+}>
+
+export const wantedOf = (
+  decks: ReadonlyArray<Deck>,
+  owned: Owned,
+  added: Owned,
+): Wanted => {
+  const lines = linesOf(needs(decks, owned), added)
+
+  return {
+    copies: Record.fromEntries(
+      Array.map(
+        lines,
+        ({ printingId, quantity }): readonly [PrintingId, number] => [
+          printingId,
+          quantity,
+        ],
+      ),
+    ),
+    fromDecks: Number.sumAll(Array.map(lines, ({ missing }) => missing)),
+    fromCustom: Number.sumAll(Array.map(lines, ({ added }) => added)),
+  }
+}
+
+export const wantedCopiesOf = (
+  wanted: Wanted,
+  printingIds: ReadonlyArray<PrintingId>,
+): number =>
+  Number.sumAll(
+    Array.map(printingIds, printingId =>
+      Option.getOrElse(Record.get(wanted.copies, printingId), () => 0),
+    ),
+  )
+
 export type CardTraderLine = Readonly<{
   blueprintId: CardTraderBlueprintId
   quantity: number
@@ -97,9 +176,9 @@ export const cardTraderLinesOf = (
   const onCardTrader = Array.filterMap(resolved, ({ line, maybePrinting }) =>
     Option.match(
       Option.flatMap(maybePrinting, printing =>
-        Option.map(printing.maybeCardTraderBlueprintId, blueprintId => ({
-          key: `${printing.cardId}|${printing.set}`,
-          blueprintId,
+        Option.map(printing.maybeCardTrader, blueprint => ({
+          key: cardTraderKey(blueprint),
+          blueprintId: blueprint.id,
           quantity: line.quantity,
         })),
       ),
@@ -121,7 +200,7 @@ export const cardTraderLinesOf = (
     ),
     notOnCardTrader: Array.filterMap(resolved, ({ line, maybePrinting }) =>
       Option.exists(maybePrinting, printing =>
-        Option.isSome(printing.maybeCardTraderBlueprintId),
+        Option.isSome(printing.maybeCardTrader),
       )
         ? Result.failVoid
         : Result.succeed(line.printingId),

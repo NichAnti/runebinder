@@ -1,19 +1,22 @@
-import { Array, Duration, Effect, Option, Record, Result, Schema } from 'effect'
+import { Array, Duration, Effect, Option, Record, Schema } from 'effect'
 import { Command, type Update } from 'foldkit'
 import { modifyFields } from 'foldkit/struct'
 
-import { Collection, Printing, Wishlist } from '../../../domain'
+import {
+  type CardTraderImport,
+  Collection,
+  Printing,
+  Wishlist,
+} from '../../../domain'
 import { ApiClient, CardTraderClient, TokenStore } from '../../../service'
 import { Message } from './message'
 import {
+  type Action,
+  type Failure,
   Model,
+  Operation,
   type Ready,
   Save,
-  type SendFailure,
-  SendTarget,
-  Sending,
-  targetKey,
-  wishlistNameOf,
 } from './model'
 
 type UpdateReturn = Update.Return<
@@ -71,75 +74,133 @@ const CardTraderLine = Schema.Struct({
   quantity: Schema.Int,
 })
 
-const deleteAll = (
-  client: CardTraderClient['Service'],
-  token: Parameters<CardTraderClient['Service']['deleteWishlist']>[0],
-  wishlistIds: ReadonlyArray<Wishlist.CardTraderWishlistId>,
-) =>
-  Effect.forEach(wishlistIds, wishlistId =>
-    client.deleteWishlist(token, wishlistId),
-  ).pipe(
-    Effect.as(true),
-    Effect.catch(() => Effect.succeed(false)),
-  )
+type OperationError = Readonly<{ reason: Failure }>
 
-export const SendWishlist = Command.define('SendWishlist', {
+const notSaved = (): OperationError => ({ reason: 'NotSaved' })
+
+const storedToken = Effect.gen(function* () {
+  const store = yield* TokenStore
+  return yield* Option.match(yield* store.read, {
+    onNone: () => Effect.fail<OperationError>({ reason: 'NotConnected' }),
+    onSome: ({ token }) => Effect.succeed(token),
+  })
+})
+
+const saveLink = (
+  wishlist: Wishlist.WishlistRef,
+  cardTraderWishlistId: Wishlist.CardTraderWishlistId,
+) =>
+  Effect.gen(function* () {
+    const api = yield* ApiClient
+    const payload = { cardTraderWishlistId }
+
+    yield* wishlist._tag === 'Custom'
+      ? api.wishlist.linkCustom({ payload })
+      : api.wishlist.linkDeck({ params: { deckId: wishlist.deckId }, payload })
+  }).pipe(Effect.mapError(notSaved))
+
+const clearLink = (wishlist: Wishlist.WishlistRef) =>
+  Effect.gen(function* () {
+    const api = yield* ApiClient
+
+    yield* wishlist._tag === 'Custom'
+      ? api.wishlist.unlinkCustom()
+      : api.wishlist.unlinkDeck({ params: { deckId: wishlist.deckId } })
+  }).pipe(Effect.mapError(notSaved))
+
+const failedWith =
+  (wishlist: Wishlist.WishlistRef, action: Action) =>
+  ({ reason }: OperationError) =>
+    Effect.succeed(
+      Message.FailedCardTraderOperation({ wishlist, action, reason }),
+    )
+
+export const CreateOnCardTrader = Command.define('CreateOnCardTrader', {
   args: {
-    target: SendTarget,
+    wishlist: Wishlist.WishlistRef,
+    name: Schema.String,
     lines: Schema.NonEmptyArray(CardTraderLine),
   },
-  messages: [Message.SucceededSendWishlist, Message.FailedSendWishlist],
-  execute: ({ target, lines }) =>
+  messages: [
+    Message.SucceededCreateOnCardTrader,
+    Message.FailedCardTraderOperation,
+  ],
+  execute: ({ wishlist, name, lines }) =>
     Effect.gen(function* () {
-      const key = targetKey(target)
-      const store = yield* TokenStore
       const client = yield* CardTraderClient
-      const api = yield* ApiClient
-      const maybeStored = yield* store.read
+      const token = yield* storedToken
+      const cardTraderWishlistId = yield* client.createWishlist(token, {
+        name,
+        lines,
+      })
+      yield* saveLink(wishlist, cardTraderWishlistId)
 
-      if (Option.isNone(maybeStored)) {
-        return Message.FailedSendWishlist({ key, reason: 'NotConnected' })
-      }
+      return Message.SucceededCreateOnCardTrader({
+        wishlist,
+        cardTraderWishlistId,
+        name,
+      })
+    }).pipe(Effect.catch(failedWith(wishlist, 'Create'))),
+})
 
-      const { token } = maybeStored.value
-      const name = wishlistNameOf(target)
-      const wishlistId = yield* client.createWishlist(token, { name, lines })
-      const previousIds = yield* target._tag === 'Custom'
-        ? api.wishlist
-            .replaceCardTraderWishlist({ payload: { wishlistId } })
-            .pipe(
-              Effect.map(({ maybePreviousWishlistId }) =>
-                Option.toArray(maybePreviousWishlistId),
-              ),
-              Effect.mapError((): { reason: SendFailure } => ({
-                reason: 'Unavailable',
-              })),
-            )
-        : client
-            .listWishlists(token)
-            .pipe(
-              Effect.map(
-                Array.filterMap(listed =>
-                  listed.name === name && listed.id !== wishlistId
-                    ? Result.succeed(listed.id)
-                    : Result.failVoid,
-                ),
-              ),
-            )
-      const isPreviousDeleted = yield* deleteAll(client, token, previousIds)
+export const SyncOnCardTrader = Command.define('SyncOnCardTrader', {
+  args: {
+    wishlist: Wishlist.WishlistRef,
+    name: Schema.String,
+    lines: Schema.NonEmptyArray(CardTraderLine),
+    previousId: Wishlist.CardTraderWishlistId,
+  },
+  messages: [
+    Message.SucceededSyncOnCardTrader,
+    Message.FailedCardTraderOperation,
+  ],
+  execute: ({ wishlist, name, lines, previousId }) =>
+    Effect.gen(function* () {
+      const client = yield* CardTraderClient
+      const token = yield* storedToken
+      const cardTraderWishlistId = yield* client.createWishlist(token, {
+        name,
+        lines,
+      })
+      yield* saveLink(wishlist, cardTraderWishlistId)
+      const isPreviousDeleted = yield* client
+        .deleteWishlist(token, previousId)
+        .pipe(
+          Effect.as(true),
+          Effect.catch(() => Effect.succeed(false)),
+        )
 
-      return Message.SucceededSendWishlist({
-        key,
-        wishlistId,
+      return Message.SucceededSyncOnCardTrader({
+        wishlist,
+        cardTraderWishlistId,
+        name,
+        previousId,
         isPreviousDeleted,
       })
-    }).pipe(
-      Effect.catch(({ reason }) =>
-        Effect.succeed(
-          Message.FailedSendWishlist({ key: targetKey(target), reason }),
-        ),
-      ),
-    ),
+    }).pipe(Effect.catch(failedWith(wishlist, 'Sync'))),
+})
+
+export const DeleteOnCardTrader = Command.define('DeleteOnCardTrader', {
+  args: {
+    wishlist: Wishlist.WishlistRef,
+    cardTraderWishlistId: Wishlist.CardTraderWishlistId,
+  },
+  messages: [
+    Message.SucceededDeleteOnCardTrader,
+    Message.FailedCardTraderOperation,
+  ],
+  execute: ({ wishlist, cardTraderWishlistId }) =>
+    Effect.gen(function* () {
+      const client = yield* CardTraderClient
+      const token = yield* storedToken
+      yield* client.deleteWishlist(token, cardTraderWishlistId)
+      yield* clearLink(wishlist)
+
+      return Message.SucceededDeleteOnCardTrader({
+        wishlist,
+        cardTraderWishlistId,
+      })
+    }).pipe(Effect.catch(failedWith(wishlist, 'Delete'))),
 })
 
 // ENTRY
@@ -205,28 +266,123 @@ export const step = (model: Model, { printingId, step }: Stepped) =>
     commands: [WaitToSaveItem({ printingId, revision: ready.nextRevision })],
   }))
 
-export type Send = Readonly<{
-  target: SendTarget
+export type Outgoing = Readonly<{
+  wishlist: Wishlist.WishlistRef
+  name: string
   lines: Array.NonEmptyReadonlyArray<Wishlist.CardTraderLine>
 }>
 
-export const sendingOf = (model: Model, key: string): Sending =>
+export const linkOf = (
+  model: Model,
+  wishlist: Wishlist.WishlistRef,
+): Option.Option<Wishlist.CardTraderWishlistId> =>
   model._tag === 'Ready'
-    ? Option.getOrElse(Record.get(model.sendings, key), () => Sending.Idle())
-    : Sending.Idle()
+    ? Record.get(model.links, Wishlist.refKey(wishlist))
+    : Option.none()
 
-export const send = (model: Model, { target, lines }: Send) =>
+export const operationOf = (
+  model: Model,
+  wishlist: Wishlist.WishlistRef,
+): Option.Option<Operation> =>
+  model._tag === 'Ready'
+    ? Record.get(model.operations, Wishlist.refKey(wishlist))
+    : Option.none()
+
+const isWorking = (ready: Ready, wishlist: Wishlist.WishlistRef) =>
+  Option.exists(
+    operationOf(ready, wishlist),
+    operation => operation._tag === 'Working',
+  )
+
+const working = (
+  ready: Ready,
+  wishlist: Wishlist.WishlistRef,
+  action: Action,
+): Ready =>
+  modifyFields(ready, {
+    operations: operations =>
+      Record.set(
+        operations,
+        Wishlist.refKey(wishlist),
+        Operation.Working({ action }),
+      ),
+  })
+
+export const create = (model: Model, { wishlist, name, lines }: Outgoing) =>
   whenReady(model, ready =>
-    sendingOf(ready, targetKey(target))._tag === 'Sending'
+    isWorking(ready, wishlist)
       ? { model }
       : {
-          model: modifyFields(ready, {
-            sendings: sendings =>
-              Record.set(sendings, targetKey(target), Sending.Sending()),
-          }),
-          commands: [SendWishlist({ target, lines })],
+          model: working(ready, wishlist, 'Create'),
+          commands: [CreateOnCardTrader({ wishlist, name, lines })],
         },
   )
+
+export const sync = (model: Model, { wishlist, name, lines }: Outgoing) =>
+  whenReady(model, ready =>
+    Option.match(linkOf(ready, wishlist), {
+      onNone: () => create(ready, { wishlist, name, lines }),
+      onSome: previousId =>
+        isWorking(ready, wishlist)
+          ? { model }
+          : {
+              model: working(ready, wishlist, 'Sync'),
+              commands: [
+                SyncOnCardTrader({ wishlist, name, lines, previousId }),
+              ],
+            },
+    }),
+  )
+
+export const remove = (model: Model, wishlist: Wishlist.WishlistRef) =>
+  whenReady(model, ready =>
+    Option.match(linkOf(ready, wishlist), {
+      onNone: () => ({ model }),
+      onSome: cardTraderWishlistId =>
+        isWorking(ready, wishlist)
+          ? { model }
+          : {
+              model: working(ready, wishlist, 'Delete'),
+              commands: [
+                DeleteOnCardTrader({ wishlist, cardTraderWishlistId }),
+              ],
+            },
+    }),
+  )
+
+export const addAll = (
+  model: Model,
+  imported: ReadonlyArray<CardTraderImport.Imported>,
+) =>
+  whenReady(model, ready => {
+    const revisioned = Array.map(imported, (item, offset) => ({
+      ...item,
+      revision: ready.nextRevision + offset,
+    }))
+
+    return {
+      model: modifyFields(ready, {
+        added: added =>
+          Array.reduce(revisioned, added, (next, { printingId, quantity }) =>
+            Collection.withQuantity(
+              next,
+              printingId,
+              Collection.clampQuantity(
+                Collection.quantityOf(next, printingId) + quantity,
+              ),
+            ),
+          ),
+        saves: saves =>
+          Array.reduce(revisioned, saves, (next, { printingId, revision }) =>
+            Record.set(next, printingId, Save.Waiting({ revision })),
+          ),
+        nextRevision: revision => revision + Array.length(revisioned),
+      }),
+      commands: Array.map(revisioned, ({ printingId, revision }) =>
+        WaitToSaveItem({ printingId, revision }),
+      ),
+    }
+  })
 
 // UPDATE
 
@@ -250,15 +406,43 @@ const isWaiting = (
     save => save._tag === 'Waiting' && save.revision === revision,
   )
 
+const linked = (
+  ready: Ready,
+  wishlist: Wishlist.WishlistRef,
+  maybeId: Option.Option<Wishlist.CardTraderWishlistId>,
+): Ready => {
+  const key = Wishlist.refKey(wishlist)
+
+  return modifyFields(ready, {
+    links: links =>
+      Option.match(maybeId, {
+        onNone: () => Record.remove(links, key),
+        onSome: id => Record.set(links, key, id),
+      }),
+    operations: operations => Record.remove(operations, key),
+  })
+}
+
 export const update = (model: Model, message: Message) =>
   Message.match<UpdateReturn>(message, {
     SucceededLoadWishlist: ({ wishlist }) => ({
       model: Model.Ready({
         added: Collection.fromItems(wishlist.items),
-        maybeSentWishlistId: wishlist.maybeCardTraderWishlistId,
+        links: Record.fromEntries(
+          Array.map(
+            wishlist.cardTraderLinks,
+            ({
+              wishlist,
+              cardTraderWishlistId,
+            }): readonly [string, Wishlist.CardTraderWishlistId] => [
+              Wishlist.refKey(wishlist),
+              cardTraderWishlistId,
+            ],
+          ),
+        ),
         saves: {},
         nextRevision: 0,
-        sendings: {},
+        operations: {},
       }),
     }),
 
@@ -336,23 +520,30 @@ export const update = (model: Model, message: Message) =>
         }
       }),
 
-    SucceededSendWishlist: ({ key, wishlistId, isPreviousDeleted }) =>
+    SucceededCreateOnCardTrader: ({ wishlist, cardTraderWishlistId }) =>
       whenReady(model, ready => ({
-        model: modifyFields(ready, {
-          sendings: sendings =>
-            Record.set(
-              sendings,
-              key,
-              Sending.Sent({ wishlistId, isPreviousDeleted }),
-            ),
-        }),
+        model: linked(ready, wishlist, Option.some(cardTraderWishlistId)),
       })),
 
-    FailedSendWishlist: ({ key, reason }) =>
+    SucceededSyncOnCardTrader: ({ wishlist, cardTraderWishlistId }) =>
+      whenReady(model, ready => ({
+        model: linked(ready, wishlist, Option.some(cardTraderWishlistId)),
+      })),
+
+    SucceededDeleteOnCardTrader: ({ wishlist }) =>
+      whenReady(model, ready => ({
+        model: linked(ready, wishlist, Option.none()),
+      })),
+
+    FailedCardTraderOperation: ({ wishlist, action, reason }) =>
       whenReady(model, ready => ({
         model: modifyFields(ready, {
-          sendings: sendings =>
-            Record.set(sendings, key, Sending.Failed({ reason })),
+          operations: operations =>
+            Record.set(
+              operations,
+              Wishlist.refKey(wishlist),
+              Operation.Failed({ action, reason }),
+            ),
         }),
       })),
   })

@@ -2,7 +2,6 @@ import { Match } from 'effect'
 import type { Document, Html, HtmlBuilder } from 'foldkit/html'
 
 import { APP_NAME } from './constant'
-import { CatalogueQuery } from './domain'
 import { Message } from './message'
 import { Model } from './model'
 import { LoggedIn, LoggedOut } from './page'
@@ -10,23 +9,24 @@ import {
   AppRoute,
   cardTraderRouter,
   catalogueHome,
-  collectionRouter,
   decksRouter,
-  wishlistRouter,
+  wishlistsRouter,
 } from './route'
-import { Button, Link } from './ui'
+import { Button, Icon, Link } from './ui'
 
 const title = (route: AppRoute): string =>
   AppRoute.match(route, {
     SignIn: () => `Sign in | ${APP_NAME}`,
     SignUp: () => `Create an account | ${APP_NAME}`,
-    Catalogue: () => `Catalogue | ${APP_NAME}`,
+    Catalogue: () => `Cards | ${APP_NAME}`,
     Card: ({ cardId }) => `${cardId} | ${APP_NAME}`,
     CardTrader: () => `CardTrader | ${APP_NAME}`,
-    Collection: () => `Collection | ${APP_NAME}`,
     Decks: () => `Decks | ${APP_NAME}`,
     Deck: () => `Deck | ${APP_NAME}`,
-    Wishlist: () => `Wishlists | ${APP_NAME}`,
+    Wishlists: () => `Wishlists | ${APP_NAME}`,
+    CustomWishlist: () => `Custom wishlist | ${APP_NAME}`,
+    DeckWishlist: () => `Deck wishlist | ${APP_NAME}`,
+    CardTraderWishlist: () => `CardTrader wishlist | ${APP_NAME}`,
     NotFound: () => `Not found | ${APP_NAME}`,
   })
 
@@ -50,18 +50,9 @@ const navView = (loggedIn: LoggedIn.Model, h: HtmlBuilder<Message>): Html =>
       Link.view(
         {
           href: catalogueHome(),
-          content: ['Catalogue'],
+          content: ['Cards'],
           variant: 'Nav',
           isCurrent: loggedIn.route._tag === 'Catalogue',
-        },
-        h,
-      ),
-      Link.view(
-        {
-          href: collectionRouter(CatalogueQuery.empty),
-          content: ['Collection'],
-          variant: 'Nav',
-          isCurrent: loggedIn.route._tag === 'Collection',
         },
         h,
       ),
@@ -77,24 +68,45 @@ const navView = (loggedIn: LoggedIn.Model, h: HtmlBuilder<Message>): Html =>
       ),
       Link.view(
         {
-          href: wishlistRouter(),
+          href: wishlistsRouter(),
           content: ['Wishlists'],
           variant: 'Nav',
-          isCurrent: loggedIn.route._tag === 'Wishlist',
-        },
-        h,
-      ),
-      Link.view(
-        {
-          href: cardTraderRouter(),
-          content: ['CardTrader'],
-          variant: 'Nav',
-          isCurrent: loggedIn.route._tag === 'CardTrader',
+          isCurrent:
+            loggedIn.route._tag === 'Wishlists' ||
+            loggedIn.route._tag === 'CustomWishlist' ||
+            loggedIn.route._tag === 'DeckWishlist' ||
+            loggedIn.route._tag === 'CardTraderWishlist',
         },
         h,
       ),
     ],
   )
+
+const cardTraderStatusView = (
+  loggedIn: LoggedIn.Model,
+  h: HtmlBuilder<Message>,
+): Html =>
+  loggedIn.cardTrader.connection._tag === 'Connected'
+    ? Link.view(
+        {
+          href: cardTraderRouter(),
+          content: ['CardTrader: connected'],
+          variant: 'Nav',
+          isCurrent: loggedIn.route._tag === 'CardTrader',
+        },
+        h,
+      )
+    : Button.view(
+        {
+          content: [
+            Icon.view({ name: 'LockClosed', size: 'Small' }),
+            'Connect CardTrader',
+          ],
+          variant: 'Secondary',
+          onClick: Message.ClickedConnectCardTrader(),
+        },
+        h,
+      )
 
 const accountView = (loggedIn: LoggedIn.Model, h: HtmlBuilder<Message>): Html =>
   h.div(
@@ -139,7 +151,11 @@ const headerView = (model: Model, h: HtmlBuilder<Message>): Html =>
                 navView(loggedIn, h),
                 h.div(
                   [h.Class('ml-auto flex items-center gap-3')],
-                  [themeToggleView(model, h), accountView(loggedIn, h)],
+                  [
+                    cardTraderStatusView(loggedIn, h),
+                    themeToggleView(model, h),
+                    accountView(loggedIn, h),
+                  ],
                 ),
               ],
             }),

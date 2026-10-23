@@ -8,18 +8,26 @@ export type ViewConfig<Message> = Readonly<{
   isChecked: boolean
   onToggle: (isChecked: boolean) => Message
   description?: string
+  isDisabled?: boolean
 }>
 
 const recipe = {
   root: 'flex flex-col gap-1',
   row: 'flex items-center gap-2',
-  box: 'flex size-5 cursor-pointer items-center justify-center rounded-control border border-border bg-surface text-accent-fg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus aria-checked:border-accent aria-checked:bg-accent',
+  box: 'flex size-5 cursor-pointer items-center justify-center rounded-control border border-border bg-surface text-accent-fg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus aria-checked:border-accent aria-checked:bg-accent aria-disabled:cursor-not-allowed aria-disabled:opacity-50',
   label: 'cursor-pointer text-sm text-fg',
   description: 'pl-7 text-sm text-fg-muted',
 }
 
 export const view = <Message>(
-  { id, label, isChecked, onToggle, description }: ViewConfig<Message>,
+  {
+    id,
+    label,
+    isChecked,
+    onToggle,
+    description,
+    isDisabled = false,
+  }: ViewConfig<Message>,
   h: HtmlBuilder<Message>,
 ): Html =>
   HeadlessCheckbox.view(
@@ -27,6 +35,7 @@ export const view = <Message>(
       id,
       isChecked,
       onToggle,
+      isDisabled,
       hasDescription: description !== undefined,
       toView: attributes =>
         h.div(

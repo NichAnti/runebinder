@@ -15,7 +15,11 @@ import {
   matchPrinting,
   withBlueprints,
 } from './match'
-import { RECORDING_DIRECTORY, readBlueprints } from './recording'
+import {
+  RECORDING_DIRECTORY,
+  readBlueprints,
+  readExpansionCodes,
+} from './recording'
 import type { Blueprint } from './schema'
 
 const blueprint = (id: number, collectorNumber: string): Blueprint => ({
@@ -106,12 +110,44 @@ describe('matchPrinting', () => {
     )
   })
 
+  test('a match keeps the CardTrader slug and expansion code', () => {
+    const report = Result.getOrThrow(
+      withBlueprints(
+        [printingWithId('tst-007-010')],
+        { TST: [{ ...blueprint(1, '007'), name: 'Ahri - Alluring' }] },
+        { 1: 'tst' },
+      ),
+    )
+
+    expect(Array.map(report.printings, p => p.maybeCardTrader)).toStrictEqual([
+      Option.some({
+        id: Printing.CardTraderBlueprintId.make(1),
+        metaName: Printing.CardTraderSlug.make('ahri-alluring'),
+        expansionCode: Printing.CardTraderExpansionCode.make('tst'),
+      }),
+    ])
+  })
+
+  test('a blueprint in an unknown expansion rejects the whole build', () => {
+    expect(
+      Result.isFailure(
+        withBlueprints(
+          [printingWithId('tst-007-010')],
+          { TST: [blueprint(1, '007')] },
+          {},
+        ),
+      ),
+    ).toBe(true)
+  })
+
   test('an ambiguous match rejects the whole build', () => {
     expect(
       Result.isFailure(
-        withBlueprints([printingWithId('tst-r02')], {
-          TST: [blueprint(5, 'R02'), blueprint(6, 'R02')],
-        }),
+        withBlueprints(
+          [printingWithId('tst-r02')],
+          { TST: [blueprint(5, 'R02'), blueprint(6, 'R02')] },
+          { 1: 'tst' },
+        ),
       ),
     ).toBe(true)
   })
@@ -137,14 +173,15 @@ layer(RecordedRiotGallery.pipe(Layer.provideMerge(NodeServices.layer)))(
         const source = yield* CatalogueSource
         const printings = yield* source.printings
         const blueprintsBySet = yield* readBlueprints(RECORDING_DIRECTORY)
+        const expansionCodes = yield* readExpansionCodes(RECORDING_DIRECTORY)
         const report = Result.getOrThrow(
-          withBlueprints(printings, blueprintsBySet),
+          withBlueprints(printings, blueprintsBySet, expansionCodes),
         )
 
         assert.deepStrictEqual(report.unmatched, [])
         assert.isTrue(
-          Array.every(report.printings, ({ maybeCardTraderBlueprintId }) =>
-            Option.isSome(maybeCardTraderBlueprintId),
+          Array.every(report.printings, ({ maybeCardTrader }) =>
+            Option.isSome(maybeCardTrader),
           ),
         )
       }),

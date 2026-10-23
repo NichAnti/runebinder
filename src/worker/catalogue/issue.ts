@@ -16,5 +16,9 @@ export const CatalogueIssue = Schema.TaggedUnion({
     id: Schema.String,
     blueprintIds: Schema.Array(Schema.Int),
   },
+  UnnamedCardTraderBlueprint: {
+    id: Schema.String,
+    blueprintId: Schema.Int,
+  },
 })
 export type CatalogueIssue = typeof CatalogueIssue.Type

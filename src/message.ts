@@ -11,6 +11,7 @@ export const Message = defineMessageUnion({
   ClickedThemeToggle: {},
   ChangedSystemTheme: { theme: Theme.Resolved },
   ClickedSignOut: {},
+  ClickedConnectCardTrader: {},
   GotLoggedOutMessage: { message: LoggedOut.Message },
   GotLoggedInMessage: { message: LoggedIn.Message },
   SucceededSignOut: {},

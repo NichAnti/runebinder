@@ -1,4 +1,4 @@
-import { Array } from 'effect'
+import { Array, Option } from 'effect'
 
 import {
   type Collection,
@@ -7,7 +7,6 @@ import {
   type Printing,
   Wishlist,
 } from '../../../../domain'
-import * as WishlistState from '../../wishlist'
 
 export type Context = Readonly<{
   decks: ReadonlyArray<Deck.Deck>
@@ -18,7 +17,7 @@ export type Context = Readonly<{
 export type Section = Readonly<{
   key: string
   title: string
-  target: WishlistState.SendTarget
+  wishlist: Wishlist.WishlistRef
   isCustom: boolean
   lines: ReadonlyArray<Wishlist.Line>
 }>
@@ -36,18 +35,30 @@ export const sectionsOf = ({
   ...Array.map(decks, (deck): Section => ({
     key: deck.id,
     title: deck.name,
-    target: { _tag: 'Deck', deckId: deck.id, deckName: deck.name },
+    wishlist: Wishlist.deckWishlist(deck.id),
     isCustom: false,
     lines: Wishlist.linesOf(Missing.needs([deck], owned), {}),
   })),
   {
-    key: WishlistState.CUSTOM_KEY,
+    key: Wishlist.refKey(Wishlist.CUSTOM),
     title: 'Custom wishlist',
-    target: { _tag: 'Custom' },
+    wishlist: Wishlist.CUSTOM,
     isCustom: true,
     lines: Wishlist.linesOf([], added),
   },
 ]
+
+export const sectionOf = (
+  context: Context,
+  wishlist: Wishlist.WishlistRef,
+): Option.Option<Section> =>
+  Array.findFirst(
+    sectionsOf(context),
+    ({ key }) => key === Wishlist.refKey(wishlist),
+  )
+
+export const cardTraderNameOf = (section: Section): string =>
+  Wishlist.cardTraderNameOf(section.wishlist, section.title)
 
 export const printingIdsOf = (
   context: Context,

@@ -10,13 +10,6 @@ export const Save = defineTaggedUnion({
 })
 export type Save = typeof Save.Type
 
-export const Refresh = defineTaggedUnion({
-  Idle: {},
-  Refreshing: {},
-  Failed: {},
-})
-export type Refresh = typeof Refresh.Type
-
 export const Model = defineTaggedUnion({
   NotLoaded: {},
   Loading: {},
@@ -25,7 +18,6 @@ export const Model = defineTaggedUnion({
     owned: Collection.Owned,
     saves: Schema.Record(Printing.PrintingId, Save),
     nextRevision: Schema.Int,
-    refresh: Refresh,
   },
 })
 export type Model = typeof Model.Type

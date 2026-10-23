@@ -10,7 +10,7 @@ export type ViewConfig = Readonly<{
   maybeSubtitle: Option.Option<string>
   domains: ReadonlyArray<Printing.Domain>
   meta: string
-  maybeHighlight: Option.Option<string>
+  highlights: ReadonlyArray<string>
 }>
 
 const DOMAIN_DOT: Readonly<Record<Printing.Domain, string>> = {
@@ -25,6 +25,7 @@ const DOMAIN_DOT: Readonly<Record<Printing.Domain, string>> = {
 
 const recipe = {
   root: 'group flex flex-col gap-2',
+  frame: 'relative',
   image:
     'aspect-[744/1039] w-full rounded-card bg-surface-raised object-cover shadow-raised transition-transform group-hover:-translate-y-0.5',
   text: 'flex flex-col',
@@ -34,7 +35,9 @@ const recipe = {
   dots: 'flex gap-1',
   dot: 'size-2.5 rounded-full',
   meta: 'text-xs text-fg-muted',
-  highlight: 'text-xs font-semibold text-accent',
+  highlights: 'absolute top-2 right-2 flex flex-col items-end gap-1',
+  highlight:
+    'rounded-control bg-accent px-2 py-0.5 text-xs font-semibold text-accent-fg shadow-raised',
 }
 
 export const view = <Message>(
@@ -45,20 +48,44 @@ export const view = <Message>(
     maybeSubtitle,
     domains,
     meta,
-    maybeHighlight,
+    highlights,
   }: ViewConfig,
   h: HtmlBuilder<Message>,
 ): Html =>
   h.span(
     [h.DataAttribute('slot', 'card-tile'), h.Class(recipe.root)],
     [
-      h.img([
-        h.Src(imageUrl),
-        h.Alt(imageAlt),
-        h.Loading('lazy'),
-        h.DataAttribute('slot', 'image'),
-        h.Class(recipe.image),
-      ]),
+      h.span(
+        [h.DataAttribute('slot', 'frame'), h.Class(recipe.frame)],
+        [
+          h.img([
+            h.Src(imageUrl),
+            h.Alt(imageAlt),
+            h.Loading('lazy'),
+            h.DataAttribute('slot', 'image'),
+            h.Class(recipe.image),
+          ]),
+          Array.match(highlights, {
+            onEmpty: () => h.empty,
+            onNonEmpty: all =>
+              h.span(
+                [
+                  h.DataAttribute('slot', 'highlights'),
+                  h.Class(recipe.highlights),
+                ],
+                Array.map(all, highlight =>
+                  h.span(
+                    [
+                      h.DataAttribute('slot', 'highlight'),
+                      h.Class(recipe.highlight),
+                    ],
+                    [highlight],
+                  ),
+                ),
+              ),
+          }),
+        ],
+      ),
       h.span(
         [h.Class(recipe.text)],
         [
@@ -88,21 +115,10 @@ export const view = <Message>(
               ]),
             ),
           ),
-          Option.match(maybeHighlight, {
-            onNone: () =>
-              h.span(
-                [h.DataAttribute('slot', 'meta'), h.Class(recipe.meta)],
-                [meta],
-              ),
-            onSome: highlight =>
-              h.span(
-                [
-                  h.DataAttribute('slot', 'highlight'),
-                  h.Class(recipe.highlight),
-                ],
-                [highlight],
-              ),
-          }),
+          h.span(
+            [h.DataAttribute('slot', 'meta'), h.Class(recipe.meta)],
+            [meta],
+          ),
         ],
       ),
     ],

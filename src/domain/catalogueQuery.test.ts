@@ -63,7 +63,7 @@ describe('QueryParams', () => {
         energy: '2-5',
         might: '-3',
         power: '1-',
-        ownership: 'not-owned',
+        ownership: 'wanted',
         sort: 'energy-desc',
       }),
     ).toStrictEqual({
@@ -75,7 +75,7 @@ describe('QueryParams', () => {
       energy: { maybeMin: Option.some(2), maybeMax: Option.some(5) },
       might: { maybeMin: Option.none(), maybeMax: Option.some(3) },
       power: { maybeMin: Option.some(1), maybeMax: Option.none() },
-      ownership: 'NotOwned',
+      ownership: 'Wanted',
       sort: Option.some({ field: 'Energy', direction: 'Descending' }),
     })
   })
@@ -120,17 +120,19 @@ describe('activeFilterCount and clearFilters', () => {
     q: 'vi',
     set: 'UNL,OGN',
     energy: '2-',
+    ownership: 'owned',
     sort: 'name-asc',
   })
 
-  test('counts each filter value and each bounded range', () => {
+  test('counts each filter value and each bounded range, not the view', () => {
     expect(CatalogueQuery.activeFilterCount(query)).toBe(3)
   })
 
-  test('clearing filters keeps the search and the sort', () => {
+  test('clearing filters keeps the search, the view and the sort', () => {
     expect(CatalogueQuery.clearFilters(query)).toStrictEqual({
       ...CatalogueQuery.empty,
       q: Option.some('vi'),
+      ownership: 'Owned',
       sort: Option.some({ field: 'Name', direction: 'Ascending' }),
     })
   })

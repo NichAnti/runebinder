@@ -6,9 +6,6 @@ import * as CardPanel from '../../cardPanel'
 
 export const PAGE_SIZE = 60
 
-export const Scope = Schema.Literals(['Catalogue', 'Collection'])
-export type Scope = typeof Scope.Type
-
 export const Results = defineTaggedUnion({
   Waiting: {},
   Showing: {

@@ -8,6 +8,7 @@ import {
 } from 'drizzle-orm/sqlite-core'
 
 import { user } from './auth'
+import { deck } from './deck'
 
 export const wishlistItem = sqliteTable(
   'wishlist_item',
@@ -33,4 +34,15 @@ export const cardTraderWishlist = sqliteTable(
     wishlistId: integer('wishlist_id').notNull(),
   },
   table => [check('cardtrader_wishlist_id', sql`${table.wishlistId} > 0`)],
+)
+
+export const deckCardTraderWishlist = sqliteTable(
+  'deck_cardtrader_wishlist',
+  {
+    deckId: text('deck_id')
+      .primaryKey()
+      .references(() => deck.id, { onDelete: 'cascade' }),
+    wishlistId: integer('wishlist_id').notNull(),
+  },
+  table => [check('deck_cardtrader_wishlist_id', sql`${table.wishlistId} > 0`)],
 )

@@ -9,12 +9,12 @@ import { Collection, Printing } from '../../../../domain'
 import * as CollectionState from '../../collection'
 import { summaryView } from './summaryView'
 
-const Message = defineMessageUnion({ ClickedRefresh: {} })
+const Message = defineMessageUnion({ ClickedRetry: {} })
 type Message = typeof Message.Type
 
 type Model = Readonly<{
   collection: CollectionState.Model
-  refreshCount: number
+  retryCount: number
 }>
 
 const vi = Printing.PrintingId.make('ogn-066-298')
@@ -28,15 +28,14 @@ const ready: Model = {
     owned: { [vi]: Collection.OwnedQuantity.make(3) },
     saves: {},
     nextRevision: 0,
-    refresh: CollectionState.Refresh.Idle(),
   }),
-  refreshCount: 0,
+  retryCount: 0,
 }
 
 const update = (model: Model, message: Message) =>
   Message.match<Update.Return<Model, Message>>(message, {
-    ClickedRefresh: () => ({
-      model: modifyFields(model, { refreshCount: count => count + 1 }),
+    ClickedRetry: () => ({
+      model: modifyFields(model, { retryCount: count => count + 1 }),
     }),
   })
 
@@ -48,11 +47,11 @@ const view = (model: Model, h: HtmlBuilder<Message>) =>
         {
           collection: model.collection,
           printingSets,
-          onRefresh: Message.ClickedRefresh(),
+          onRetry: Message.ClickedRetry(),
         },
         h,
       ),
-      h.p([], [`Refreshes: ${model.refreshCount}`]),
+      h.p([], [`Retries: ${model.retryCount}`]),
     ],
   )
 
@@ -65,8 +64,7 @@ describe('collection summary', () => {
       expect(
         within(role('list', { name: 'Sets' }), role('listitem')),
       ).toHaveText('OGN 1 / 2'),
-      click(role('button', { name: 'Refresh' })),
-      expect(text('Refreshes: 1')).toExist(),
+      expect(role('button', { name: 'Refresh' })).not.toExist(),
     )
   })
 
@@ -80,7 +78,7 @@ describe('collection summary', () => {
       ),
       expect(role('alert')).toContainText('could not be loaded'),
       click(role('button', { name: 'Try again' })),
-      expect(text('Refreshes: 1')).toExist(),
+      expect(text('Retries: 1')).toExist(),
     )
   })
 })

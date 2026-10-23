@@ -1,5 +1,5 @@
 export { Message } from './message'
-export { Model, Refresh, Save, init } from './model'
+export { Model, Save, init } from './model'
 export {
   type Change,
   LoadCollection,
@@ -11,7 +11,7 @@ export {
   ensureLoaded,
   failedSaveCount,
   maybeOwned,
-  refresh,
+  retry,
   step,
   update,
 } from './update'

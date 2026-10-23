@@ -59,7 +59,7 @@ describe('shell', () => {
       { update, view },
       given(loggedInAt(AppRoute.Catalogue(CatalogueQuery.empty))),
       expect(role('status')).toContainText('Loading the catalogue…'),
-      expect(role('link', { name: 'Catalogue' })).toHaveAttr(
+      expect(role('link', { name: 'Cards' })).toHaveAttr(
         'aria-current',
         'page',
       ),

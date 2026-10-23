@@ -26,6 +26,8 @@ erDiagram
   deck ||--o{ deck_card : contains
   deck ||--o{ deck_additional_legend : brings
   user ||--o{ wishlist_item : wants
+  user ||--o| cardtrader_wishlist : "custom wishlist on CardTrader"
+  deck ||--o| deck_cardtrader_wishlist : "deck wishlist on CardTrader"
 
   user {
     text id PK
@@ -62,11 +64,20 @@ erDiagram
     text printing_id PK, FK
     int quantity "added by hand"
   }
+  cardtrader_wishlist {
+    text user_id PK, FK
+    int wishlist_id "CardTrader wishlist id"
+  }
+  deck_cardtrader_wishlist {
+    text deck_id PK, FK
+    int wishlist_id "CardTrader wishlist id"
+  }
 ```
 
 - `user`, `session`, `account` and `verification` are Better Auth's tables (`src/worker/schema/auth.ts`, generated). Only the relevant columns are shown.
 - `collection_item`, `deck`, `deck_card` and `wishlist_item` arrive in Phases 6 to 8; their exact columns are decided then. `printing_id` columns hold a `PrintingId` from the catalogue file (not a foreign key); the Backend checks it on every write against `catalogue/printingIds.json`, a list of every `PrintingId` that `catalogue:build` writes next to `catalogue.json`.
-- Deleting a user cascades to everything they own, and deleting a deck cascades to its cards and additional legends.
+- Deleting a user cascades to everything they own, and deleting a deck cascades to its cards, additional legends and CardTrader link.
+- A wishlist belongs to the app: one per deck (computed) and the custom one (`wishlist_item`). The two `*cardtrader_wishlist` tables only link an app wishlist to the CardTrader wishlist it was last created or synced as. The links are split by owner so each has a real foreign key (a user for the custom one, a deck for a deck's).
 
 ### Decks
 
@@ -159,28 +170,42 @@ A collector number matching more than one blueprint fails the build
 
 **Calls the app makes:**
 
-| Call                    | When                                                                                                                    |
-| ----------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `GET /info`             | connecting a token and checking a stored one                                                                            |
-| `POST /wishlists`       | sending a wishlist: `game_id` 22, private, one line per printing with `blueprint_id`, `collector_number` and `quantity` |
-| `DELETE /wishlists/:id` | after a send, removing the previous wishlist the app made                                                               |
+| Call                    | When                                                                                                |
+| ----------------------- | --------------------------------------------------------------------------------------------------- |
+| `GET /info`             | connecting a token, and checking a stored one on the CardTrader settings page                       |
+| `GET /wishlists`        | once per visit to the Wishlists page while connected, and on Refresh (`game_id` 22, 100 per page)   |
+| `GET /wishlists/:id`    | opening a CardTrader wishlist to import from it                                                     |
+| `POST /wishlists`       | Create or Sync: `game_id` 22, private, one line per card and set with `blueprint_id` and `quantity` |
+| `DELETE /wishlists/:id` | Delete, and the old wishlist after a Sync                                                           |
+
+Every call is made only when the user clicks or opens the page that needs it.
+Nothing is created, replaced or deleted on CardTrader by itself.
 
 Two recorded calls (`catalogue/recordings/cardtrader/wishlist-*.json`) show that a
 Riftbound wishlist keeps only the card (`meta_name`) and the set
 (`expansion_code`): `collector_number` comes back `null` whether it is sent
 with `blueprint_id` or without it. So the app sends one line per card and set,
-with the missing copies of its printings added up, and the Wishlist page links
+with the missing copies of its printings added up, and the wishlist pages link
 each exact printing to its CardTrader page
 (`https://www.cardtrader.com/cards/{blueprint_id}`). Adding exact printings to
 the CardTrader cart (`/marketplace/products`, `/cart/add`) is a possible later
 option; the app never calls `/cart/purchase`.
 
-CardTrader has no wishlist update. A send creates the new wishlist first and
-then deletes the previous one this app created (its id is kept per user in
-D1), so a failed send never leaves the user without one. Edits made on
-CardTrader to that wishlist are replaced, and the user is warned. `/info`
-responses include `shared_secret`; the client drops it when decoding and they
-are never recorded.
+CardTrader has no wishlist update. **Sync** (after a confirmation) creates the
+new wishlist, saves the link, then deletes the old one, so a failure never
+leaves the user without one; an old one that could not be deleted shows up
+under "On CardTrader". **Delete** (after a confirmation) deletes on CardTrader
+and then clears the link. `/info` responses include `shared_secret`; the
+client drops it when decoding and they are never recorded.
+
+**Import.** `catalogue:build` stores, per printing, its CardTrader blueprint
+id, the slug of the blueprint name (`metaName`, e.g. `ahri-alluring` for
+"Ahri - Alluring") and the expansion code from `expansions.json`. A
+CardTrader line is matched on `metaName` + `expansion_code`; it becomes that
+card's standard (Base) printing in the set, because CardTrader has no version.
+A line that matches no card, or more than one (`recruit` in OGN), is shown
+disabled and never imported. Imported quantities are added to the custom
+wishlist. The rule is confirmed by the recorded line only.
 
 **Token:** checked with `GET /info`, then kept in `sessionStorage` or, when
 the user chooses "Remember on this device", `localStorage`. It is held as
@@ -249,7 +274,7 @@ sequenceDiagram
   participant S as SPA (ApiClient)
   participant W as Backend
   participant DB as D1
-  opt first screen that shows owned amounts this visit, or Refresh
+  opt first screen that shows owned amounts this visit, or Try again after a failure
     S->>W: GET /api/collection
     W->>DB: select the user's rows
     W-->>S: [{printingId, quantity}]
@@ -281,7 +306,7 @@ sequenceDiagram
   W-->>S: deck id
 ```
 
-### Send the wishlist to CardTrader (Phases 5 and 8)
+### Create, sync or delete a wishlist on CardTrader (Phases 5 and 8)
 
 ```mermaid
 sequenceDiagram
@@ -290,20 +315,28 @@ sequenceDiagram
   participant B as Browser storage
   participant CT as CardTrader API
   participant W as Backend
-  S->>B: read token
-  alt no token
+  S->>B: read token (once per visit, no network)
+  alt not connected
+    U->>S: Connect CardTrader (locked area or header)
     U->>S: paste token, choose tab-only or remember
     S->>CT: GET /info
     S->>B: store
+    Note over S: the area unlocks; the action is not run
   end
-  S->>CT: POST /wishlists (blueprint ids and quantities)
-  CT-->>S: new wishlist id
-  S->>W: save the new wishlist id (API route decided in 8.2)
-  W-->>S: previous id, if any
-  opt previous wishlist
-    S->>CT: DELETE /wishlists/{previous id}
+  alt Create
+    U->>S: Create
+    S->>CT: POST /wishlists
+    S->>W: PUT /api/wishlist/cardtrader/{custom | decks/:id}
+  else Sync (confirmed)
+    U->>S: Sync
+    S->>CT: POST /wishlists
+    S->>W: PUT the new link
+    S->>CT: DELETE /wishlists/{old id}
+  else Delete (confirmed)
+    U->>S: Delete
+    S->>CT: DELETE /wishlists/{id}
+    S->>W: DELETE the link
   end
-  S-->>U: link to the wishlist on CardTrader
 ```
 
 ## Open questions

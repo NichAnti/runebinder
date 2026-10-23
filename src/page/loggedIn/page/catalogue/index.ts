@@ -1,5 +1,5 @@
 export { Message, OutMessage } from './message'
-export { Model, PAGE_SIZE, Results, Scope, init } from './model'
+export { Model, PAGE_SIZE, Results, init } from './model'
 export {
   type Context,
   ReplaceQuery,

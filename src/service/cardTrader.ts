@@ -1,10 +1,19 @@
-import { Array, Context, Effect, Layer, Option, Redacted, Schema } from 'effect'
+import {
+  Array,
+  Context,
+  Effect,
+  Layer,
+  Option,
+  Redacted,
+  Result,
+  Schema,
+} from 'effect'
 import { FetchHttpClient, HttpClient, HttpClientRequest } from 'effect/http'
 import { KeyValueStore } from 'effect/persistence'
 
 import { BrowserKeyValueStore } from '@effect/platform-browser'
 
-import { Wishlist } from '../domain'
+import { CardTraderImport, Wishlist } from '../domain'
 
 const API_BASE_URL = 'https://api.cardtrader.com/api/v2'
 const TOKEN_STORAGE_KEY = 'cardtrader-token'
@@ -161,6 +170,18 @@ export const ListedWishlist = Schema.Struct({
 })
 export type ListedWishlist = typeof ListedWishlist.Type
 
+const ShownWishlist = Schema.Struct({
+  id: Wishlist.CardTraderWishlistId,
+  name: Schema.String,
+  items: Schema.Array(
+    Schema.Struct({
+      quantity: Schema.Int,
+      meta_name: Schema.String,
+      expansion_code: Schema.String,
+    }),
+  ),
+})
+
 export class CardTraderClient extends Context.Service<
   CardTraderClient,
   {
@@ -178,6 +199,10 @@ export class CardTraderClient extends Context.Service<
     readonly listWishlists: (
       token: Redacted.Redacted<CardTraderToken>,
     ) => Effect.Effect<ReadonlyArray<ListedWishlist>, CardTraderError>
+    readonly showWishlist: (
+      token: Redacted.Redacted<CardTraderToken>,
+      wishlistId: Wishlist.CardTraderWishlistId,
+    ) => Effect.Effect<CardTraderImport.RemoteWishlist, CardTraderError>
   }
 >()('cardtrader/service/CardTraderClient') {
   static readonly layerWith = Layer.effect(
@@ -298,10 +323,38 @@ export class CardTraderClient extends Context.Service<
         (token: Redacted.Redacted<CardTraderToken>) => listFrom(token, 1, []),
       )
 
+      const showWishlist = Effect.fn('CardTraderClient.showWishlist')(
+        function* (
+          token: Redacted.Redacted<CardTraderToken>,
+          wishlistId: Wishlist.CardTraderWishlistId,
+        ) {
+          const response = yield* get(`/wishlists/${wishlistId}`, token)
+          const body = yield* response.json.pipe(Effect.mapError(unavailable))
+          const shown = yield* Schema.decodeUnknownEffect(ShownWishlist)(
+            body,
+          ).pipe(Effect.mapError(unavailable))
+
+          return {
+            id: shown.id,
+            name: shown.name,
+            items: Array.filterMap(shown.items, item =>
+              item.quantity > 0
+                ? Result.succeed({
+                    quantity: item.quantity,
+                    metaName: item.meta_name,
+                    expansionCode: item.expansion_code,
+                  })
+                : Result.failVoid,
+            ),
+          }
+        },
+      )
+
       return CardTraderClient.of({
         createWishlist,
         deleteWishlist,
         listWishlists,
+        showWishlist,
         info: Effect.fn('CardTraderClient.info')(function* (token) {
           const response = yield* get('/info', token)
           const body = yield* response.json.pipe(

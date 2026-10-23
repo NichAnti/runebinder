@@ -1,8 +1,8 @@
 import { Array, Number, Option, Record } from 'effect'
 import type { Html, HtmlBuilder } from 'foldkit/html'
 
-import { type DeckEdit, Printing } from '../../../domain'
-import { Button, Link, QuantityStepper } from '../../../ui'
+import { type DeckEdit, Printing, Wishlist } from '../../../domain'
+import { Button, IconButton, Link, QuantityStepper } from '../../../ui'
 import { type CountKind, Counts } from './counts'
 
 export const VARIANT_LABELS: Readonly<Record<Printing.Variant, string>> = {
@@ -25,6 +25,7 @@ export type PrintingsConfig<Message> = Readonly<{
   onStep: (printingId: Printing.PrintingId, step: DeckEdit.Step) => Message
   onRetry: Message
   isShowingImages: boolean
+  isLinkingCardTrader?: boolean
 }>
 
 const labelOf = (printing: Printing.Printing): string =>
@@ -135,6 +136,30 @@ const linkView = <Message>(
     h,
   )
 
+const cardTraderLinkView = <Message>(
+  printing: Printing.Printing,
+  { isLinkingCardTrader = false }: PrintingsConfig<Message>,
+  h: HtmlBuilder<Message>,
+): Html =>
+  Option.match(
+    Option.filter(printing.maybeCardTrader, () => isLinkingCardTrader),
+    {
+      onNone: () => h.empty,
+      onSome: blueprint =>
+        IconButton.view(
+          {
+            icon: 'ArrowTopRightOnSquare',
+            label: `Open ${VARIANT_LABELS[printing.variant]} ${printing.publicCode} on CardTrader`,
+            action: {
+              _tag: 'External',
+              href: Wishlist.cardTraderCardUrl(blueprint.id),
+            },
+          },
+          h,
+        ),
+    },
+  )
+
 export const printingsView = <Message>(
   config: PrintingsConfig<Message>,
   h: HtmlBuilder<Message>,
@@ -150,7 +175,16 @@ export const printingsView = <Message>(
           h.keyed('li')(
             printing.id,
             [h.Class('flex items-center justify-between gap-3')],
-            [linkView(printing, config, h), stepperView(printing, config, h)],
+            [
+              linkView(printing, config, h),
+              h.div(
+                [h.Class('flex items-center gap-2')],
+                [
+                  cardTraderLinkView(printing, config, h),
+                  stepperView(printing, config, h),
+                ],
+              ),
+            ],
           ),
         ),
       ),

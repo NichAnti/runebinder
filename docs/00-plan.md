@@ -73,9 +73,12 @@ Its structure is agreed before any code is written.
 - [x] 8.1 Missing-cards calculation, pure with tests: the most copies any one deck uses, per exact printing, minus what is owned
 - [x] 8.2 Wishlists: one per deck (its missing cards, computed, read-only) and one custom wishlist (stored, edited by hand, also from the card page). Each is sent to CardTrader on its own as one line per card and set (CardTrader does not keep the version); a deck's wishlist replaces the one with the same name, the custom one replaces the stored id. Lines link to the exact version on CardTrader and can be marked as bought (one, selected, or all), which adds the version that arrived to the collection and lowers the custom wishlist
 
+- [x] 8.3 CardTrader as an add-on: a connect dialog opened from the header and from locked (greyed-out) areas, which unlock without running the action; `/cardtrader` stays as settings. `/wishlists` lists each deck's wishlist and the custom one with icon actions (Create, Sync and Delete on CardTrader, the last two confirmed) and the other Riftbound wishlists on CardTrader (Open, Delete). `/wishlists/{custom | deck id}` shows one wishlist's cards. `/cardtrader/wishlists/{id}` imports all or selected lines into the custom wishlist; lines not in the catalogue are disabled. Links are stored per wishlist (`cardtrader_wishlist` for the custom one, `deck_cardtrader_wishlist` per deck)
+
 ## Phase 9: Finishing the MVP
 
 - [x] 9.1 Card page "used in decks" section and hover
+- [x] 9.1b One Cards page at `/` replaces Catalogue and Collection: an All cards / My collection / Wanted switch at the top (Wanted: what decks miss plus the custom wishlist, with its own summary), the collection summary on My collection, Owned and Need badges on each card; `/collection` and Refresh removed (reloading the page reloads the collection)
 - [ ] 9.2 Polish and docs refresh
 - [x] 9.3 Riot "Legal Jibber Jabber" notice in the app (site footer, added in 4.3)
 - [ ] 9.4 Register the product on the Riot Developer Portal and apply for a production key

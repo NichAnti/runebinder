@@ -22,3 +22,13 @@ export const Blueprint = Schema.Struct({
 export type Blueprint = typeof Blueprint.Type
 
 export const BlueprintExport = Schema.Array(Blueprint)
+
+export const Expansion = Schema.Struct({
+  id: Schema.Int,
+  game_id: Schema.Int,
+  code: Schema.String,
+  name: Schema.String,
+})
+export type Expansion = typeof Expansion.Type
+
+export const ExpansionExport = Schema.Array(Expansion)

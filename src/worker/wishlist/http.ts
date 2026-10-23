@@ -27,12 +27,25 @@ export const WishlistLive = HttpApiBuilder.group(
           const user = yield* CurrentUser
           yield* repository.setItem(user.id, printingId, quantity)
         }),
-      replaceCardTraderWishlist: ({ payload: { wishlistId } }) =>
+      linkCustom: ({ payload: { cardTraderWishlistId } }) =>
         Effect.gen(function* () {
           const user = yield* CurrentUser
-          const maybePreviousWishlistId =
-            yield* repository.replaceCardTraderWishlist(user.id, wishlistId)
-          return { maybePreviousWishlistId }
+          yield* repository.linkCustom(user.id, cardTraderWishlistId)
+        }),
+      unlinkCustom: () =>
+        Effect.gen(function* () {
+          const user = yield* CurrentUser
+          yield* repository.unlinkCustom(user.id)
+        }),
+      linkDeck: ({ params: { deckId }, payload: { cardTraderWishlistId } }) =>
+        Effect.gen(function* () {
+          const user = yield* CurrentUser
+          yield* repository.linkDeck(user.id, deckId, cardTraderWishlistId)
+        }),
+      unlinkDeck: ({ params: { deckId } }) =>
+        Effect.gen(function* () {
+          const user = yield* CurrentUser
+          yield* repository.unlinkDeck(user.id, deckId)
         }),
     })
   }),

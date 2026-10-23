@@ -3,7 +3,7 @@ import { describe, expect, test } from 'vitest'
 
 import { Collection, Printing } from '../../../domain'
 import { Message } from './message'
-import { Model, Refresh, Save, init } from './model'
+import { Model, Save, init } from './model'
 import {
   LoadCollection,
   SaveQuantity,
@@ -11,7 +11,7 @@ import {
   change,
   ensureLoaded,
   failedSaveCount,
-  refresh,
+  retry,
   update,
 } from './update'
 
@@ -24,7 +24,6 @@ const ready = Model.Ready({
   owned: { [vi]: owned(1) },
   saves: {},
   nextRevision: 0,
-  refresh: Refresh.Idle(),
 })
 
 describe('loading the collection', () => {
@@ -54,7 +53,6 @@ describe('loading the collection', () => {
             owned: { [vi]: owned(2) },
             saves: {},
             nextRevision: 0,
-            refresh: Refresh.Idle(),
           }),
         )
       }),
@@ -166,29 +164,12 @@ describe('saving changes', () => {
   })
 })
 
-describe('refreshing', () => {
-  test('a refresh keeps changes that are not saved yet', () => {
-    const changed = change(ready, { printingId: jinx, quantity: quantity(2) })
-    const refreshing = refresh(changed.model)
-
-    expect(refreshing.commands?.map(({ name }) => name)).toStrictEqual([
-      LoadCollection.name,
-    ])
-
-    story(
-      update,
-      given(refreshing.model),
-      message(
-        Message.SucceededLoadCollection({
-          items: [{ printingId: vi, quantity: owned(5) }],
-        }),
-      ),
-      model(next => {
-        expect(next._tag === 'Ready' && next.owned).toStrictEqual({
-          [vi]: owned(5),
-          [jinx]: owned(2),
-        })
-      }),
-    )
+describe('retrying', () => {
+  test('only a failed load is retried', () => {
+    expect(retry(ready).commands).toBeUndefined()
+    expect(retry(Model.Loading()).commands).toBeUndefined()
+    expect(
+      retry(Model.Failed()).commands?.map(({ name }) => name),
+    ).toStrictEqual([LoadCollection.name])
   })
 })

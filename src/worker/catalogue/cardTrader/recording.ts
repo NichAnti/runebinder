@@ -14,11 +14,51 @@ import {
 
 import { CatalogueIssue } from '../issue'
 import { RejectedRecords, UnreadableRecording } from '../source'
-import { type Blueprint, BlueprintExport } from './schema'
+import { type Blueprint, BlueprintExport, ExpansionExport } from './schema'
 
 export const RECORDING_DIRECTORY = 'catalogue/recordings/cardtrader'
 
 const BLUEPRINT_FILE = /^blueprints-([a-z0-9]+)\.json$/
+
+const EXPANSION_FILE = 'expansions.json'
+
+const decodeExpansions = Schema.decodeUnknownEffect(
+  Schema.fromJsonString(ExpansionExport),
+  { onExcessProperty: 'error' },
+)
+
+export const readExpansionCodes = (directory: string) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem
+    const path = yield* Path.Path
+    const json = yield* fs.readFileString(path.join(directory, EXPANSION_FILE))
+    const expansions = yield* decodeExpansions(json).pipe(
+      Effect.mapError(
+        error =>
+          new RejectedRecords({
+            issues: [
+              CatalogueIssue.cases.InvalidRecord.make({
+                index: 0,
+                message: `${EXPANSION_FILE}: ${error.message}`,
+              }),
+            ],
+          }),
+      ),
+    )
+
+    return Record.fromEntries(
+      Array.map(expansions, ({ id, code }): readonly [string, string] => [
+        `${id}`,
+        code,
+      ]),
+    )
+  }).pipe(
+    Effect.catchTag('PlatformError', error =>
+      Effect.fail(
+        new UnreadableRecording({ message: globalThis.String(error) }),
+      ),
+    ),
+  )
 
 const decodeExport = Schema.decodeUnknownResult(
   Schema.fromJsonString(BlueprintExport),

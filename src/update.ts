@@ -154,6 +154,13 @@ const foldLoggedIn = Update.foldChild({
   toParentMessage: toLoggedInMessage,
 })
 
+const openCardTraderConnect = Update.foldChildStep({
+  update: LoggedIn.openConnect,
+  read: readLoggedIn,
+  write: writeLoggedIn,
+  toParentMessage: toLoggedInMessage,
+})
+
 const foldLoggedInRoute = Update.foldChild({
   update: LoggedIn.enterRoute,
   read: readLoggedIn,
@@ -190,10 +197,12 @@ export const enterRoute = (model: Model, route: AppRoute): UpdateReturn =>
             'Catalogue',
             'Card',
             'CardTrader',
-            'Collection',
             'Decks',
             'Deck',
-            'Wishlist',
+            'Wishlists',
+            'CustomWishlist',
+            'DeckWishlist',
+            'CardTraderWishlist',
             'NotFound',
             (route: LoggedInRoute) => foldLoggedInRoute(model, route),
           ),
@@ -230,6 +239,7 @@ export const update = (model: Model, message: Message) =>
     ChangedSystemTheme: ({ theme }) =>
       applyTheme(modifyFields(model, { systemTheme: () => theme })),
     ClickedSignOut: () => ({ model, commands: [SignOut()] }),
+    ClickedConnectCardTrader: () => openCardTraderConnect(model),
     GotLoggedOutMessage: ({ message }) => foldLoggedOut(model, message),
     GotLoggedInMessage: ({ message }) => foldLoggedIn(model, message),
     SucceededSignOut: () => ({

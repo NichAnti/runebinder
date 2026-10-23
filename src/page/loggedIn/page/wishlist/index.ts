@@ -1,5 +1,5 @@
 export { Message, OutMessage, Purchase } from './message'
-export { Model, init } from './model'
+export { Model, Pending, init } from './model'
 export { type Context, type Section, sectionsOf } from './sections'
 export {
   LoadCardToWish,
@@ -8,4 +8,4 @@ export {
   enter,
   update,
 } from './update'
-export { type ViewInputs, view } from './view'
+export { type Focus, type ViewInputs, view } from './view'

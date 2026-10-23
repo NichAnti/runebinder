@@ -20,4 +20,20 @@ describe('Link', () => {
       expect(role('link', { name: 'About' })).not.toHaveAttr('aria-current'),
     )
   })
+
+  test('an external link opens in a new tab', () => {
+    scene(
+      { update, view },
+      given(initialModel),
+      expect(role('link', { name: 'CardTrader' })).toHaveAttr(
+        'target',
+        '_blank',
+      ),
+      expect(role('link', { name: 'CardTrader' })).toHaveAttr(
+        'rel',
+        'noopener noreferrer',
+      ),
+      expect(role('link', { name: 'About' })).not.toHaveAttr('target'),
+    )
+  })
 })

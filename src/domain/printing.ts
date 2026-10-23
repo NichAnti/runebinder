@@ -71,6 +71,29 @@ export const CardTraderBlueprintId = Schema.Int.pipe(
 )
 export type CardTraderBlueprintId = typeof CardTraderBlueprintId.Type
 
+export const CardTraderSlug = Schema.String.check(
+  Schema.isPattern(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+).pipe(Schema.brand('CardTraderSlug'))
+export type CardTraderSlug = typeof CardTraderSlug.Type
+
+export const CardTraderExpansionCode = Schema.String.check(
+  Schema.isPattern(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+).pipe(Schema.brand('CardTraderExpansionCode'))
+export type CardTraderExpansionCode = typeof CardTraderExpansionCode.Type
+
+export const CardTraderBlueprint = Schema.Struct({
+  id: CardTraderBlueprintId,
+  metaName: CardTraderSlug,
+  expansionCode: CardTraderExpansionCode,
+})
+export type CardTraderBlueprint = typeof CardTraderBlueprint.Type
+
+export const cardTraderKey = ({
+  metaName,
+  expansionCode,
+}: Readonly<{ metaName: string; expansionCode: string }>): string =>
+  `${metaName}|${expansionCode}`
+
 export const Orientation = Schema.Literals(['Portrait', 'Landscape'])
 export type Orientation = typeof Orientation.Type
 
@@ -98,7 +121,7 @@ export const Printing = Schema.Struct({
   imageUrl: Schema.String,
   maybeAccessibilityText: Schema.Option(Schema.String),
   orientation: Orientation,
-  maybeCardTraderBlueprintId: Schema.Option(CardTraderBlueprintId),
+  maybeCardTrader: Schema.Option(CardTraderBlueprint),
 })
 export type Printing = typeof Printing.Type
 
@@ -108,7 +131,7 @@ export const Card = Schema.Struct({
 })
 export type Card = typeof Card.Type
 
-const slugify = (text: string): string =>
+export const slugify = (text: string): string =>
   pipe(
     text,
     String.normalize('NFKD'),

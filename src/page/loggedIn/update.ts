@@ -3,10 +3,9 @@ import { Command, Update } from 'foldkit'
 import { pushUrl, replaceUrl } from 'foldkit/navigation'
 import { modifyFields } from 'foldkit/struct'
 
-import { Collection, Deck, Printing } from '../../domain'
+import { Collection, Deck, Printing, Wishlist } from '../../domain'
 import {
   type CatalogueRoute,
-  type CollectionRoute,
   type LoggedInRoute,
   deckRouter,
   decksRouter,
@@ -17,12 +16,14 @@ import type {
   CatalogueIndexService,
   TokenStore,
 } from '../../service'
+import * as CardTraderState from './cardTrader'
+import * as CardTraderWishlists from './cardTraderWishlists'
 import * as CollectionState from './collection'
 import * as DecksState from './decks'
 import { Message } from './message'
 import { CatalogueState, type Model } from './model'
 import * as CardPage from './page/card'
-import * as CardTraderPage from './page/cardTrader'
+import * as CardTraderWishlistPage from './page/cardTraderWishlist'
 import * as CataloguePage from './page/catalogue'
 import * as DeckPage from './page/deck'
 import * as DeckListPage from './page/deckList'
@@ -47,38 +48,34 @@ type CardPageEntry = Readonly<{
   isIndexReady: boolean
 }>
 
+export const wantedOf = (model: Model): Option.Option<Wishlist.Wanted> =>
+  model.decks._tag === 'Ready' &&
+  model.collection._tag === 'Ready' &&
+  model.wishlist._tag === 'Ready'
+    ? Option.some(
+        Wishlist.wantedOf(
+          model.decks.decks,
+          model.collection.owned,
+          model.wishlist.added,
+        ),
+      )
+    : Option.none()
+
 export const contextOf = (
-  { _tag, ...query }: CatalogueRoute | CollectionRoute,
-  collection: CollectionState.Model,
-): CataloguePage.Context => {
-  const maybeOwned = CollectionState.maybeOwned(collection)
+  { _tag, ...query }: CatalogueRoute,
+  model: Model,
+): CataloguePage.Context => ({
+  query,
+  maybeOwned: CollectionState.maybeOwned(model.collection),
+  maybeWanted: wantedOf(model),
+})
 
-  return _tag === 'Collection'
-    ? { scope: 'Collection', query: { ...query, ownership: 'All' }, maybeOwned }
-    : { scope: 'Catalogue', query, maybeOwned }
-}
-
-type CataloguePageSlot = Readonly<{
-  read: (model: Model) => Option.Option<CataloguePage.Model>
-  write: (model: Model, nextPage: CataloguePage.Model) => Model
-  toParentMessage: (message: CataloguePage.Message) => Message
-}>
-
-const CATALOGUE_PAGE_SLOTS: Readonly<
-  Record<CataloguePage.Scope, CataloguePageSlot>
-> = {
-  Catalogue: {
-    read: model => Option.some(model.cataloguePage),
-    write: (model, nextPage) =>
-      modifyFields(model, { cataloguePage: () => nextPage }),
-    toParentMessage: message => Message.GotCataloguePageMessage({ message }),
-  },
-  Collection: {
-    read: model => Option.some(model.collectionPage),
-    write: (model, nextPage) =>
-      modifyFields(model, { collectionPage: () => nextPage }),
-    toParentMessage: message => Message.GotCollectionPageMessage({ message }),
-  },
+const cataloguePageSlot = {
+  read: (model: Model) => Option.some(model.cataloguePage),
+  write: (model: Model, nextPage: CataloguePage.Model): Model =>
+    modifyFields(model, { cataloguePage: () => nextPage }),
+  toParentMessage: (message: CataloguePage.Message) =>
+    Message.GotCataloguePageMessage({ message }),
 }
 
 const readCardPage = (model: Model) => Option.some(model.cardPage)
@@ -87,26 +84,25 @@ const writeCardPage = (model: Model, nextCardPage: CardPage.Model): Model =>
 const toCardPageMessage = (message: CardPage.Message): Message =>
   Message.GotCardPageMessage({ message })
 
-const foldCataloguePageEntry = (entry: CataloguePageEntry) =>
-  Update.foldChild({
-    update: (
-      page: CataloguePage.Model,
-      { context, isIndexReady }: CataloguePageEntry,
-    ) => CataloguePage.enter(page, context, isIndexReady),
-    ...CATALOGUE_PAGE_SLOTS[entry.context.scope],
-  })(entry)
+const foldCataloguePageEntry = Update.foldChild({
+  update: (
+    page: CataloguePage.Model,
+    { context, isIndexReady }: CataloguePageEntry,
+  ) => CataloguePage.enter(page, context, isIndexReady),
+  ...cataloguePageSlot,
+})
 
 const foldCataloguePageOutMessage = CataloguePage.OutMessage.match<
   Update.Step<Model, Message, ApiClient>
 >({
   SteppedQuantity: stepped => stepQuantity(stepped),
-  RequestedCollectionRetry: () => refreshCollection,
+  RequestedCollectionRetry: () => retryCollection,
 })
 
 const foldCataloguePage = (context: CataloguePage.Context) =>
   Update.foldChild({
     update: CataloguePage.update(context),
-    ...CATALOGUE_PAGE_SLOTS[context.scope],
+    ...cataloguePageSlot,
     foldOutMessage: foldCataloguePageOutMessage,
   })
 
@@ -122,7 +118,7 @@ const foldCardPageOutMessage = CardPage.OutMessage.match<
   Update.Step<Model, Message, Requirements>
 >({
   SteppedQuantity: stepped => stepQuantity(stepped),
-  RequestedCollectionRetry: () => refreshCollection,
+  RequestedCollectionRetry: () => retryCollection,
   AddedToWishlist: ({ printingId }) => stepWishlist({ printingId, step: 1 }),
 })
 
@@ -134,27 +130,87 @@ const foldCardPage = Update.foldChild({
   foldOutMessage: foldCardPageOutMessage,
 })
 
-const readCardTraderPage = (model: Model) => Option.some(model.cardTraderPage)
-const writeCardTraderPage = (
-  model: Model,
-  nextCardTraderPage: CardTraderPage.Model,
-): Model => modifyFields(model, { cardTraderPage: () => nextCardTraderPage })
-const toCardTraderPageMessage = (message: CardTraderPage.Message): Message =>
-  Message.GotCardTraderPageMessage({ message })
+// CARDTRADER
 
-const enterCardTraderPage = Update.foldChildStep({
-  update: CardTraderPage.enter,
-  read: readCardTraderPage,
-  write: writeCardTraderPage,
-  toParentMessage: toCardTraderPageMessage,
+const cardTraderFold = {
+  read: (model: Model) => Option.some(model.cardTrader),
+  write: (model: Model, nextCardTrader: CardTraderState.Model): Model =>
+    modifyFields(model, { cardTrader: () => nextCardTrader }),
+  toParentMessage: (message: CardTraderState.Message) =>
+    Message.GotCardTraderMessage({ message }),
+}
+
+const foldCardTrader = Update.foldChild({
+  update: CardTraderState.update,
+  ...cardTraderFold,
+})
+const ensureCardTraderChecked = Update.foldChildStep({
+  update: CardTraderState.ensureChecked,
+  ...cardTraderFold,
+})
+const verifyCardTrader = Update.foldChildStep({
+  update: CardTraderState.verify,
+  ...cardTraderFold,
+})
+const rejectCardTraderToken = Update.foldChildStep({
+  update: CardTraderState.rejectToken,
+  ...cardTraderFold,
+})
+export const openConnect = Update.foldChildStep({
+  update: CardTraderState.open,
+  ...cardTraderFold,
 })
 
-const foldCardTraderPage = Update.foldChild({
-  update: CardTraderPage.update,
-  read: readCardTraderPage,
-  write: writeCardTraderPage,
-  toParentMessage: toCardTraderPageMessage,
+const isConnected = (model: Model): boolean =>
+  CardTraderState.isConnected(model.cardTrader)
+
+const whenConnected =
+  <R>(step: Update.Step<Model, Message, R>): Update.Step<Model, Message, R> =>
+  stepModel =>
+    isConnected(stepModel) ? step(stepModel) : { model: stepModel }
+
+const remoteFold = {
+  read: (model: Model) => Option.some(model.cardTraderWishlists),
+  write: (model: Model, nextRemote: CardTraderWishlists.Model): Model =>
+    modifyFields(model, { cardTraderWishlists: () => nextRemote }),
+  toParentMessage: (message: CardTraderWishlists.Message) =>
+    Message.GotCardTraderWishlistsMessage({ message }),
+}
+
+const foldRemote = Update.foldChild({
+  update: CardTraderWishlists.update,
+  ...remoteFold,
 })
+const ensureListed = Update.foldChildStep({
+  update: CardTraderWishlists.ensureListed,
+  ...remoteFold,
+})
+const refreshRemote = Update.foldChildStep({
+  update: CardTraderWishlists.refresh,
+  ...remoteFold,
+})
+const ensureShown = Update.foldChild({
+  update: CardTraderWishlists.ensureShown,
+  ...remoteFold,
+})
+const deleteRemote = Update.foldChild({
+  update: CardTraderWishlists.remove,
+  ...remoteFold,
+})
+
+const withRemote =
+  (
+    f: (remote: CardTraderWishlists.Model) => CardTraderWishlists.Model,
+  ): Update.Step<Model, Message> =>
+  stepModel => ({
+    model: modifyFields(stepModel, { cardTraderWishlists: f }),
+  })
+
+const forgetRemoteWhenDisconnected: Update.Step<Model, Message> = stepModel =>
+  isConnected(stepModel) ||
+  stepModel.cardTraderWishlists.listing._tag === 'NotLoaded'
+    ? { model: stepModel }
+    : withRemote(CardTraderWishlists.reset)(stepModel)
 
 const readCollection = (model: Model) => Option.some(model.collection)
 const writeCollection = (
@@ -185,8 +241,8 @@ const stepQuantity = Update.foldChild({
   toParentMessage: toCollectionMessage,
 })
 
-const refreshCollection = Update.foldChildStep({
-  update: CollectionState.refresh,
+const retryCollection = Update.foldChildStep({
+  update: CollectionState.retry,
   read: readCollection,
   write: writeCollection,
   toParentMessage: toCollectionMessage,
@@ -273,8 +329,6 @@ const foldDeckPageOutMessage = DeckPage.OutMessage.match<
   Update.Step<Model, Message, Requirements>
 >({
   EditedDeck: edits => editDeck(edits),
-  RequestedSendMissing: ({ deckId, deckName, lines }) =>
-    sendWishlist({ target: { _tag: 'Deck', deckId, deckName }, lines }),
   RequestedRemoveDeck: ({ deckId }) => removeDeck(deckId),
   RequestedRetryLoadDecks: () => retryDecks,
 })
@@ -333,8 +387,20 @@ const stepWishlist = Update.foldChild({
   update: WishlistState.step,
   ...wishlistFold,
 })
-const sendWishlist = Update.foldChild({
-  update: WishlistState.send,
+const createWishlist = Update.foldChild({
+  update: WishlistState.create,
+  ...wishlistFold,
+})
+const syncWishlist = Update.foldChild({
+  update: WishlistState.sync,
+  ...wishlistFold,
+})
+const removeWishlist = Update.foldChild({
+  update: WishlistState.remove,
+  ...wishlistFold,
+})
+const importIntoWishlist = Update.foldChild({
+  update: WishlistState.addAll,
   ...wishlistFold,
 })
 
@@ -401,7 +467,12 @@ const foldWishlistPageOutMessage = WishlistPage.OutMessage.match<
   Update.Step<Model, Message, Requirements>
 >({
   SteppedAdded: stepped => stepWishlist(stepped),
-  RequestedSend: request => sendWishlist(request),
+  RequestedCreate: outgoing => createWishlist(outgoing),
+  RequestedSync: outgoing => syncWishlist(outgoing),
+  RequestedDelete: ({ wishlist }) => removeWishlist(wishlist),
+  RequestedDeleteRemote: ({ wishlistId }) => deleteRemote(wishlistId),
+  RequestedConnect: () => openConnect,
+  RequestedRefreshRemote: () => refreshRemote,
   MarkedBought: ({ purchases }) =>
     Update.combine<Model, Message, Requirements>(
       Array.map(purchases, recordPurchase),
@@ -409,7 +480,7 @@ const foldWishlistPageOutMessage = WishlistPage.OutMessage.match<
   RequestedRetry: () => stepModel =>
     Update.combine<Model, Message, Requirements>(stepModel, [
       retryDecks,
-      refreshCollection,
+      retryCollection,
       retryWishlist,
     ]),
 })
@@ -448,77 +519,187 @@ const enterWishlistPage: Update.Step<
       })(stepModel),
   })
 
+const cardTraderWishlistPageSlot = {
+  read: (model: Model) => Option.some(model.cardTraderWishlistPage),
+  write: (model: Model, nextPage: CardTraderWishlistPage.Model): Model =>
+    modifyFields(model, { cardTraderWishlistPage: () => nextPage }),
+  toParentMessage: (message: CardTraderWishlistPage.Message) =>
+    Message.GotCardTraderWishlistPageMessage({ message }),
+}
+
+const foldCardTraderWishlistPage = (
+  wishlistId: Wishlist.CardTraderWishlistId,
+) =>
+  Update.foldChild({
+    update: CardTraderWishlistPage.update,
+    ...cardTraderWishlistPageSlot,
+    foldOutMessage: CardTraderWishlistPage.OutMessage.match<
+      Update.Step<Model, Message, Requirements>
+    >({
+      Imported: ({ items }) => importIntoWishlist(items),
+      RequestedConnect: () => openConnect,
+      RequestedRetry: () => ensureShown(wishlistId),
+    }),
+  })
+
+const enterCardTraderWishlistPage =
+  (
+    wishlistId: Wishlist.CardTraderWishlistId,
+  ): Update.Step<Model, Message, CatalogueIndexService> =>
+  stepModel =>
+    Update.foldChildStep({
+      update: (page: CardTraderWishlistPage.Model) =>
+        CardTraderWishlistPage.enter(
+          page,
+          Option.flatMap(
+            CardTraderWishlists.detailOf(
+              stepModel.cardTraderWishlists,
+              wishlistId,
+            ),
+            detail =>
+              detail._tag === 'Ready'
+                ? Option.some(detail.wishlist)
+                : Option.none(),
+          ),
+          stepModel.catalogue._tag === 'Ready',
+        ),
+      ...cardTraderWishlistPageSlot,
+    })(stepModel)
+
 // ROUTE
 
-export const enterRoute = (
-  model: Model,
-  route: LoggedInRoute,
-): UpdateReturn => {
-  const routed = modifyFields(model, { route: () => route })
-  const isIndexReady = routed.catalogue._tag === 'Ready'
+const enterWishlistRoute = (
+  routed: Model,
+  steps: ReadonlyArray<Update.Step<Model, Message, Requirements>>,
+): UpdateReturn =>
+  Update.combine<Model, Message, Requirements>(routed, [
+    ensureDecks,
+    ensureCollection,
+    ensureWishlist,
+    enterWishlistPage,
+    ...steps,
+  ])
+
+const enterPage = (model: Model, route: LoggedInRoute): UpdateReturn => {
+  const isIndexReady = model.catalogue._tag === 'Ready'
 
   return Match.value(route).pipe(
     withUpdateReturn,
     Match.tagsExhaustive({
       Catalogue: catalogueRoute =>
-        Update.combine<Model, Message, ApiClient | CatalogueIndexService>(
-          routed,
-          [
-            foldCataloguePageEntry({
-              context: contextOf(catalogueRoute, routed.collection),
-              isIndexReady,
-            }),
-            ensureCollection,
-          ],
-        ),
-      Collection: collectionRoute =>
-        Update.combine<Model, Message, ApiClient | CatalogueIndexService>(
-          routed,
-          [
-            foldCataloguePageEntry({
-              context: contextOf(collectionRoute, routed.collection),
-              isIndexReady,
-            }),
-            ensureCollection,
-          ],
-        ),
+        Update.combine<Model, Message, Requirements>(model, [
+          foldCataloguePageEntry({
+            context: contextOf(catalogueRoute, model),
+            isIndexReady,
+          }),
+          ensureCollection,
+          ensureDecks,
+          ensureWishlist,
+        ]),
       Card: ({ cardId }) =>
-        Update.combine<Model, Message, Requirements>(routed, [
+        Update.combine<Model, Message, Requirements>(model, [
           foldCardPageEntry({ cardId, isIndexReady }),
           ensureCollection,
           ensureWishlist,
           ensureDecks,
         ]),
-      CardTrader: () => enterCardTraderPage(routed),
-      Decks: () => ensureDecks(routed),
+      CardTrader: () => verifyCardTrader(model),
+      Decks: () => ensureDecks(model),
       Deck: ({ deckId }) =>
-        Update.combine<Model, Message, Requirements>(routed, [
+        Update.combine<Model, Message, Requirements>(model, [
           ensureDecks,
           ensureCollection,
           ensureWishlist,
           enterDeckPage(deckId),
         ]),
-      Wishlist: () =>
-        Update.combine<Model, Message, Requirements>(routed, [
-          ensureDecks,
-          ensureCollection,
+      Wishlists: () => enterWishlistRoute(model, [whenConnected(ensureListed)]),
+      CustomWishlist: () => enterWishlistRoute(model, []),
+      DeckWishlist: () => enterWishlistRoute(model, []),
+      CardTraderWishlist: ({ wishlistId }) =>
+        Update.combine<Model, Message, Requirements>(model, [
           ensureWishlist,
-          enterWishlistPage,
+          whenConnected(stepModel => ensureShown(stepModel, wishlistId)),
+          enterCardTraderWishlistPage(wishlistId),
         ]),
-      NotFound: () => ({ model: routed }),
+      NotFound: () => ({ model }),
     }),
   )
 }
 
+export const enterRoute = (model: Model, route: LoggedInRoute): UpdateReturn =>
+  Update.combine<Model, Message, Requirements>(
+    modifyFields(model, { route: () => route }),
+    [ensureCardTraderChecked, stepModel => enterPage(stepModel, route)],
+  )
+
+const reenterRoute: Update.Step<Model, Message, Requirements> = stepModel =>
+  enterRoute(stepModel, stepModel.route)
+
 // UPDATE
 
+const isWishlistRoute = (route: LoggedInRoute): boolean =>
+  route._tag === 'Wishlists' ||
+  route._tag === 'CustomWishlist' ||
+  route._tag === 'DeckWishlist'
+
+const isWantedView = (route: LoggedInRoute): boolean =>
+  route._tag === 'Catalogue' && route.ownership === 'Wanted'
+
 const isWaitingForDecks = (route: LoggedInRoute): boolean =>
-  route._tag === 'Deck' || route._tag === 'Wishlist'
+  route._tag === 'Deck' || isWishlistRoute(route) || isWantedView(route)
 
 const isWaitingForCollection = (route: LoggedInRoute): boolean =>
-  route._tag === 'Collection' ||
-  route._tag === 'Wishlist' ||
+  isWishlistRoute(route) ||
   (route._tag === 'Catalogue' && route.ownership !== 'All')
+
+const isConnectedNow = (message: CardTraderState.Message): boolean =>
+  message._tag === 'FoundStoredToken' ||
+  message._tag === 'SucceededConnectCardTrader'
+
+const remoteChangeOf = (
+  message: WishlistState.Message,
+): Option.Option<Update.Step<Model, Message, Requirements>> => {
+  if (message._tag === 'SucceededCreateOnCardTrader') {
+    return Option.some(
+      withRemote(remote =>
+        CardTraderWishlists.added(remote, {
+          id: message.cardTraderWishlistId,
+          name: message.name,
+        }),
+      ),
+    )
+  } else if (message._tag === 'SucceededSyncOnCardTrader') {
+    return Option.some(
+      withRemote(remote => {
+        const withNew = CardTraderWishlists.added(remote, {
+          id: message.cardTraderWishlistId,
+          name: message.name,
+        })
+        return message.isPreviousDeleted
+          ? CardTraderWishlists.removed(withNew, message.previousId)
+          : withNew
+      }),
+    )
+  } else if (message._tag === 'SucceededDeleteOnCardTrader') {
+    return Option.some(
+      withRemote(remote =>
+        CardTraderWishlists.removed(remote, message.cardTraderWishlistId),
+      ),
+    )
+  } else if (
+    message._tag === 'FailedCardTraderOperation' &&
+    message.reason === 'InvalidToken'
+  ) {
+    return Option.some(
+      Update.combine<Model, Message, CardTraderClient | TokenStore>([
+        rejectCardTraderToken,
+        forgetRemoteWhenDisconnected,
+      ]),
+    )
+  } else {
+    return Option.none()
+  }
+}
 
 const attemptOf = (state: CatalogueState): number =>
   CatalogueState.match(state, {
@@ -533,32 +714,40 @@ export const update = (model: Model, message: Message) =>
       Match.value(model.route).pipe(
         withUpdateReturn,
         Match.tag('Catalogue', catalogueRoute =>
-          foldCataloguePage(contextOf(catalogueRoute, model.collection))(
-            model,
-            message,
-          ),
+          foldCataloguePage(contextOf(catalogueRoute, model))(model, message),
         ),
         Match.orElse(() => ({ model })),
       ),
-
-    GotCollectionPageMessage: ({ message }) =>
-      Match.value(model.route).pipe(
-        withUpdateReturn,
-        Match.tag('Collection', collectionRoute =>
-          foldCataloguePage(contextOf(collectionRoute, model.collection))(
-            model,
-            message,
-          ),
-        ),
-        Match.orElse(() => ({ model })),
-      ),
-
-    ClickedRefreshCollection: () => refreshCollection(model),
 
     GotCardPageMessage: ({ message }) => foldCardPage(model, message),
 
-    GotCardTraderPageMessage: ({ message }) =>
-      foldCardTraderPage(model, message),
+    GotCardTraderMessage: ({ message }) =>
+      Update.combine<Model, Message, Requirements>(model, [
+        foldCardTrader(message),
+        forgetRemoteWhenDisconnected,
+        ...(isConnectedNow(message) ? [reenterRoute] : []),
+      ]),
+
+    GotCardTraderWishlistsMessage: ({ message }) =>
+      Update.combine<Model, Message, Requirements>(model, [
+        foldRemote(message),
+        ...(CardTraderWishlists.isRejected(message)
+          ? [rejectCardTraderToken, forgetRemoteWhenDisconnected]
+          : []),
+        ...(message._tag === 'SucceededShowWishlist' &&
+        model.route._tag === 'CardTraderWishlist'
+          ? [reenterRoute]
+          : []),
+      ]),
+
+    GotCardTraderWishlistPageMessage: ({ message }) =>
+      Match.value(model.route).pipe(
+        withUpdateReturn,
+        Match.tag('CardTraderWishlist', ({ wishlistId }) =>
+          foldCardTraderWishlistPage(wishlistId)(model, message),
+        ),
+        Match.orElse(() => ({ model })),
+      ),
 
     AcquiredCatalogueIndex: ({ allValues, printingSets }) =>
       enterRoute(
@@ -587,7 +776,7 @@ export const update = (model: Model, message: Message) =>
       isWaitingForCollection(model.route)
         ? Update.combine<Model, Message, Requirements>(model, [
             foldCollection(message),
-            stepModel => enterRoute(stepModel, stepModel.route),
+            reenterRoute,
           ])
         : foldCollection(model, message),
 
@@ -595,7 +784,7 @@ export const update = (model: Model, message: Message) =>
       message._tag === 'SucceededLoadDecks' && isWaitingForDecks(model.route)
         ? Update.combine<Model, Message, Requirements>(model, [
             foldDecks(message),
-            stepModel => enterRoute(stepModel, stepModel.route),
+            reenterRoute,
           ])
         : foldDecks(model, message),
 
@@ -614,13 +803,14 @@ export const update = (model: Model, message: Message) =>
       ),
 
     GotWishlistMessage: ({ message }) =>
-      message._tag === 'SucceededLoadWishlist' &&
-      model.route._tag === 'Wishlist'
-        ? Update.combine<Model, Message, Requirements>(model, [
-            foldWishlist(message),
-            stepModel => enterRoute(stepModel, stepModel.route),
-          ])
-        : foldWishlist(model, message),
+      Update.combine<Model, Message, Requirements>(model, [
+        foldWishlist(message),
+        ...Option.toArray(remoteChangeOf(message)),
+        ...(message._tag === 'SucceededLoadWishlist' &&
+        (isWishlistRoute(model.route) || isWantedView(model.route))
+          ? [reenterRoute]
+          : []),
+      ]),
 
     GotWishlistPageMessage: ({ message }) =>
       Option.match(wishlistContextOf(model), {

@@ -19,7 +19,6 @@ import { testCard } from '../../../../testing'
 import * as CardPanel from '../../cardPanel'
 import * as CollectionState from '../../collection'
 import * as DecksState from '../../decks'
-import * as WishlistState from '../../wishlist'
 import { OutMessage } from './message'
 import { type AddTab, init } from './model'
 import { update } from './update'
@@ -49,7 +48,6 @@ const sceneView = withViewInputs(view, {
   decks,
   deckId: deck.id,
   collection: CollectionState.init(),
-  sending: WishlistState.Sending.Idle(),
 })
 const loaded = modifyFields(init(), {
   maybeDeckId: () => Option.some(deck.id),
@@ -190,7 +188,6 @@ describe('deck page', () => {
           decks,
           deckId: Deck.DeckId.make('00000000-0000-4000-8000-000000000000'),
           collection: CollectionState.init(),
-          sending: WishlistState.Sending.Idle(),
         })(),
       },
       given(init()),

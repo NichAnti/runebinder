@@ -7,28 +7,31 @@ import {
   CatalogueSearch,
   Collection,
   Printing,
+  Wishlist,
 } from '../../../../domain'
-import { catalogueHome } from '../../../../route'
 import {
   Button,
   Disclosure,
   FilterChip,
-  Link,
   Notice,
   RangeFilter,
   SearchField,
+  SegmentedControl,
   Select,
 } from '../../../../ui'
 import * as CardPanel from '../../cardPanel'
 import * as CollectionState from '../../collection'
 import { Message } from './message'
-import { type Model, Results, type Scope } from './model'
+import { type Model, Results } from './model'
+import { summaryView } from './summaryView'
+import { wantedSummaryView } from './wantedSummaryView'
 
 export type ViewInputs = Readonly<{
-  scope: Scope
   query: CatalogueQuery.Query
   allValues: CatalogueSearch.Facets
+  printingSets: Collection.PrintingSets
   collection: CollectionState.Model
+  maybeWanted: Option.Option<Wishlist.Wanted>
 }>
 
 const COLLAPSED_TAG_COUNT = 20
@@ -244,18 +247,6 @@ const activeFiltersView = (
                 ),
             ),
           ),
-          ...(inputs.query.ownership === 'All'
-            ? []
-            : [
-                Button.view(
-                  {
-                    content: [`${OWNERSHIP_LABELS[inputs.query.ownership]} ×`],
-                    variant: 'Secondary',
-                    onClick: Message.SelectedOwnership({ value: 'All' }),
-                  },
-                  h,
-                ),
-              ]),
           Button.view(
             {
               content: ['Clear filters'],
@@ -269,21 +260,20 @@ const activeFiltersView = (
 
 const OWNERSHIP_LABELS: Readonly<Record<CatalogueQuery.Ownership, string>> = {
   All: 'All cards',
-  Owned: 'Owned',
-  NotOwned: 'Not owned',
+  Owned: 'My collection',
+  Wanted: 'Wanted',
 }
 
 const ownershipView = (inputs: ViewInputs, h: HtmlBuilder<Message>): Html =>
-  Select.view(
+  SegmentedControl.view(
     {
-      id: 'catalogue-ownership',
       label: 'Show',
-      value: inputs.query.ownership,
-      options: Array.map(CatalogueQuery.Ownership.literals, ownership => ({
+      choices: Array.map(CatalogueQuery.Ownership.literals, ownership => ({
         value: ownership,
         label: OWNERSHIP_LABELS[ownership],
       })),
-      onChange: value => Message.SelectedOwnership({ value }),
+      selected: inputs.query.ownership,
+      onSelect: value => Message.SelectedOwnership({ value }),
     },
     h,
   )
@@ -295,16 +285,24 @@ const printingCountText = (
     ? '1 printing'
     : `${Array.length(printingIds)} printings`
 
-const ownedText = (
-  collection: CollectionState.Model,
+const highlightsOf = (
+  { collection, maybeWanted }: ViewInputs,
   printingIds: ReadonlyArray<Printing.PrintingId>,
-): Option.Option<string> =>
-  pipe(
-    CollectionState.maybeOwned(collection),
-    Option.map(owned => Collection.totalOf(owned, printingIds)),
-    Option.filter(total => total > 0),
-    Option.map(total => `Owned ${total}`),
-  )
+): ReadonlyArray<string> =>
+  Array.getSomes([
+    pipe(
+      CollectionState.maybeOwned(collection),
+      Option.map(owned => Collection.totalOf(owned, printingIds)),
+      Option.filter(total => total > 0),
+      Option.map(total => `Owned ${total}`),
+    ),
+    pipe(
+      maybeWanted,
+      Option.map(wanted => Wishlist.wantedCopiesOf(wanted, printingIds)),
+      Option.filter(total => total > 0),
+      Option.map(total => `Need ${total}`),
+    ),
+  ])
 
 const sortView = (inputs: ViewInputs, h: HtmlBuilder<Message>): Html => {
   const current = CatalogueQuery.effectiveSort(inputs.query)
@@ -331,20 +329,19 @@ const sortView = (inputs: ViewInputs, h: HtmlBuilder<Message>): Html => {
 const isUnfiltered = (query: CatalogueQuery.Query): boolean =>
   Option.isNone(query.q) && CatalogueQuery.activeFilterCount(query) === 0
 
-const noResultsView = (
-  { scope, query }: ViewInputs,
-  h: HtmlBuilder<Message>,
-): Html =>
-  scope === 'Collection' && isUnfiltered(query)
+const noResultsView = ({ query }: ViewInputs, h: HtmlBuilder<Message>): Html =>
+  query.ownership === 'Owned' && isUnfiltered(query)
     ? Notice.view(
         {
           title: 'Your collection is empty',
-          description: [
-            'Open a card in the catalogue and use + on the printings you own.',
-          ],
+          description: ['Open a card and use + on the printings you own.'],
           actions: [
-            Link.view(
-              { href: catalogueHome(), content: ['Go to the catalogue'] },
+            Button.view(
+              {
+                content: ['Show all cards'],
+                variant: 'Secondary',
+                onClick: Message.SelectedOwnership({ value: 'All' }),
+              },
               h,
             ),
           ],
@@ -422,8 +419,8 @@ const resultsView = (
                               maybeSubtitle: card.maybeSubtitle,
                               domains: card.domains,
                               meta: printingCountText(card.printingIds),
-                              maybeHighlight: ownedText(
-                                inputs.collection,
+                              highlights: highlightsOf(
+                                inputs,
                                 card.printingIds,
                               ),
                             },
@@ -457,6 +454,30 @@ const resultsView = (
       }),
   })
 
+const viewSummaryView = (inputs: ViewInputs, h: HtmlBuilder<Message>): Html =>
+  Match.value(inputs.query.ownership).pipe(
+    Match.withReturnType<Html>(),
+    Match.when('All', () => h.empty),
+    Match.when('Owned', () =>
+      summaryView(
+        {
+          collection: inputs.collection,
+          printingSets: inputs.printingSets,
+          onRetry: Message.ClickedRetryCollection(),
+        },
+        h,
+      ),
+    ),
+    Match.when('Wanted', () =>
+      Option.match(inputs.maybeWanted, {
+        onNone: () =>
+          Notice.view({ title: 'Loading what you need…', description: [] }, h),
+        onSome: wanted => wantedSummaryView(wanted, h),
+      }),
+    ),
+    Match.exhaustive,
+  )
+
 const countText = (model: Model): string =>
   Results.match(model.results, {
     Waiting: () => 'Searching…',
@@ -474,9 +495,14 @@ export const view = Submodel.defineView<Model, Message, ViewInputs>(
         h.div(
           [h.Class('flex flex-col gap-3')],
           [
-            inputs.scope === 'Catalogue'
-              ? h.h1([h.Class('text-2xl font-semibold')], ['Catalogue'])
-              : h.h2([h.Class('text-lg font-semibold')], ['Your cards']),
+            h.div(
+              [h.Class('flex flex-wrap items-center justify-between gap-3')],
+              [
+                h.h1([h.Class('text-2xl font-semibold')], ['Cards']),
+                ownershipView(inputs, h),
+              ],
+            ),
+            viewSummaryView(inputs, h),
             SearchField.view(
               {
                 id: 'catalogue-search',
@@ -537,12 +563,7 @@ export const view = Submodel.defineView<Model, Message, ViewInputs>(
                     ),
                     h.div(
                       [h.Class('flex flex-wrap items-center gap-3')],
-                      [
-                        ...(inputs.scope === 'Catalogue'
-                          ? [ownershipView(inputs, h)]
-                          : []),
-                        sortView(inputs, h),
-                      ],
+                      [sortView(inputs, h)],
                     ),
                   ],
                 ),

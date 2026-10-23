@@ -6,7 +6,10 @@ import { modifyFields } from 'foldkit/struct'
 
 import * as Checkbox from './checkbox'
 
-export const Model = Schema.Struct({ isRemembered: Schema.Boolean })
+export const Model = Schema.Struct({
+  isRemembered: Schema.Boolean,
+  isDisabled: Schema.Boolean,
+})
 export type Model = typeof Model.Type
 
 export const Message = defineMessageUnion({
@@ -14,7 +17,7 @@ export const Message = defineMessageUnion({
 })
 export type Message = typeof Message.Type
 
-export const initialModel: Model = { isRemembered: false }
+export const initialModel: Model = { isRemembered: false, isDisabled: false }
 
 export const update = (model: Model, message: Message) =>
   Message.match<Update.Return<Model, Message>>(message, {
@@ -31,6 +34,7 @@ export const view = (model: Model, h: HtmlBuilder<Message>): Html =>
       description: 'Otherwise it is forgotten when this tab closes.',
       isChecked: model.isRemembered,
       onToggle: isChecked => Message.ToggledRemember({ isChecked }),
+      isDisabled: model.isDisabled,
     },
     h,
   )

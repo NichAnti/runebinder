@@ -47,14 +47,6 @@ export const Message = defineMessageUnion({
   ClickedClearLegend: {},
   ClickedClearChampion: {},
   ClickedRemoveAdditionalLegend: { position: Schema.Int },
-  ClickedSendMissing: {
-    lines: Schema.NonEmptyArray(
-      Schema.Struct({
-        blueprintId: Printing.CardTraderBlueprintId,
-        quantity: Schema.Int,
-      }),
-    ),
-  },
   ClickedCopyCode: {},
   CompletedCopyDeckCode: { code: DeckCode.DeckCode },
   FailedCopyDeckCode: { code: DeckCode.DeckCode },
@@ -71,16 +63,6 @@ export const OutMessage = defineMessageUnion({
     edits: Schema.NonEmptyArray(DeckEdit.DeckEdit),
   },
   RequestedRemoveDeck: { deckId: Deck.DeckId },
-  RequestedSendMissing: {
-    deckId: Deck.DeckId,
-    deckName: Schema.String,
-    lines: Schema.NonEmptyArray(
-      Schema.Struct({
-        blueprintId: Printing.CardTraderBlueprintId,
-        quantity: Schema.Int,
-      }),
-    ),
-  },
   RequestedRetryLoadDecks: {},
 })
 export type OutMessage = typeof OutMessage.Type

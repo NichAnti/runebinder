@@ -268,6 +268,7 @@ const foundView = (
             Message.ClickedStepQuantity({ printingId, step }),
           onRetry: Message.ClickedRetryCollection(),
           isShowingImages: true,
+          isLinkingCardTrader: true,
         },
         h,
       ),

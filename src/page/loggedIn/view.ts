@@ -2,21 +2,24 @@ import { Match, Option } from 'effect'
 import { Submodel } from 'foldkit'
 import type { Html, HtmlBuilder } from 'foldkit/html'
 
+import { Wishlist } from '../../domain'
 import { catalogueHome } from '../../route'
 import { Button, Notice } from '../../ui'
 import * as NotFound from '../notFound'
+import * as CardTraderState from './cardTrader'
+import * as CardTraderWishlists from './cardTraderWishlists'
 import * as CollectionState from './collection'
 import * as DecksState from './decks'
 import { Message } from './message'
 import { CatalogueState, type Model } from './model'
 import * as CardPage from './page/card'
 import * as CardTraderPage from './page/cardTrader'
+import * as CardTraderWishlistPage from './page/cardTraderWishlist'
 import * as CataloguePage from './page/catalogue'
-import * as CollectionPage from './page/collection'
 import * as DeckPage from './page/deck'
 import * as DeckListPage from './page/deckList'
 import * as WishlistPage from './page/wishlist'
-import { contextOf, wishlistContextOf } from './update'
+import { wantedOf, wishlistContextOf } from './update'
 import * as WishlistState from './wishlist'
 
 const catalogueGate = (
@@ -54,6 +57,38 @@ const catalogueGate = (
     Ready: whenReady,
   })
 
+const wishlistPageView = (
+  model: Model,
+  focus: WishlistPage.Focus,
+  h: HtmlBuilder<Message>,
+): Html =>
+  catalogueGate(
+    model,
+    () =>
+      h.submodel({
+        slotId: 'wishlist-page',
+        model: model.wishlistPage,
+        view: WishlistPage.view,
+        viewInputs: {
+          focus,
+          isReady: Option.isSome(wishlistContextOf(model)),
+          hasFailed:
+            model.decks._tag === 'Failed' ||
+            model.collection._tag === 'Failed' ||
+            model.wishlist._tag === 'Failed',
+          context: Option.getOrElse(
+            wishlistContextOf(model),
+            (): WishlistPage.Context => ({ decks: [], owned: {}, added: {} }),
+          ),
+          wishlist: model.wishlist,
+          remote: model.cardTraderWishlists,
+          isConnected: CardTraderState.isConnected(model.cardTrader),
+        },
+        toParentMessage: message => Message.GotWishlistPageMessage({ message }),
+      }),
+    h,
+  )
+
 export const view = Submodel.defineView<Model, Message>((model, h) =>
   h.main(
     [h.Class('mx-auto flex w-full max-w-7xl flex-col px-4 py-8')],
@@ -71,6 +106,12 @@ export const view = Submodel.defineView<Model, Message>((model, h) =>
         toParentMessage: message => Message.GotDecksMessage({ message }),
       }),
       h.submodel({
+        slotId: 'cardtrader-connect',
+        model: model.cardTrader,
+        view: CardTraderState.view,
+        toParentMessage: message => Message.GotCardTraderMessage({ message }),
+      }),
+      h.submodel({
         slotId: 'wishlist-status',
         model: model.wishlist,
         view: WishlistState.view,
@@ -78,54 +119,24 @@ export const view = Submodel.defineView<Model, Message>((model, h) =>
       }),
       Match.value(model.route).pipe(
         Match.tagsExhaustive({
-          Catalogue: catalogueRoute =>
+          Catalogue: ({ _tag, ...query }) =>
             catalogueGate(
               model,
-              ({ allValues }) =>
+              ({ allValues, printingSets }) =>
                 h.submodel({
                   slotId: 'catalogue-page',
                   model: model.cataloguePage,
                   view: CataloguePage.view,
                   viewInputs: {
-                    ...contextOf(catalogueRoute, model.collection),
+                    query,
                     allValues,
+                    printingSets,
                     collection: model.collection,
+                    maybeWanted: wantedOf(model),
                   },
                   toParentMessage: message =>
                     Message.GotCataloguePageMessage({ message }),
                 }),
-              h,
-            ),
-          Collection: collectionRoute =>
-            catalogueGate(
-              model,
-              ({ allValues, printingSets }) =>
-                h.div(
-                  [h.Class('flex flex-col gap-8')],
-                  [
-                    h.h1([h.Class('text-2xl font-semibold')], ['Collection']),
-                    CollectionPage.summaryView(
-                      {
-                        collection: model.collection,
-                        printingSets,
-                        onRefresh: Message.ClickedRefreshCollection(),
-                      },
-                      h,
-                    ),
-                    h.submodel({
-                      slotId: 'collection-page',
-                      model: model.collectionPage,
-                      view: CataloguePage.view,
-                      viewInputs: {
-                        ...contextOf(collectionRoute, model.collection),
-                        allValues,
-                        collection: model.collection,
-                      },
-                      toParentMessage: message =>
-                        Message.GotCollectionPageMessage({ message }),
-                    }),
-                  ],
-                ),
               h,
             ),
           Card: cardRoute =>
@@ -168,49 +179,48 @@ export const view = Submodel.defineView<Model, Message>((model, h) =>
                     decks: model.decks,
                     deckId,
                     collection: model.collection,
-                    sending: WishlistState.sendingOf(model.wishlist, deckId),
                   },
                   toParentMessage: message =>
                     Message.GotDeckPageMessage({ message }),
                 }),
               h,
             ),
-          Wishlist: () =>
-            catalogueGate(
+          Wishlists: () => wishlistPageView(model, { _tag: 'All' }, h),
+          CustomWishlist: () =>
+            wishlistPageView(
               model,
-              () =>
-                h.submodel({
-                  slotId: 'wishlist-page',
-                  model: model.wishlistPage,
-                  view: WishlistPage.view,
-                  viewInputs: {
-                    isReady: Option.isSome(wishlistContextOf(model)),
-                    hasFailed:
-                      model.decks._tag === 'Failed' ||
-                      model.collection._tag === 'Failed' ||
-                      model.wishlist._tag === 'Failed',
-                    context: Option.getOrElse(
-                      wishlistContextOf(model),
-                      (): WishlistPage.Context => ({
-                        decks: [],
-                        owned: {},
-                        added: {},
-                      }),
-                    ),
-                    wishlist: model.wishlist,
-                  },
-                  toParentMessage: message =>
-                    Message.GotWishlistPageMessage({ message }),
-                }),
+              { _tag: 'One', wishlist: Wishlist.CUSTOM },
               h,
             ),
+          DeckWishlist: ({ deckId }) =>
+            wishlistPageView(
+              model,
+              { _tag: 'One', wishlist: Wishlist.deckWishlist(deckId) },
+              h,
+            ),
+          CardTraderWishlist: ({ wishlistId }) =>
+            h.submodel({
+              slotId: 'cardtrader-wishlist-page',
+              model: model.cardTraderWishlistPage,
+              view: CardTraderWishlistPage.view,
+              viewInputs: {
+                wishlistId,
+                maybeDetail: CardTraderWishlists.detailOf(
+                  model.cardTraderWishlists,
+                  wishlistId,
+                ),
+                isConnected: CardTraderState.isConnected(model.cardTrader),
+              },
+              toParentMessage: message =>
+                Message.GotCardTraderWishlistPageMessage({ message }),
+            }),
           CardTrader: () =>
             h.submodel({
               slotId: 'cardtrader-page',
-              model: model.cardTraderPage,
+              model: model.cardTrader,
               view: CardTraderPage.view,
               toParentMessage: message =>
-                Message.GotCardTraderPageMessage({ message }),
+                Message.GotCardTraderMessage({ message }),
             }),
           NotFound: ({ path }) =>
             NotFound.view(

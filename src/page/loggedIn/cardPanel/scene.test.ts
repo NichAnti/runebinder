@@ -32,7 +32,6 @@ const collection = CollectionState.Model.Ready({
   },
   saves: {},
   nextRevision: 0,
-  refresh: CollectionState.Refresh.Idle(),
 })
 
 const sceneView = withViewInputs(tileView, {
@@ -47,7 +46,7 @@ const sceneView = withViewInputs(tileView, {
       maybeSubtitle: Option.none(),
       domains: ['Fury'],
       meta: '2 printings',
-      maybeHighlight: Option.none(),
+      highlights: [],
     },
   },
   counts: CollectionState.countsOf(collection),
