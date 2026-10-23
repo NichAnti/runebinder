@@ -8,13 +8,14 @@ import {
   given,
   role,
   scene,
+  text,
   withViewInputs,
   within,
 } from 'foldkit/scene'
 import { modifyFields } from 'foldkit/struct'
 import { describe, test } from 'vitest'
 
-import { Deck, Printing } from '../../../../domain'
+import { Collection, Deck, Printing } from '../../../../domain'
 import { searchResult, testCard } from '../../../../testing'
 import * as CardPanel from '../../cardPanel'
 import * as CollectionState from '../../collection'
@@ -274,6 +275,24 @@ describe('deck page', () => {
       expect(within(mainDeck, role('group', { name: 'Units' }))).toContainText(
         'Test Unit',
       ),
+    )
+  })
+
+  test('each card says how many copies are still needed', () => {
+    const owningOne = withViewInputs(view, {
+      decks,
+      deckId: deck.id,
+      collection: CollectionState.Model.Ready({
+        owned: { [base]: Collection.OwnedQuantity.make(1) },
+        saves: {},
+        nextRevision: 0,
+      }),
+    })
+
+    scene(
+      { update: update(Option.some(deck)), view: owningOne() },
+      given(loaded),
+      expect(within(mainDeck, text('Need 2'))).toExist(),
     )
   })
 

@@ -79,6 +79,8 @@ Its structure is agreed before any code is written.
 
 - [x] 9.1 Card page "used in decks" section and hover
 - [x] 9.1b One Cards page at `/` replaces Catalogue and Collection: an All cards / My collection / Wanted switch at the top (Wanted: what decks miss plus the custom wishlist, with its own summary), the collection summary on My collection, Owned and Need badges on each card; `/collection` and Refresh removed (reloading the page reloads the collection)
+- [x] 9.1c Deck page: sticky progress bar per part; − / + on search results up to the copy limit; "only cards this legend allows" on by default; card actions in Grid too; main deck grouped by type and sorted by energy with an energy curve; split runes evenly; Need badges on deck cards
+- [ ] 9.1d Deck page on phones: the add panel as a bottom sheet; inline-editable name; Undo after a removal; Duplicate deck
 - [ ] 9.2 Polish and docs refresh
 - [x] 9.3 Riot "Legal Jibber Jabber" notice in the app (site footer, added in 4.3)
 - [ ] 9.4 Register the product on the Riot Developer Portal and apply for a production key
