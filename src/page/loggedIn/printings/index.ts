@@ -1,3 +1,4 @@
+export { badgesOf } from './badges'
 export { Counts } from './counts'
 export {
   type PrintingsConfig,

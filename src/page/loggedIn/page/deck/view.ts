@@ -63,6 +63,7 @@ export type ViewInputs = Readonly<{
   decks: DecksState.Model
   deckId: Deck.DeckId
   collection: CollectionState.Model
+  maybeWanted: Option.Option<Wishlist.Wanted>
 }>
 
 type Context = Readonly<{
@@ -73,7 +74,7 @@ type Context = Readonly<{
   problems: Option.Option<ReadonlyArray<DeckRules.RuleProblem>>
   maybeLegend: Option.Option<Printing.Printing>
   additionalLegendsAsked: number
-  maybeNeeds: Option.Option<Readonly<Record<string, number>>>
+  maybeWanted: Option.Option<Wishlist.Wanted>
 }>
 
 const SECTION_LABELS: Readonly<Record<DeckRules.Section, string>> = {
@@ -133,22 +134,15 @@ const problemsIn = (
     onSome: Array.filter(problem => DeckRules.sectionOf(problem) === section),
   })
 
-const needText = (
+const badgesFor = (
   context: Context,
   printingIds: ReadonlyArray<Printing.PrintingId>,
 ): ReadonlyArray<string> =>
-  Option.match(context.maybeNeeds, {
-    onNone: () => [],
-    onSome: needs => {
-      const need = Number.sumAll(
-        Array.map(printingIds, printingId =>
-          Option.getOrElse(Record.get(needs, printingId), () => 0),
-        ),
-      )
-
-      return need > 0 ? [`Need ${need}`] : []
-    },
-  })
+  Printings.badgesOf(
+    CollectionState.maybeOwned(context.collection),
+    context.maybeWanted,
+    printingIds,
+  )
 
 const smallButton = (
   content: string,
@@ -448,13 +442,14 @@ const gridLineView = (
             card,
             {
               _tag: 'Tile',
-              tile: tileOf(card, Array.headNonEmpty(line.cards).printingId, [
-                `×${line.copies}`,
-                ...needText(
+              tile: tileOf(
+                card,
+                Array.headNonEmpty(line.cards).printingId,
+                badgesFor(
                   context,
                   Array.map(line.cards, ({ printingId }) => printingId),
                 ),
-              ]),
+              ),
             },
             h,
           ),
@@ -493,13 +488,13 @@ const listLineView = (
                 card,
                 {
                   _tag: 'Line',
-                  content: [`${line.copies}× ${line.label}`],
+                  content: [line.label],
                 },
                 h,
               ),
           }),
           ...Array.map(
-            needText(
+            badgesFor(
               context,
               Array.map(line.cards, ({ printingId }) => printingId),
             ),
@@ -773,7 +768,7 @@ const slotView = (
                     tile: tileOf(
                       card,
                       printingId,
-                      needText(context, [printingId]),
+                      badgesFor(context, [printingId]),
                     ),
                   },
                   h,
@@ -983,9 +978,12 @@ const resultView = (
           maybeSubtitle: card.maybeSubtitle,
           domains: card.domains,
           meta: '',
-          highlights: isChoice
-            ? Option.toArray(inDeckText(tab, context.deck.contents, card))
-            : [],
+          highlights: [
+            ...(isChoice
+              ? Option.toArray(inDeckText(tab, context.deck.contents, card))
+              : []),
+            ...badgesFor(context, card.printingIds),
+          ],
         },
         h,
       ),
@@ -1463,7 +1461,7 @@ const deckView = (
   model: Model,
   deck: Deck.Deck,
   removal: Option.Option<DecksState.Removal>,
-  { collection }: ViewInputs,
+  { collection, maybeWanted }: ViewInputs,
   h: HtmlBuilder<Message>,
 ): Html => {
   const byPrinting = cardsByPrinting(model.cards)
@@ -1478,17 +1476,7 @@ const deckView = (
     problems:
       rules._tag === 'Checked' ? Option.some(rules.problems) : Option.none(),
     maybeLegend: Option.flatMap(contents.maybeLegend, find),
-    maybeNeeds: Option.map(CollectionState.maybeOwned(collection), owned =>
-      Record.fromEntries(
-        Array.map(
-          Missing.needs([deck], owned),
-          ({ printingId, missing }): readonly [string, number] => [
-            printingId,
-            missing,
-          ],
-        ),
-      ),
-    ),
+    maybeWanted,
     additionalLegendsAsked: Array.reduce(
       [
         ...Option.toArray(contents.maybeChosenChampion),

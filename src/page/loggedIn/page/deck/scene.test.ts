@@ -17,7 +17,7 @@ import {
 import { modifyFields } from 'foldkit/struct'
 import { describe, test } from 'vitest'
 
-import { Collection, Deck, Printing } from '../../../../domain'
+import { Collection, Deck, Printing, Wishlist } from '../../../../domain'
 import { searchResult, testCard } from '../../../../testing'
 import * as CardPanel from '../../cardPanel'
 import * as CollectionState from '../../collection'
@@ -57,6 +57,7 @@ const sceneView = withViewInputs(view, {
   decks,
   deckId: deck.id,
   collection: CollectionState.init(),
+  maybeWanted: Option.none(),
 })
 const loaded = modifyFields(init(), {
   maybeDeckId: () => Option.some(deck.id),
@@ -71,7 +72,7 @@ describe('deck page', () => {
     scene(
       { update: update(Option.some(deck)), view: sceneView() },
       given(asList),
-      expect(mainDeck).toContainText('3× Test Unit, Tester'),
+      expect(mainDeck).toContainText('Test Unit, Tester'),
       click(
         within(
           mainDeck,
@@ -120,6 +121,7 @@ describe('deck page', () => {
         saves: {},
         nextRevision: 0,
       }),
+      maybeWanted: Option.none(),
     })
 
     scene(
@@ -249,6 +251,7 @@ describe('deck page', () => {
           }),
           deckId: deck.id,
           collection: CollectionState.init(),
+          maybeWanted: Option.none(),
         })(),
       },
       given(
@@ -300,6 +303,7 @@ describe('deck page', () => {
           }),
           deckId: deck.id,
           collection: CollectionState.init(),
+          maybeWanted: Option.none(),
         })(),
       },
       given(
@@ -387,7 +391,7 @@ describe('deck page', () => {
     )
   })
 
-  test('each card says how many copies are still needed', () => {
+  test('each card shows the same Owned and Need badges as the cards page', () => {
     const owningOne = withViewInputs(view, {
       decks,
       deckId: deck.id,
@@ -396,12 +400,21 @@ describe('deck page', () => {
         saves: {},
         nextRevision: 0,
       }),
+      maybeWanted: Option.some(
+        Wishlist.wantedOf(
+          [deck],
+          { [base]: Collection.OwnedQuantity.make(1) },
+          {},
+        ),
+      ),
     })
 
     scene(
       { update: update(Option.some(deck)), view: owningOne() },
       given(loaded),
+      expect(within(mainDeck, text('Owned 1'))).toExist(),
       expect(within(mainDeck, text('Need 2'))).toExist(),
+      expect(within(mainDeck, text('×3'))).not.toExist(),
     )
   })
 
@@ -442,11 +455,14 @@ describe('deck page', () => {
           }),
           deckId: deck.id,
           collection: CollectionState.init(),
+          maybeWanted: Option.none(),
         })(),
       },
       given(asList),
-      expect(mainDeck).toContainText('2× Test Unit, Tester'),
-      expect(mainDeck).toContainText('1× Test Unit, Tester'),
+      expect(within(mainDeck, selector(`#version-Main-${base}`))).toExist(),
+      expect(
+        within(mainDeck, selector(`#version-Main-${alternate}`)),
+      ).toExist(),
       change(within(mainDeck, selector(`#version-Main-${alternate}`)), base),
       expectOutMessage(
         OutMessage.EditedDeck({
@@ -483,6 +499,7 @@ describe('deck page', () => {
           decks,
           deckId: Deck.DeckId.make('00000000-0000-4000-8000-000000000000'),
           collection: CollectionState.init(),
+          maybeWanted: Option.none(),
         })(),
       },
       given(init()),

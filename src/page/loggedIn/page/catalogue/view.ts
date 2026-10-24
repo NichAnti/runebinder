@@ -21,6 +21,7 @@ import {
 } from '../../../../ui'
 import * as CardPanel from '../../cardPanel'
 import * as CollectionState from '../../collection'
+import * as Printings from '../../printings'
 import { Message } from './message'
 import { type Model, Results } from './model'
 import { summaryView } from './summaryView'
@@ -289,20 +290,11 @@ const highlightsOf = (
   { collection, maybeWanted }: ViewInputs,
   printingIds: ReadonlyArray<Printing.PrintingId>,
 ): ReadonlyArray<string> =>
-  Array.getSomes([
-    pipe(
-      CollectionState.maybeOwned(collection),
-      Option.map(owned => Collection.totalOf(owned, printingIds)),
-      Option.filter(total => total > 0),
-      Option.map(total => `Owned ${total}`),
-    ),
-    pipe(
-      maybeWanted,
-      Option.map(wanted => Wishlist.wantedCopiesOf(wanted, printingIds)),
-      Option.filter(total => total > 0),
-      Option.map(total => `Need ${total}`),
-    ),
-  ])
+  Printings.badgesOf(
+    CollectionState.maybeOwned(collection),
+    maybeWanted,
+    printingIds,
+  )
 
 const sortView = (inputs: ViewInputs, h: HtmlBuilder<Message>): Html => {
   const current = CatalogueQuery.effectiveSort(inputs.query)

@@ -179,6 +179,7 @@ export const view = Submodel.defineView<Model, Message>((model, h) =>
                     decks: model.decks,
                     deckId,
                     collection: model.collection,
+                    maybeWanted: wantedOf(model),
                   },
                   toParentMessage: message =>
                     Message.GotDeckPageMessage({ message }),
