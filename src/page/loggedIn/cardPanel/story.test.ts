@@ -22,10 +22,35 @@ const hoveredOpen = (cardId: Printing.CardId) =>
   modifyFields(init(), {
     hoverIntent: () => openHoverIntent(true),
     panel: () =>
-      Panel.Open({ cardId, opener: 'Hover', card: PanelCard.Loading() }),
+      Panel.Open({
+        cardId,
+        tileId: cardId,
+        opener: 'Hover',
+        card: PanelCard.Loading(),
+      }),
   })
 
 describe('card panel', () => {
+  test('two tiles of the same card open only the hovered one, without reloading', () => {
+    story(
+      update,
+      given(hoveredOpen(vi)),
+      message(
+        Message.GotHoverIntentMessage({
+          cardId: vi,
+          tileId: 'second-tile',
+          message: HoverIntent.Message.EnteredTrigger(),
+        }),
+      ),
+      model(next => {
+        expect(next.panel._tag === 'Open' ? next.panel.tileId : 'closed').toBe(
+          'second-tile',
+        )
+      }),
+      Command.expectNone(),
+    )
+  })
+
   test('moving to another card while hovering shows that card', () => {
     story(
       update,
@@ -33,6 +58,7 @@ describe('card panel', () => {
       message(
         Message.GotHoverIntentMessage({
           cardId: jinx,
+          tileId: jinx,
           message: HoverIntent.Message.EnteredTrigger(),
         }),
       ),
@@ -48,7 +74,12 @@ describe('card panel', () => {
     const pinned = modifyFields(hoveredOpen(vi), {
       hoverIntent: () => openHoverIntent(false),
       panel: () =>
-        Panel.Open({ cardId: vi, opener: 'Click', card: PanelCard.Loading() }),
+        Panel.Open({
+          cardId: vi,
+          tileId: vi,
+          opener: 'Click',
+          card: PanelCard.Loading(),
+        }),
     })
 
     story(
@@ -57,6 +88,7 @@ describe('card panel', () => {
       message(
         Message.GotHoverIntentMessage({
           cardId: vi,
+          tileId: vi,
           message: HoverIntent.Message.CompletedWaitBeforeClosing({
             version: pinned.hoverIntent.pendingCloseVersion,
           }),

@@ -16,6 +16,7 @@ export type Trigger =
 
 export type ViewInputs = Readonly<{
   cardId: Printing.CardId
+  tileId: string
   label: string
   trigger: Trigger
   counts: Printings.Counts
@@ -83,9 +84,9 @@ const contentView = (
 
 export const tileView = Submodel.defineView<Model, Message, ViewInputs>(
   (model, viewInputs, h) => {
-    const id = `card-panel-${viewInputs.cardId}`
+    const id = `card-panel-${viewInputs.tileId}`
     const maybeOpen =
-      model.panel._tag === 'Open' && model.panel.cardId === viewInputs.cardId
+      model.panel._tag === 'Open' && model.panel.tileId === viewInputs.tileId
         ? Option.some(model.panel)
         : Option.none()
     const isPinned = Option.exists(
@@ -99,12 +100,19 @@ export const tileView = Submodel.defineView<Model, Message, ViewInputs>(
         label: viewInputs.label,
         hoverIntent: model.hoverIntent,
         toHoverIntentMessage: message =>
-          Message.GotHoverIntentMessage({ cardId: viewInputs.cardId, message }),
+          Message.GotHoverIntentMessage({
+            cardId: viewInputs.cardId,
+            tileId: viewInputs.tileId,
+            message,
+          }),
         trigger:
           viewInputs.trigger._tag === 'Tile'
             ? [CardTile.view(viewInputs.trigger.tile, h)]
             : viewInputs.trigger.content,
-        onClick: Message.ClickedTrigger({ cardId: viewInputs.cardId }),
+        onClick: Message.ClickedTrigger({
+          cardId: viewInputs.cardId,
+          tileId: viewInputs.tileId,
+        }),
         isOpen: Option.isSome(maybeOpen),
         isPinned,
         onDismiss: Message.ClickedDismiss(),

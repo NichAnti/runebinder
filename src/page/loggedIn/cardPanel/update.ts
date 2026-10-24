@@ -11,7 +11,7 @@ import {
   type CatalogueIndexService,
 } from '../../../service'
 import { Message, OutMessage } from './message'
-import { type Model, type Opener, Panel, PanelCard } from './model'
+import { type Model, type Opener, Panel, PanelCard, type Target } from './model'
 
 type UpdateReturn = Update.ReturnWithOutMessage<
   Model,
@@ -42,34 +42,48 @@ export const LoadPanelCard = Command.define('LoadPanelCard', {
 
 // UPDATE
 
-const isOpenFor = (model: Model, cardId: Printing.CardId): boolean =>
-  model.panel._tag === 'Open' && model.panel.cardId === cardId
+const isOpenFor = (model: Model, tileId: string): boolean =>
+  model.panel._tag === 'Open' && model.panel.tileId === tileId
 
 const isPinned = (model: Model): boolean =>
   model.panel._tag === 'Open' && model.panel.opener === 'Click'
 
 const open =
-  (cardId: Printing.CardId, opener: Opener): Step =>
+  ({ cardId, tileId }: Target, opener: Opener): Step =>
   stepModel =>
     Panel.match(stepModel.panel, {
       Open: panel =>
         panel.cardId === cardId
           ? {
               model: modifyFields(stepModel, {
-                panel: () => modifyFields(panel, { opener: () => opener }),
+                panel: () =>
+                  modifyFields(panel, {
+                    tileId: () => tileId,
+                    opener: () => opener,
+                  }),
               }),
             }
           : {
               model: modifyFields(stepModel, {
                 panel: () =>
-                  Panel.Open({ cardId, opener, card: PanelCard.Loading() }),
+                  Panel.Open({
+                    cardId,
+                    tileId,
+                    opener,
+                    card: PanelCard.Loading(),
+                  }),
               }),
               commands: [LoadPanelCard({ cardId })],
             },
       Closed: () => ({
         model: modifyFields(stepModel, {
           panel: () =>
-            Panel.Open({ cardId, opener, card: PanelCard.Loading() }),
+            Panel.Open({
+              cardId,
+              tileId,
+              opener,
+              card: PanelCard.Loading(),
+            }),
         }),
         commands: [LoadPanelCard({ cardId })],
       }),
@@ -80,12 +94,12 @@ const closeUnlessPinned: Step = stepModel =>
     ? { model: stepModel }
     : { model: modifyFields(stepModel, { panel: () => Panel.Closed() }) }
 
-const foldHoverIntentOutMessage = (cardId: Printing.CardId) =>
+const foldHoverIntentOutMessage = (target: Target) =>
   HoverIntent.OutMessage.match<Step>({
     Opened: () => stepModel =>
       isPinned(stepModel)
         ? { model: stepModel }
-        : open(cardId, 'Hover')(stepModel),
+        : open(target, 'Hover')(stepModel),
     Closed: () => closeUnlessPinned,
   })
 
@@ -95,69 +109,69 @@ const writeHoverIntent = (
   nextHoverIntent: HoverIntent.Model,
 ): Model => modifyFields(model, { hoverIntent: () => nextHoverIntent })
 
-const foldHoverIntent = (cardId: Printing.CardId) =>
+const foldHoverIntent = (target: Target) =>
   Update.foldChild({
     update: HoverIntent.update,
     read: readHoverIntent,
     write: writeHoverIntent,
     toParentMessage: message =>
-      Message.GotHoverIntentMessage({ cardId, message }),
-    foldOutMessage: foldHoverIntentOutMessage(cardId),
+      Message.GotHoverIntentMessage({ ...target, message }),
+    foldOutMessage: foldHoverIntentOutMessage(target),
   })
 
-const foldHoverIntentClose = (cardId: Printing.CardId) =>
+const foldHoverIntentClose = (target: Target) =>
   Update.foldChildStep({
     update: HoverIntent.close,
     read: readHoverIntent,
     write: writeHoverIntent,
     toParentMessage: message =>
-      Message.GotHoverIntentMessage({ cardId, message }),
-    foldOutMessage: foldHoverIntentOutMessage(cardId),
+      Message.GotHoverIntentMessage({ ...target, message }),
+    foldOutMessage: foldHoverIntentOutMessage(target),
   })
 
 const isEntering = (message: HoverIntent.Message): boolean =>
   message._tag === 'EnteredTrigger' || message._tag === 'FocusedTrigger'
 
 const followHover =
-  (cardId: Printing.CardId, message: HoverIntent.Message): Step =>
+  (target: Target, message: HoverIntent.Message): Step =>
   stepModel =>
     isEntering(message) &&
     stepModel.panel._tag === 'Open' &&
     stepModel.panel.opener === 'Hover' &&
-    stepModel.panel.cardId !== cardId
-      ? open(cardId, 'Hover')(stepModel)
+    stepModel.panel.tileId !== target.tileId
+      ? open(target, 'Hover')(stepModel)
       : { model: stepModel }
 
 export const update = (model: Model, message: Message) =>
   Message.match<UpdateReturn>(message, {
-    GotHoverIntentMessage: ({ cardId, message }) =>
+    GotHoverIntentMessage: ({ cardId, tileId, message }) =>
       Update.combine(model, [
-        foldHoverIntent(cardId)(message),
-        followHover(cardId, message),
+        foldHoverIntent({ cardId, tileId })(message),
+        followHover({ cardId, tileId }, message),
       ]),
 
-    ClickedTrigger: ({ cardId }) =>
-      isOpenFor(model, cardId) && isPinned(model)
+    ClickedTrigger: ({ cardId, tileId }) =>
+      isOpenFor(model, tileId) && isPinned(model)
         ? Update.combine(model, [
             stepModel => ({
               model: modifyFields(stepModel, { panel: () => Panel.Closed() }),
             }),
-            foldHoverIntentClose(cardId),
+            foldHoverIntentClose({ cardId, tileId }),
           ])
         : Update.combine(model, [
-            open(cardId, 'Click'),
-            foldHoverIntentClose(cardId),
+            open({ cardId, tileId }, 'Click'),
+            foldHoverIntentClose({ cardId, tileId }),
           ]),
 
     ClickedDismiss: () =>
       Panel.match<UpdateReturn>(model.panel, {
         Closed: () => ({ model }),
-        Open: ({ cardId }) =>
+        Open: ({ cardId, tileId }) =>
           Update.combine(model, [
             stepModel => ({
               model: modifyFields(stepModel, { panel: () => Panel.Closed() }),
             }),
-            foldHoverIntentClose(cardId),
+            foldHoverIntentClose({ cardId, tileId }),
           ]),
       }),
 

@@ -36,8 +36,18 @@ export const Message = defineMessageUnion({
   },
   ClickedStepCopies: {
     cardId: Printing.CardId,
+    maybeVersion: Schema.Option(Printing.PrintingId),
     zone: Deck.Zone,
     step: DeckEdit.Step,
+  },
+  SelectedVersion: {
+    zone: Deck.Zone,
+    from: Printing.PrintingId,
+    value: Schema.String,
+  },
+  SelectedSlotVersion: {
+    place: Schema.Literals(['Legend', 'ChosenChampion']),
+    value: Schema.String,
   },
   ClickedStepLine: {
     zone: Deck.Zone,
@@ -74,6 +84,8 @@ export const OutMessage = defineMessageUnion({
     edits: Schema.NonEmptyArray(DeckEdit.DeckEdit),
   },
   RequestedRemoveDeck: { deckId: Deck.DeckId },
+  SteppedOwned: { printingId: Printing.PrintingId, step: DeckEdit.Step },
+  RequestedCollectionRetry: {},
   RequestedRetryLoadDecks: {},
 })
 export type OutMessage = typeof OutMessage.Type

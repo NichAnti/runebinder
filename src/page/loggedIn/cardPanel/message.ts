@@ -9,9 +9,10 @@ import { Step } from '../collection'
 export const Message = defineMessageUnion({
   GotHoverIntentMessage: {
     cardId: Printing.CardId,
+    tileId: Schema.String,
     message: HoverIntent.Message,
   },
-  ClickedTrigger: { cardId: Printing.CardId },
+  ClickedTrigger: { cardId: Printing.CardId, tileId: Schema.String },
   ClickedDismiss: {},
   SucceededLoadPanelCard: {
     cardId: Printing.CardId,

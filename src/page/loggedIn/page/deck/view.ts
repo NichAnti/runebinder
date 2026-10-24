@@ -26,6 +26,7 @@ import {
   QuantityStepper,
   SearchField,
   SegmentedControl,
+  Select,
   Tabs,
   TextField,
   Toast,
@@ -46,7 +47,7 @@ import {
   isChampionUnit,
   linesOf,
   nameOf,
-  quantitiesOf,
+  versionLinesOf,
 } from './lines'
 import { Message } from './message'
 import {
@@ -175,7 +176,7 @@ const tileOf = (
     title: printing.name,
     maybeSubtitle: printing.maybeSubtitle,
     domains: printing.domains,
-    meta: Option.getOrElse(printing.maybeType, () => ''),
+    meta: versionLabel(printing),
     highlights,
   }
 }
@@ -183,21 +184,21 @@ const tileOf = (
 const panelView = (
   context: Context,
   place: DeckStructure.Place,
+  slotKey: string,
   card: Printing.Card,
   trigger: CardPanel.Trigger,
-  quantities: Readonly<Record<string, number>>,
-  max: number,
   h: HtmlBuilder<Message>,
 ): Html =>
   h.submodel({
-    slotId: `deck-${place}-${card.id}`,
+    slotId: `deck-${place}-${slotKey}`,
     model: context.model.panels[place],
     view: CardPanel.tileView,
     viewInputs: {
       cardId: card.id,
+      tileId: `${place}-${slotKey}`,
       label: nameOf(card),
       trigger,
-      counts: Printings.Counts.Ready({ kind: 'InDeck', quantities, max }),
+      counts: CollectionState.countsOf(context.collection),
     },
     toParentMessage: message =>
       Message.GotCardPanelMessage({ panelId: place, message }),
@@ -257,6 +258,7 @@ const countersView = (
   cardId: Printing.CardId,
   printingIds: ReadonlyArray<Printing.PrintingId>,
   maybeLimit: Option.Option<number>,
+  maybeVersion: Option.Option<Printing.PrintingId>,
   zone: Deck.Zone,
   label: string,
   h: HtmlBuilder<Message>,
@@ -264,10 +266,21 @@ const countersView = (
   const { contents } = context.deck
   const zones: ReadonlyArray<Deck.Zone> =
     zone === 'Main' || zone === 'Sideboard' ? ['Main', 'Sideboard'] : [zone]
-  const counter = (counted: Deck.Zone) => {
-    const copies = copiesIn(contents, counted, printingIds)
+  const counted = Option.match(maybeVersion, {
+    onNone: () => printingIds,
+    onSome: version => [version],
+  })
+  const counter = (countedZone: Deck.Zone) => {
+    const copies = copiesIn(contents, countedZone, counted)
     const canAdd = Option.isSome(
-      copyStepOf(contents, counted, printingIds, maybeLimit, 1),
+      copyStepOf(
+        contents,
+        countedZone,
+        printingIds,
+        maybeLimit,
+        1,
+        maybeVersion,
+      ),
     )
 
     return h.div(
@@ -275,21 +288,23 @@ const countersView = (
       [
         h.span(
           [h.AriaHidden(true), h.Class('w-10 text-xs text-fg-muted')],
-          [ZONE_SHORT_LABELS[counted]],
+          [ZONE_SHORT_LABELS[countedZone]],
         ),
         QuantityStepper.view(
           {
-            label: `In ${SECTION_LABELS[counted]}: ${label}`,
+            label: `In ${SECTION_LABELS[countedZone]}: ${label}`,
             quantity: copies,
             max: canAdd ? copies + 1 : copies,
             onDecrement: Message.ClickedStepCopies({
               cardId,
-              zone: counted,
+              maybeVersion,
+              zone: countedZone,
               step: -1,
             }),
             onIncrement: Message.ClickedStepCopies({
               cardId,
-              zone: counted,
+              maybeVersion,
+              zone: countedZone,
               step: 1,
             }),
           },
@@ -344,10 +359,57 @@ const lineStepper = (
         card.id,
         Array.map(card.printings, ({ id }) => id),
         DeckRules.copyLimitOf(Printing.basePrinting(card)),
+        Option.some(Array.headNonEmpty(line.cards).printingId),
         zone,
         line.label,
         h,
       ),
+  })
+
+const versionLabel = (printing: Printing.Printing): string =>
+  `${Printings.VARIANT_LABELS[printing.variant]} · ${printing.publicCode}`
+
+const versionPickerView = (
+  card: Printing.Card,
+  printingId: Printing.PrintingId,
+  id: string,
+  onChange: (value: string) => Message,
+  h: HtmlBuilder<Message>,
+): Html =>
+  Array.length(card.printings) > 1
+    ? Select.view(
+        {
+          id,
+          label: 'Version',
+          value: printingId,
+          options: Array.map(card.printings, printing => ({
+            value: printing.id,
+            label: versionLabel(printing),
+          })),
+          onChange,
+        },
+        h,
+      )
+    : h.empty
+
+const lineVersionView = (
+  zone: Deck.Zone,
+  line: Line,
+  h: HtmlBuilder<Message>,
+): Html =>
+  Option.match(line.maybeCard, {
+    onNone: () => h.empty,
+    onSome: card => {
+      const from = Array.headNonEmpty(line.cards).printingId
+
+      return versionPickerView(
+        card,
+        from,
+        `version-${zone}-${from}`,
+        value => Message.SelectedVersion({ zone, from, value }),
+        h,
+      )
+    },
   })
 
 const lineActions = (
@@ -367,11 +429,6 @@ const lineActions = (
       ]
     : []
 
-const quantitiesIn = (line: Line): Readonly<Record<string, number>> =>
-  Record.fromEntries(
-    Array.map(line.cards, ({ printingId, copies }) => [printingId, copies]),
-  )
-
 const gridLineView = (
   context: Context,
   zone: Deck.Zone,
@@ -388,6 +445,7 @@ const gridLineView = (
           panelView(
             context,
             zone,
+            line.key,
             card,
             {
               _tag: 'Tile',
@@ -399,11 +457,10 @@ const gridLineView = (
                 ),
               ]),
             },
-            quantitiesIn(line),
-            Deck.MAX_COPIES,
             h,
           ),
       }),
+      lineVersionView(zone, line, h),
       lineStepper(context, zone, line, h),
       ...Array.match(lineActions(zone, line, h), {
         onEmpty: () => [],
@@ -433,10 +490,12 @@ const listLineView = (
               panelView(
                 context,
                 zone,
+                line.key,
                 card,
-                { _tag: 'Line', content: [`${line.copies}× ${line.label}`] },
-                quantitiesIn(line),
-                Deck.MAX_COPIES,
+                {
+                  _tag: 'Line',
+                  content: [`${line.copies}× ${line.label}`],
+                },
                 h,
               ),
           }),
@@ -449,6 +508,7 @@ const listLineView = (
           ),
         ],
       ),
+      lineVersionView(zone, line, h),
       lineStepper(context, zone, line, h),
       ...lineActions(zone, line, h),
     ],
@@ -478,7 +538,7 @@ const zoneView = (
         h,
       ),
       ...(zone === 'Runes' ? [splitRunesView(context, h)] : []),
-      Array.match(linesOf(cards, context.byPrinting), {
+      Array.match(versionLinesOf(cards, context.byPrinting), {
         onEmpty: () =>
           linesView(context, zone, [], placeholderView(context, zone, h), h),
         onNonEmpty: lines =>
@@ -717,6 +777,7 @@ const slotView = (
                 panelView(
                   context,
                   place,
+                  printingId,
                   card,
                   {
                     _tag: 'Tile',
@@ -726,8 +787,13 @@ const slotView = (
                       needText(context, [printingId]),
                     ),
                   },
-                  { [printingId]: 1 },
-                  1,
+                  h,
+                ),
+                versionPickerView(
+                  card,
+                  printingId,
+                  `version-${place}`,
+                  value => Message.SelectedSlotVersion({ place, value }),
                   h,
                 ),
                 h.div(
@@ -785,10 +851,9 @@ const additionalLegendsView = (
                         panelView(
                           context,
                           'AdditionalLegends',
+                          printingId,
                           card,
                           { _tag: 'Line', content: [nameOf(card)] },
-                          quantitiesOf(legends),
-                          Deck.MAX_COPIES,
                           h,
                         ),
                     },
@@ -954,6 +1019,7 @@ const resultView = (
             card.id,
             card.printingIds,
             card.maybeCopyLimit,
+            Option.none(),
             zoneOfTab(tab),
             label,
             h,

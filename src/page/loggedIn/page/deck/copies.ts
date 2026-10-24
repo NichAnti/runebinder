@@ -85,16 +85,34 @@ const added = (
     },
   )
 
+const preferring = (
+  contents: Deck.DeckContents,
+  zone: Deck.Zone,
+  printingIds: ReadonlyArray<Printing.PrintingId>,
+  maybeVersion: Option.Option<Printing.PrintingId>,
+): Option.Option<Printing.PrintingId> =>
+  Option.orElse(
+    Option.filter(
+      maybeVersion,
+      version => copiesIn(contents, zone, [version]) > 0,
+    ),
+    () => mostCopies(contents, zone, printingIds),
+  )
+
 const moved = (
   contents: Deck.DeckContents,
   from: Deck.Zone,
   to: Deck.Zone,
   printingIds: ReadonlyArray<Printing.PrintingId>,
+  maybeVersion: Option.Option<Printing.PrintingId>,
 ): Option.Option<CopyStep> =>
-  Option.map(mostCopies(contents, from, printingIds), printingId => ({
-    _tag: 'Edits',
-    edits: [step(from, printingId, -1), step(to, printingId, 1)],
-  }))
+  Option.map(
+    preferring(contents, from, printingIds, maybeVersion),
+    printingId => ({
+      _tag: 'Edits',
+      edits: [step(from, printingId, -1), step(to, printingId, 1)],
+    }),
+  )
 
 export const copyStepOf = (
   contents: Deck.DeckContents,
@@ -102,10 +120,17 @@ export const copyStepOf = (
   printingIds: ReadonlyArray<Printing.PrintingId>,
   maybeLimit: Option.Option<number>,
   by: DeckEdit.Step,
+  maybeVersion: Option.Option<Printing.PrintingId> = Option.none(),
 ): Option.Option<CopyStep> => {
   if (by === -1) {
     return Option.map(
-      mostCopies(contents, zone, printingIds),
+      Option.match(maybeVersion, {
+        onNone: () => mostCopies(contents, zone, printingIds),
+        onSome: version =>
+          copiesIn(contents, zone, [version]) > 0
+            ? Option.some(version)
+            : Option.none(),
+      }),
       (printingId): CopyStep => ({
         _tag: 'Edits',
         edits: [step(zone, printingId, -1)],
@@ -133,11 +158,19 @@ export const copyStepOf = (
     ),
     addition => {
       if (addition === 'Add') {
-        return Option.some(added(contents, zone, printingIds))
+        return Option.some(
+          Option.match(maybeVersion, {
+            onNone: () => added(contents, zone, printingIds),
+            onSome: (version): CopyStep => ({
+              _tag: 'Edits',
+              edits: [step(zone, version, 1)],
+            }),
+          }),
+        )
       } else if (addition === 'MoveFromMain') {
-        return moved(contents, 'Main', 'Sideboard', printingIds)
+        return moved(contents, 'Main', 'Sideboard', printingIds, maybeVersion)
       } else {
-        return moved(contents, 'Sideboard', 'Main', printingIds)
+        return moved(contents, 'Sideboard', 'Main', printingIds, maybeVersion)
       }
     },
   )

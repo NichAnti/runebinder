@@ -403,6 +403,7 @@ const resultsView = (
                         view: CardPanel.tileView,
                         viewInputs: {
                           cardId: card.id,
+                          tileId: card.id,
                           label: Option.match(card.maybeSubtitle, {
                             onNone: () => card.name,
                             onSome: subtitle => `${card.name}, ${subtitle}`,

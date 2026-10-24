@@ -428,47 +428,6 @@ export const enter = (
 
 // EDITS
 
-const zoneOf = (place: DeckStructure.Place): Option.Option<Deck.Zone> =>
-  place === 'Main' ||
-  place === 'Runes' ||
-  place === 'Battlefields' ||
-  place === 'Sideboard'
-    ? Option.some(place)
-    : Option.none()
-
-const stepEdits = (
-  deck: Deck.Deck,
-  place: DeckStructure.Place,
-  printingId: Printing.PrintingId,
-  step: DeckEdit.Step,
-): ReadonlyArray<DeckEdit.DeckEdit> =>
-  Option.match(zoneOf(place), {
-    onSome: zone => [{ _tag: 'StepCopies', zone, printingId, step }],
-    onNone: () => {
-      if (place === 'Legend') {
-        return step === 1
-          ? [{ _tag: 'AddCard', printingId, maybeType: Option.some('Legend') }]
-          : [{ _tag: 'ClearLegend' }]
-      } else if (place === 'ChosenChampion') {
-        return step === 1
-          ? [{ _tag: 'SetChampion', printingId }]
-          : [{ _tag: 'ClearChampion' }]
-      } else if (step === 1) {
-        return [{ _tag: 'AddAdditionalLegend', printingId }]
-      } else {
-        return Option.toArray(
-          Option.map(
-            Array.findLastIndex(
-              deck.contents.additionalLegends,
-              legend => legend === printingId,
-            ),
-            position => ({ _tag: 'RemoveAdditionalLegend', position }),
-          ),
-        )
-      }
-    },
-  })
-
 const edited = (
   model: Model,
   maybeDeck: Option.Option<Deck.Deck>,
@@ -563,10 +522,7 @@ const tabAfter = (tab: AddTab, maybeDeck: Option.Option<Deck.Deck>): AddTab => {
   }
 }
 
-const foldCardPanel = (
-  place: DeckStructure.Place,
-  maybeDeck: Option.Option<Deck.Deck>,
-) =>
+const foldCardPanel = (place: DeckStructure.Place) =>
   Update.foldChild({
     update: CardPanel.update,
     read: (model: Model) => Option.some(model.panels[place]),
@@ -576,18 +532,10 @@ const foldCardPanel = (
       }),
     toParentMessage: message =>
       Message.GotCardPanelMessage({ panelId: place, message }),
-    toParentOutMessage: CardPanel.OutMessage.match<OutMessage | undefined>({
+    toParentOutMessage: CardPanel.OutMessage.match<OutMessage>({
       SteppedQuantity: ({ printingId, step }) =>
-        Option.getOrUndefined(
-          Option.flatMap(maybeDeck, deck =>
-            Array.match(stepEdits(deck, place, printingId, step), {
-              onEmpty: () => Option.none<OutMessage>(),
-              onNonEmpty: edits =>
-                Option.some(OutMessage.EditedDeck({ deckId: deck.id, edits })),
-            }),
-          ),
-        ),
-      RequestedCollectionRetry: () => undefined,
+        OutMessage.SteppedOwned({ printingId, step }),
+      RequestedCollectionRetry: () => OutMessage.RequestedCollectionRetry(),
     }),
   })
 
@@ -659,13 +607,20 @@ export const update =
           ? { model: modifyFields(model, { searchResults: () => cards }) }
           : { model },
 
-      ClickedStepCopies: ({ cardId, zone, step }) =>
+      ClickedStepCopies: ({ cardId, maybeVersion, zone, step }) =>
         Option.match(
           Option.flatMap(maybeDeck, deck =>
             Option.flatMap(
               copyInfoOf(model, cardId),
               ({ printingIds, maybeLimit }) =>
-                copyStepOf(deck.contents, zone, printingIds, maybeLimit, step),
+                copyStepOf(
+                  deck.contents,
+                  zone,
+                  printingIds,
+                  maybeLimit,
+                  step,
+                  maybeVersion,
+                ),
             ),
           ),
           {
@@ -736,7 +691,7 @@ export const update =
       SkippedLoadCatalogue: () => ({ model }),
 
       GotCardPanelMessage: ({ panelId, message }) =>
-        foldCardPanel(panelId, maybeDeck)(model, message),
+        foldCardPanel(panelId)(model, message),
 
       GotToastMessage: ({ message }) => foldToast(model, message),
 
@@ -746,6 +701,45 @@ export const update =
         edited(model, maybeDeck, () => [
           { _tag: 'StepCopies', zone, printingId, step },
         ]),
+
+      SelectedVersion: ({ zone, from, value }) =>
+        Option.match(Schema.decodeOption(Printing.PrintingId)(value), {
+          onNone: () => ({ model }),
+          onSome: to =>
+            edited(model, maybeDeck, deck =>
+              to === from
+                ? []
+                : Array.flatten(
+                    Array.makeBy(
+                      DeckEdit.copiesOf(deck.contents, zone, from),
+                      (): ReadonlyArray<DeckEdit.DeckEdit> => [
+                        {
+                          _tag: 'StepCopies',
+                          zone,
+                          printingId: from,
+                          step: -1,
+                        },
+                        { _tag: 'StepCopies', zone, printingId: to, step: 1 },
+                      ],
+                    ),
+                  ),
+            ),
+        }),
+
+      SelectedSlotVersion: ({ place, value }) =>
+        Option.match(Schema.decodeOption(Printing.PrintingId)(value), {
+          onNone: () => ({ model }),
+          onSome: printingId =>
+            edited(model, maybeDeck, () => [
+              place === 'Legend'
+                ? {
+                    _tag: 'AddCard',
+                    printingId,
+                    maybeType: Option.some('Legend'),
+                  }
+                : { _tag: 'SetChampion', printingId },
+            ]),
+        }),
 
       ClickedMakeChampion: ({ printingId }) =>
         edited(model, maybeDeck, () => [{ _tag: 'MakeChampion', printingId }]),

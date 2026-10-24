@@ -36,6 +36,7 @@ const collection = CollectionState.Model.Ready({
 
 const sceneView = withViewInputs(tileView, {
   cardId: testCard.id,
+  tileId: testCard.id,
   label: 'Test Unit',
   trigger: {
     _tag: 'Tile',

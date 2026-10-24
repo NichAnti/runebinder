@@ -2,12 +2,14 @@ import { Option } from 'effect'
 import {
   Command,
   Mount,
+  change,
   click,
   expect,
   expectOutMessage,
   given,
   role,
   scene,
+  selector,
   text,
   withViewInputs,
   within,
@@ -109,9 +111,19 @@ describe('deck page', () => {
     )
   })
 
-  test('a line opens every printing with its copies in the deck', () => {
+  test('a line opens the same card panel as the cards page', () => {
+    const owningOne = withViewInputs(view, {
+      decks,
+      deckId: deck.id,
+      collection: CollectionState.Model.Ready({
+        owned: { [base]: Collection.OwnedQuantity.make(1) },
+        saves: {},
+        nextRevision: 0,
+      }),
+    })
+
     scene(
-      { update: update(Option.some(deck)), view: sceneView() },
+      { update: update(Option.some(deck)), view: owningOne() },
       given(asList),
       click(within(mainDeck, role('button', { name: 'Test Unit, Tester' }))),
       Command.resolve(
@@ -127,32 +139,21 @@ describe('deck page', () => {
       ),
       expect(
         within(
-          role('group', { name: 'In deck: Standard TST-001/010' }),
+          role('group', { name: 'Owned: Standard TST-001/010' }),
           role('status'),
         ),
-      ).toHaveText('3'),
+      ).toHaveText('1'),
       click(
         within(
-          role('group', { name: 'In deck: Alternate art TST-001a/010' }),
+          role('group', { name: 'Owned: Alternate art TST-001a/010' }),
           role('button', { name: 'Add one' }),
         ),
       ),
       expectOutMessage(
-        OutMessage.EditedDeck({
-          deckId: deck.id,
-          edits: [
-            {
-              _tag: 'StepCopies',
-              zone: 'Main',
-              printingId: alternate,
-              step: 1,
-            },
-          ],
-        }),
+        OutMessage.SteppedOwned({ printingId: alternate, step: 1 }),
       ),
     )
   })
-
   test('each section says what it still needs', () => {
     scene(
       { update: update(Option.some(deck)), view: sceneView() },
@@ -416,6 +417,54 @@ describe('deck page', () => {
       ).not.toExist(),
     )
   })
+  test('each version is its own tile and can be switched', () => {
+    const mixed: Deck.Deck = {
+      ...deck,
+      contents: {
+        ...deck.contents,
+        main: [
+          { printingId: base, copies: Deck.Copies.make(2) },
+          { printingId: alternate, copies: Deck.Copies.make(1) },
+        ],
+      },
+    }
+
+    scene(
+      {
+        update: update(Option.some(mixed)),
+        view: withViewInputs(view, {
+          decks: DecksState.Model.Ready({
+            decks: [mixed],
+            saves: {},
+            nextRevision: 0,
+            creation: DecksState.Creation.Idle(),
+            removals: {},
+          }),
+          deckId: deck.id,
+          collection: CollectionState.init(),
+        })(),
+      },
+      given(asList),
+      expect(mainDeck).toContainText('2× Test Unit, Tester'),
+      expect(mainDeck).toContainText('1× Test Unit, Tester'),
+      change(within(mainDeck, selector(`#version-Main-${alternate}`)), base),
+      expectOutMessage(
+        OutMessage.EditedDeck({
+          deckId: deck.id,
+          edits: [
+            {
+              _tag: 'StepCopies',
+              zone: 'Main',
+              printingId: alternate,
+              step: -1,
+            },
+            { _tag: 'StepCopies', zone: 'Main', printingId: base, step: 1 },
+          ],
+        }),
+      ),
+    )
+  })
+
   test('deleting asks first', () => {
     scene(
       { update: update(Option.some(deck)), view: sceneView() },

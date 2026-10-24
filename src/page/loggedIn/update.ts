@@ -330,6 +330,8 @@ const foldDeckPageOutMessage = DeckPage.OutMessage.match<
 >({
   EditedDeck: edits => editDeck(edits),
   RequestedRemoveDeck: ({ deckId }) => removeDeck(deckId),
+  SteppedOwned: stepped => stepQuantity(stepped),
+  RequestedCollectionRetry: () => retryCollection,
   RequestedRetryLoadDecks: () => retryDecks,
 })
 

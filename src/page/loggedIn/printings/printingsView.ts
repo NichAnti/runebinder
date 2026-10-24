@@ -3,18 +3,13 @@ import type { Html, HtmlBuilder } from 'foldkit/html'
 
 import { type DeckEdit, Printing, Wishlist } from '../../../domain'
 import { Button, IconButton, Link, QuantityStepper } from '../../../ui'
-import { type CountKind, Counts } from './counts'
+import { Counts } from './counts'
 
 export const VARIANT_LABELS: Readonly<Record<Printing.Variant, string>> = {
   Base: 'Standard',
   AlternateArt: 'Alternate art',
   Signature: 'Signature',
   Overnumbered: 'Overnumbered',
-}
-
-const STEPPER_LABELS: Readonly<Record<CountKind, string>> = {
-  Owned: 'Owned',
-  InDeck: 'In deck',
 }
 
 export type PrintingsConfig<Message> = Readonly<{
@@ -44,7 +39,7 @@ const stepperView = <Message>(
   counts._tag === 'Ready'
     ? QuantityStepper.view(
         {
-          label: `${STEPPER_LABELS[counts.kind]}: ${VARIANT_LABELS[printing.variant]} ${printing.publicCode}`,
+          label: `Owned: ${VARIANT_LABELS[printing.variant]} ${printing.publicCode}`,
           quantity: quantityIn(counts.quantities, printing.id),
           max: counts.max,
           onDecrement: onStep(printing.id, -1),
@@ -54,17 +49,8 @@ const stepperView = <Message>(
       )
     : h.empty
 
-const totalText = (kind: CountKind, total: number): string => {
-  if (kind === 'InDeck') {
-    return total === 1
-      ? '1 copy in this deck.'
-      : `${total} copies in this deck.`
-  } else if (total === 0) {
-    return 'You own none yet.'
-  } else {
-    return `You own ${total}.`
-  }
-}
+const totalText = (total: number): string =>
+  total === 0 ? 'You own none yet.' : `You own ${total}.`
 
 const summaryView = <Message>(
   { card, counts, onRetry }: PrintingsConfig<Message>,
@@ -90,12 +76,11 @@ const summaryView = <Message>(
           ),
         ],
       ),
-    Ready: ({ kind, quantities }) =>
+    Ready: ({ quantities }) =>
       h.p(
         [h.Class('text-sm text-fg-muted')],
         [
           totalText(
-            kind,
             Number.sumAll(
               Array.map(card.printings, ({ id }) => quantityIn(quantities, id)),
             ),

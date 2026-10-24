@@ -9,7 +9,6 @@ export const countsOf = (collection: Model): Counts =>
     Failed: () => Counts.Failed(),
     Ready: ({ owned }) =>
       Counts.Ready({
-        kind: 'Owned',
         quantities: owned,
         max: Collection.MAX_QUANTITY,
       }),

@@ -17,9 +17,16 @@ export type PanelCard = typeof PanelCard.Type
 
 export const Panel = defineTaggedUnion({
   Closed: {},
-  Open: { cardId: Printing.CardId, opener: Opener, card: PanelCard },
+  Open: {
+    cardId: Printing.CardId,
+    tileId: Schema.String,
+    opener: Opener,
+    card: PanelCard,
+  },
 })
 export type Panel = typeof Panel.Type
+
+export type Target = Readonly<{ cardId: Printing.CardId; tileId: string }>
 
 export const Model = Schema.Struct({
   hoverIntent: HoverIntent.Model,

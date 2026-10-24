@@ -70,6 +70,33 @@ export const linesOf = (
     Array.sort(byLabel),
   )
 
+const byKey = Order.mapInput(Order.String, ({ key }: Line) => key)
+
+export const versionLinesOf = (
+  zoneCards: ReadonlyArray<Deck.DeckCard>,
+  byPrinting: ReadonlyMap<string, Printing.Card>,
+): ReadonlyArray<Line> =>
+  pipe(
+    zoneCards,
+    Array.map((deckCard): Line => {
+      const maybeCard = Option.fromNullishOr(
+        byPrinting.get(deckCard.printingId),
+      )
+
+      return {
+        key: deckCard.printingId,
+        maybeCard,
+        label: Option.match(maybeCard, {
+          onNone: () => deckCard.printingId,
+          onSome: nameOf,
+        }),
+        cards: [deckCard],
+        copies: deckCard.copies,
+      }
+    }),
+    Array.sort(Order.combine(byLabel, byKey)),
+  )
+
 export const quantitiesOf = (
   printingIds: ReadonlyArray<Printing.PrintingId>,
 ): Readonly<Record<string, number>> =>

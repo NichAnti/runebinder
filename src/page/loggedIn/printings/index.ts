@@ -1,4 +1,4 @@
-export { CountKind, Counts } from './counts'
+export { Counts } from './counts'
 export {
   type PrintingsConfig,
   VARIANT_LABELS,
