@@ -39,6 +39,7 @@ export const Message = defineMessageUnion({
   ClickedAddCard: { cardId: Printing.CardId },
   SucceededLoadCardToWish: { card: Printing.Card },
   ClickedStepAdded: { printingId: Printing.PrintingId, step: DeckEdit.Step },
+  ClickedRemoveAdded: { printingId: Printing.PrintingId },
   ToggledLine: { lineKey: Schema.String, isChecked: Schema.Boolean },
   SelectedVersion: { lineKey: Schema.String, value: Schema.String },
   ClickedBought: { purchases: Schema.NonEmptyArray(Purchase) },
@@ -60,6 +61,7 @@ export type Message = typeof Message.Type
 
 export const OutMessage = defineMessageUnion({
   SteppedAdded: { printingId: Printing.PrintingId, step: DeckEdit.Step },
+  RemovedAdded: { printingId: Printing.PrintingId },
   MarkedBought: { purchases: Schema.NonEmptyArray(Purchase) },
   RequestedCreate: Outgoing,
   RequestedSync: Outgoing,

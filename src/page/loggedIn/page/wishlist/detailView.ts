@@ -1,4 +1,4 @@
-import { Array, Number, Option, Record } from 'effect'
+import { Array, Number, Option, Order, Record } from 'effect'
 import type { Html, HtmlBuilder } from 'foldkit/html'
 
 import {
@@ -9,8 +9,10 @@ import {
 } from '../../../../domain'
 import { wishlistsRouter } from '../../../../route'
 import {
+  Badge,
   Button,
   Checkbox,
+  IconButton,
   Link,
   QuantityStepper,
   SearchField,
@@ -46,6 +48,20 @@ const purchaseOf = (
   isCustom: section.isCustom,
 })
 
+const labelOf = (model: Model, printingId: Printing.PrintingId): string =>
+  Option.match(
+    Option.fromNullishOr(cardsByPrinting(model.cards).get(printingId)),
+    {
+      onNone: () => printingId,
+      onSome: nameOf,
+    },
+  )
+
+const byName = (model: Model) =>
+  Order.mapInput(Order.String, (line: Wishlist.Line) =>
+    labelOf(model, line.printingId),
+  )
+
 const lineView = (
   model: Model,
   section: Section,
@@ -74,6 +90,7 @@ const lineView = (
         {
           id: `select-${lineKey}`,
           label: `Select ${label}`,
+          isLabelHidden: true,
           isChecked: Option.getOrElse(
             Record.get(model.selected, lineKey),
             () => false,
@@ -97,8 +114,22 @@ const lineView = (
         [h.Class('flex min-w-48 flex-1 flex-col gap-0.5')],
         [
           h.span(
-            [h.Class('text-sm font-semibold')],
-            [`${line.quantity}× ${label}`],
+            [
+              h.Class(
+                'flex flex-wrap items-center gap-2 text-sm font-semibold',
+              ),
+            ],
+            [
+              label,
+              ...(section.isCustom
+                ? []
+                : [
+                    Badge.view(
+                      { content: [`Need ${line.quantity}`], tone: 'Accent' },
+                      h,
+                    ),
+                  ]),
+            ],
           ),
           h.span(
             [h.Class('text-xs text-fg-muted')],
@@ -148,29 +179,46 @@ const lineView = (
               },
               h,
             ),
+            IconButton.view(
+              {
+                icon: 'Trash',
+                label: `Remove ${label}`,
+                variant: 'Danger',
+                action: {
+                  _tag: 'Click',
+                  message: Message.ClickedRemoveAdded({
+                    printingId: line.printingId,
+                  }),
+                },
+              },
+              h,
+            ),
           ]
         : []),
-      ...Option.match(maybeCard, {
-        onNone: () => [],
-        onSome: card => [
-          Select.view(
-            {
-              id: `version-${lineKey}`,
-              label: 'Bought version',
-              value: Option.getOrElse(
-                Record.get(model.versions, lineKey),
-                () => line.printingId,
-              ),
-              options: Array.map(card.printings, printing => ({
-                value: printing.id,
-                label: versionLabel(printing),
-              })),
-              onChange: value => Message.SelectedVersion({ lineKey, value }),
-            },
-            h,
-          ),
-        ],
-      }),
+      ...Option.match(
+        Option.filter(maybeCard, card => Array.length(card.printings) > 1),
+        {
+          onNone: () => [],
+          onSome: card => [
+            Select.view(
+              {
+                id: `version-${lineKey}`,
+                label: 'Arrived as',
+                value: Option.getOrElse(
+                  Record.get(model.versions, lineKey),
+                  () => line.printingId,
+                ),
+                options: Array.map(card.printings, printing => ({
+                  value: printing.id,
+                  label: versionLabel(printing),
+                })),
+                onChange: value => Message.SelectedVersion({ lineKey, value }),
+              },
+              h,
+            ),
+          ],
+        },
+      ),
       Button.view(
         {
           content: ['Bought'],
@@ -358,7 +406,9 @@ export const detailView = (
                   h.AriaLabel(`${section.title} cards`),
                   h.Class('flex flex-col gap-2'),
                 ],
-                Array.map(lines, line => lineView(model, section, line, h)),
+                Array.map(Array.sort(lines, byName(model)), line =>
+                  lineView(model, section, line, h),
+                ),
               ),
               markBoughtView(model, section, lines, h),
             ],

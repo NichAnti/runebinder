@@ -27,14 +27,29 @@ export const update = (model: Model, message: Message) =>
   })
 
 export const view = (model: Model, h: HtmlBuilder<Message>): Html =>
-  Checkbox.view(
-    {
-      id: 'remember',
-      label: 'Remember on this device',
-      description: 'Otherwise it is forgotten when this tab closes.',
-      isChecked: model.isRemembered,
-      onToggle: isChecked => Message.ToggledRemember({ isChecked }),
-      isDisabled: model.isDisabled,
-    },
-    h,
+  h.div(
+    [],
+    [
+      Checkbox.view(
+        {
+          id: 'remember',
+          label: 'Remember on this device',
+          description: 'Otherwise it is forgotten when this tab closes.',
+          isChecked: model.isRemembered,
+          onToggle: isChecked => Message.ToggledRemember({ isChecked }),
+          isDisabled: model.isDisabled,
+        },
+        h,
+      ),
+      Checkbox.view(
+        {
+          id: 'select-vi',
+          label: 'Select Vi',
+          isChecked: false,
+          isLabelHidden: true,
+          onToggle: isChecked => Message.ToggledRemember({ isChecked }),
+        },
+        h,
+      ),
+    ],
   )

@@ -1,4 +1,4 @@
-import { click, expect, given, role, scene } from 'foldkit/scene'
+import { click, expect, given, role, scene, text } from 'foldkit/scene'
 import { modifyFields } from 'foldkit/struct'
 import { describe, test } from 'vitest'
 
@@ -28,6 +28,16 @@ describe('Checkbox', () => {
       expect(
         role('checkbox', { name: 'Remember on this device' }),
       ).toBeDisabled(),
+    )
+  })
+
+  test('a hidden label still names the checkbox', () => {
+    scene(
+      { update, view },
+      given(initialModel),
+      expect(role('checkbox', { name: 'Select Vi' })).toExist(),
+      expect(text('Select Vi')).toHaveClass('sr-only'),
+      expect(text('Remember on this device')).not.toHaveClass('sr-only'),
     )
   })
 })

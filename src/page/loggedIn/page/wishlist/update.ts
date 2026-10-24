@@ -259,6 +259,11 @@ export const update = (context: Context) => (model: Model, message: Message) =>
       outMessage: OutMessage.SteppedAdded({ printingId, step }),
     }),
 
+    ClickedRemoveAdded: ({ printingId }) => ({
+      model,
+      outMessage: OutMessage.RemovedAdded({ printingId }),
+    }),
+
     ToggledLine: ({ lineKey, isChecked }) => ({
       model: modifyFields(model, {
         selected: selected => Record.set(selected, lineKey, isChecked),

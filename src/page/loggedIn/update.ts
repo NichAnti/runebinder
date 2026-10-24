@@ -469,6 +469,8 @@ const foldWishlistPageOutMessage = WishlistPage.OutMessage.match<
   Update.Step<Model, Message, Requirements>
 >({
   SteppedAdded: stepped => stepWishlist(stepped),
+  RemovedAdded: ({ printingId }) =>
+    setWishlistAdded({ printingId, quantity: Collection.Quantity.make(0) }),
   RequestedCreate: outgoing => createWishlist(outgoing),
   RequestedSync: outgoing => syncWishlist(outgoing),
   RequestedDelete: ({ wishlist }) => removeWishlist(wishlist),

@@ -6,6 +6,7 @@ import {
   expect,
   expectOutMessage,
   given,
+  label,
   role,
   scene,
   selector,
@@ -246,7 +247,7 @@ describe('wishlists page', () => {
       { update: update(context), view: sceneView({ focus: deckFocus }) },
       given(loaded),
       expect(role('heading', { name: /Vi aggro/ })).toExist(),
-      expect(text('2× Test Unit, Tester')).toExist(),
+      expect(text('Need 2')).toExist(),
       expect(role('link', { name: 'This version on CardTrader' })).toHaveAttr(
         'href',
         Wishlist.cardTraderCardUrl(blueprintId),
@@ -261,6 +262,25 @@ describe('wishlists page', () => {
       given(loaded),
       click(role('button', { name: 'Add one' })),
       expectOutMessage(OutMessage.SteppedAdded({ printingId: base, step: 1 })),
+    )
+  })
+
+  test('a custom card can be removed at once', () => {
+    scene(
+      { update: update(context), view: sceneView({ focus: customFocus }) },
+      given(loaded),
+      expect(role('checkbox', { name: 'Select Test Unit, Tester' })).toExist(),
+      expect(text('Select Test Unit, Tester')).toHaveClass('sr-only'),
+      click(role('button', { name: 'Remove Test Unit, Tester' })),
+      expectOutMessage(OutMessage.RemovedAdded({ printingId: base })),
+    )
+  })
+
+  test('the version that arrived can be chosen when there are several', () => {
+    scene(
+      { update: update(context), view: sceneView({ focus: customFocus }) },
+      given(loaded),
+      expect(label('Arrived as')).toExist(),
     )
   })
 
