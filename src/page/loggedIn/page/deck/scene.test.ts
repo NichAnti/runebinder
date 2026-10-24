@@ -345,6 +345,19 @@ describe('deck page', () => {
     )
   })
 
+  test('the main deck placeholder sits after its last cards', () => {
+    scene(
+      { update: update(Option.some(deck)), view: sceneView() },
+      given(loaded),
+      expect(
+        within(
+          within(mainDeck, role('group', { name: 'Units' })),
+          role('button', { name: 'Spells' }),
+        ),
+      ).toExist(),
+    )
+  })
+
   test('a placeholder opens the add tab with that kind of card', () => {
     scene(
       { update: update(Option.some(deck)), view: sceneView() },

@@ -625,42 +625,46 @@ const mainLinesView = (
   context: Context,
   lines: ReadonlyArray<Line>,
   h: HtmlBuilder<Message>,
-): Html =>
-  h.div(
+): Html => {
+  const groups = groupsOf(lines)
+  const maybeLastGroup = Array.last(groups)
+
+  return h.div(
     [h.Class('flex flex-col gap-5')],
-    [
-      ...Array.map(groupsOf(lines), ({ group, lines: groupLines }) =>
-        h.div(
-          [
-            h.AriaLabel(GROUP_LABELS[group]),
-            h.Role('group'),
-            h.Class('flex flex-col gap-2'),
-          ],
-          [
-            h.h3(
-              [h.Class('flex items-baseline gap-2 text-sm font-semibold')],
-              [
-                GROUP_LABELS[group],
-                h.span(
-                  [h.Class('font-normal tabular-nums text-fg-muted')],
-                  [
-                    `${Number.sumAll(Array.map(groupLines, ({ copies }) => copies))}`,
-                  ],
-                ),
-              ],
-            ),
-            linesView(context, 'Main', groupLines, [], h),
-          ],
-        ),
-      ),
-      ...Array.match(placeholderView(context, 'Main', h), {
-        onEmpty: () => [],
-        onNonEmpty: placeholder => [
-          linesView(context, 'Main', [], placeholder, h),
+    Array.map(groups, ({ group, lines: groupLines }) =>
+      h.div(
+        [
+          h.AriaLabel(GROUP_LABELS[group]),
+          h.Role('group'),
+          h.Class('flex flex-col gap-2'),
         ],
-      }),
-    ],
+        [
+          h.h3(
+            [h.Class('flex items-baseline gap-2 text-sm font-semibold')],
+            [
+              GROUP_LABELS[group],
+              h.span(
+                [h.Class('font-normal tabular-nums text-fg-muted')],
+                [
+                  `${Number.sumAll(Array.map(groupLines, ({ copies }) => copies))}`,
+                ],
+              ),
+            ],
+          ),
+          linesView(
+            context,
+            'Main',
+            groupLines,
+            Option.exists(maybeLastGroup, last => last.group === group)
+              ? placeholderView(context, 'Main', h)
+              : [],
+            h,
+          ),
+        ],
+      ),
+    ),
   )
+}
 
 const slotView = (
   context: Context,
