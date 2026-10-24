@@ -47,6 +47,19 @@ const mostCopies = (
     ({ printingId }) => printingId,
   )
 
+const ZONE_SIZE: Readonly<Record<Deck.Zone, number>> = {
+  Main: DeckRules.CONSTRUCTED_MAIN_DECK_SIZE,
+  Sideboard: DeckRules.MAX_SIDEBOARD,
+  Runes: DeckRules.RUNE_DECK_SIZE,
+  Battlefields: DeckRules.CONSTRUCTED_BATTLEFIELDS,
+}
+
+export const roomIn = (contents: Deck.DeckContents, zone: Deck.Zone): number =>
+  ZONE_SIZE[zone] -
+  (zone === 'Main'
+    ? Deck.mainDeckSize(contents)
+    : Deck.copiesIn(DeckEdit.cardsIn(contents, zone)))
+
 const step = (
   zone: Deck.Zone,
   printingId: Printing.PrintingId,
@@ -154,7 +167,7 @@ export const copyStepOf = (
       targetOf(zone),
       placement,
       maybeLimit,
-      DeckRules.MAX_SIDEBOARD - Deck.copiesIn(contents.sideboard),
+      roomIn(contents, zone),
     ),
     addition => {
       if (addition === 'Add') {

@@ -36,6 +36,15 @@ describe('adding a copy', () => {
     )
   })
 
+  test('a full part takes nothing more, not even a moved copy', () => {
+    expect(additionTo('Main', placed(1, 1), three, 0)).toStrictEqual(
+      Option.none(),
+    )
+    expect(additionTo('Main', placed(2, 1), three, 0)).toStrictEqual(
+      Option.none(),
+    )
+  })
+
   test('nothing can be added at the limit with nothing to move, or with a full sideboard', () => {
     expect(additionTo('Main', placed(3, 0), three, 10)).toStrictEqual(
       Option.none(),

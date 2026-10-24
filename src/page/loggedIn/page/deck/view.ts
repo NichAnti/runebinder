@@ -5,7 +5,6 @@ import type { Html, HtmlBuilder } from 'foldkit/html'
 import {
   type CatalogueSearch,
   Deck,
-  DeckEdit,
   DeckRules,
   type DeckStructure,
   Missing,
@@ -36,7 +35,7 @@ import * as CollectionState from '../../collection'
 import * as DecksState from '../../decks'
 import * as Printings from '../../printings'
 import { problemText } from '../deckList/view'
-import { copiesIn, copyStepOf } from './copies'
+import { copiesIn, copyStepOf, roomIn } from './copies'
 import {
   CURVE_TOP,
   type Line,
@@ -589,18 +588,8 @@ const PLACEHOLDER_TABS: Readonly<Record<Deck.Zone, ReadonlyArray<AddTab>>> = {
   Battlefields: ['Battlefield'],
 }
 
-const ZONE_ROOM: Readonly<Record<Deck.Zone, number>> = {
-  Main: DeckRules.CONSTRUCTED_MAIN_DECK_SIZE,
-  Sideboard: DeckRules.MAX_SIDEBOARD,
-  Runes: DeckRules.RUNE_DECK_SIZE,
-  Battlefields: DeckRules.CONSTRUCTED_BATTLEFIELDS,
-}
-
 const hasRoom = (context: Context, zone: Deck.Zone): boolean =>
-  (zone === 'Main'
-    ? Deck.mainDeckSize(context.deck.contents)
-    : Deck.copiesIn(DeckEdit.cardsIn(context.deck.contents, zone))) <
-  ZONE_ROOM[zone]
+  roomIn(context.deck.contents, zone) > 0
 
 const placeholderView = (
   context: Context,

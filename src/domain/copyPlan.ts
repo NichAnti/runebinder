@@ -24,11 +24,13 @@ export const additionTo = (
   target: Target,
   placement: Placement,
   maybeLimit: Option.Option<number>,
-  sideboardRoom: number,
+  targetRoom: number,
 ): Option.Option<Addition> => {
   const total = placement.main + placement.sideboard + placement.champion
 
-  if (target === 'Other') {
+  if (targetRoom <= 0) {
+    return Option.none()
+  } else if (target === 'Other') {
     return isUnderLimit(placement.other, maybeLimit)
       ? Option.some('Add')
       : Option.none()
@@ -40,8 +42,6 @@ export const additionTo = (
     } else {
       return Option.none()
     }
-  } else if (sideboardRoom <= 0) {
-    return Option.none()
   } else if (isUnderLimit(total, maybeLimit)) {
     return Option.some('Add')
   } else if (placement.main > 0) {
