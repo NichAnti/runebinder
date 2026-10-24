@@ -39,12 +39,13 @@ describe('Dialog', () => {
     )
   })
 
-  test('Cancel closes without running the action', () => {
+  test('the close icon closes without running the action', () => {
     scene(
       { update, view },
       given(initialModel),
       ...opened,
-      click(role('button', { name: 'Cancel' })),
+      expect(role('button', { name: 'Cancel' })).not.toExist(),
+      click(role('button', { name: 'Close' })),
       ...closed,
       expect(role('heading', { name: 'Delete the wishlist?' })).not.toExist(),
       expect(text('Deleted 0')).toExist(),

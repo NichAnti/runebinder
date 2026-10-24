@@ -1,3 +1,4 @@
+import { Array } from 'effect'
 import type { Html, HtmlBuilder } from 'foldkit/html'
 
 import { Dialog as HeadlessDialog } from '@foldkit/ui'
@@ -29,7 +30,6 @@ export type ViewConfig<ParentMessage> = Readonly<{
   description: ReadonlyArray<Html | string>
   body?: ReadonlyArray<Html>
   actions?: ReadonlyArray<Html>
-  cancelLabel?: string
 }>
 
 const recipe = {
@@ -44,8 +44,6 @@ const recipe = {
     'cursor-pointer rounded-control p-1 text-fg-muted hover:text-fg focus-visible:outline-2 focus-visible:outline-focus',
   description: 'text-sm text-fg-muted',
   actions: 'flex flex-wrap justify-end gap-2',
-  cancel:
-    'inline-flex cursor-pointer items-center justify-center rounded-control border border-border bg-surface px-3 py-2 text-sm font-semibold text-fg hover:bg-surface-raised focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus',
 }
 
 export const view = <ParentMessage>(
@@ -57,7 +55,6 @@ export const view = <ParentMessage>(
     description,
     body = [],
     actions = [],
-    cancelLabel = 'Cancel',
   }: ViewConfig<ParentMessage>,
   h: HtmlBuilder<ParentMessage>,
 ): Html =>
@@ -122,23 +119,18 @@ export const view = <ParentMessage>(
                       description,
                     ),
                     ...body,
-                    h.div(
-                      [
-                        h.DataAttribute('slot', 'actions'),
-                        h.Class(recipe.actions),
-                      ],
-                      [
-                        h.button(
+                    ...Array.match(actions, {
+                      onEmpty: () => [],
+                      onNonEmpty: nonEmpty => [
+                        h.div(
                           [
-                            ...render.closeButton,
-                            h.DataAttribute('slot', 'cancel'),
-                            h.Class(recipe.cancel),
+                            h.DataAttribute('slot', 'actions'),
+                            h.Class(recipe.actions),
                           ],
-                          [cancelLabel],
+                          nonEmpty,
                         ),
-                        ...actions,
                       ],
-                    ),
+                    }),
                   ],
                 ),
               ]
