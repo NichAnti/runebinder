@@ -102,7 +102,14 @@ describe('deck page', () => {
     scene(
       { update: update(Option.some(deck)), view: sceneView() },
       given(asList),
-      click(within(mainDeck, role('button', { name: 'Make champion' }))),
+      click(
+        within(
+          mainDeck,
+          role('button', {
+            name: 'Make Test Unit, Tester the chosen champion',
+          }),
+        ),
+      ),
       expectOutMessage(
         OutMessage.EditedDeck({
           deckId: deck.id,
@@ -160,10 +167,9 @@ describe('deck page', () => {
     scene(
       { update: update(Option.some(deck)), view: sceneView() },
       given(loaded),
-      expect(role('region', { name: 'Legend' })).toContainText(
-        'Choose a legend.',
-      ),
-      expect(mainDeck).toContainText('3/40 ⚠'),
+      expect(role('group', { name: 'Legend' })).toContainText('No legend yet'),
+      expect(text('Choose a legend.')).toExist(),
+      expect(mainDeck).toContainText('3 / 40'),
     )
   })
 
@@ -418,12 +424,17 @@ describe('deck page', () => {
     )
   })
 
-  test('grid tiles offer Make champion and no move buttons', () => {
+  test('grid tiles offer the champion star and no move buttons', () => {
     scene(
       { update: update(Option.some(deck)), view: sceneView() },
       given(loaded),
       expect(
-        within(mainDeck, role('button', { name: 'Make champion' })),
+        within(
+          mainDeck,
+          role('button', {
+            name: 'Make Test Unit, Tester the chosen champion',
+          }),
+        ),
       ).toExist(),
       expect(
         within(mainDeck, role('button', { name: 'To sideboard' })),

@@ -19,6 +19,8 @@ import {
   CardTile,
   Checkbox,
   ColumnChart,
+  Icon,
+  IconButton,
   Link,
   Notice,
   ProgressChip,
@@ -101,10 +103,10 @@ const TAB_LABELS: Readonly<Record<AddTab, string>> = {
 }
 
 const TARGETS: Readonly<Partial<Record<DeckRules.Section, string>>> = {
-  Main: `/${DeckRules.CONSTRUCTED_MAIN_DECK_SIZE}`,
-  Runes: `/${DeckRules.RUNE_DECK_SIZE}`,
-  Battlefields: `/${DeckRules.CONSTRUCTED_BATTLEFIELDS}`,
-  Sideboard: `/${DeckRules.MAX_SIDEBOARD}`,
+  Main: ` / ${DeckRules.CONSTRUCTED_MAIN_DECK_SIZE}`,
+  Runes: ` / ${DeckRules.RUNE_DECK_SIZE}`,
+  Battlefields: ` / ${DeckRules.CONSTRUCTED_BATTLEFIELDS}`,
+  Sideboard: ` / ${DeckRules.MAX_SIDEBOARD}`,
 }
 
 // HELPERS
@@ -156,6 +158,7 @@ const tileOf = (
   card: Printing.Card,
   printingId: Printing.PrintingId,
   highlights: ReadonlyArray<string>,
+  meta = '',
 ): CardTile.ViewConfig => {
   const printing = Option.getOrElse(
     Array.findFirst(card.printings, ({ id }) => id === printingId),
@@ -171,7 +174,7 @@ const tileOf = (
     title: printing.name,
     maybeSubtitle: printing.maybeSubtitle,
     domains: printing.domains,
-    meta: versionLabel(printing),
+    meta,
     highlights,
   }
 }
@@ -201,45 +204,87 @@ const panelView = (
 
 // SECTIONS
 
+const statusIconView = (
+  context: Context,
+  section: DeckRules.Section,
+  h: HtmlBuilder<Message>,
+): Html =>
+  Option.match(context.problems, {
+    onNone: () => h.empty,
+    onSome: () =>
+      Array.isReadonlyArrayEmpty(problemsIn(context, section))
+        ? h.span(
+            [h.Class('text-success')],
+            [Icon.view({ name: 'CheckCircle', size: 'Small' })],
+          )
+        : h.span(
+            [h.Class('text-danger')],
+            [Icon.view({ name: 'ExclamationTriangle', size: 'Small' })],
+          ),
+  })
+
+const problemsView = (
+  context: Context,
+  sections: ReadonlyArray<DeckRules.Section>,
+  h: HtmlBuilder<Message>,
+): Html =>
+  Array.match(
+    Array.flatMap(sections, section => problemsIn(context, section)),
+    {
+      onEmpty: () => h.empty,
+      onNonEmpty: problems =>
+        h.ul(
+          [
+            h.Role('alert'),
+            h.Class(
+              'flex flex-col gap-1 rounded-control border border-danger bg-surface px-3 py-2 text-sm text-danger',
+            ),
+          ],
+          Array.map(problems, problem => {
+            const text = explain(problem, nameFinder(context.byPrinting)).text
+
+            return h.keyed('li')(
+              text,
+              [h.Class('flex items-start gap-2')],
+              [Icon.view({ name: 'ExclamationTriangle', size: 'Small' }), text],
+            )
+          }),
+        ),
+    },
+  )
+
 const sectionHeader = (
   context: Context,
   section: DeckRules.Section,
   maybeCount: Option.Option<number>,
   h: HtmlBuilder<Message>,
-): Html => {
-  const problems = problemsIn(context, section)
-  const status = Option.match(context.problems, {
-    onNone: () => '',
-    onSome: () => (Array.isReadonlyArrayEmpty(problems) ? ' ✓' : ' ⚠'),
-  })
-
-  return h.div(
-    [h.Class('flex flex-col gap-1')],
+): Html =>
+  h.div(
+    [h.Class('flex flex-col gap-2')],
     [
-      h.h2(
-        [h.Class('flex items-baseline gap-2 text-base font-semibold')],
+      h.div(
+        [h.Class('flex items-center justify-between gap-3')],
         [
-          SECTION_LABELS[section],
-          ...Option.match(maybeCount, {
-            onNone: () => [],
-            onSome: count => [
-              h.span(
-                [h.Class('text-sm font-normal tabular-nums text-fg-muted')],
-                [`${count}${TARGETS[section] ?? ''}${status}`],
+          h.h2([h.Class('text-lg font-semibold')], [SECTION_LABELS[section]]),
+          h.span(
+            [
+              h.Class(
+                'flex items-center gap-1.5 text-sm tabular-nums text-fg-muted',
               ),
             ],
-          }),
+            [
+              ...Option.match(maybeCount, {
+                onNone: () => [],
+                onSome: count => [`${count}${TARGETS[section] ?? ''}`],
+              }),
+              statusIconView(context, section, h),
+            ],
+          ),
         ],
       ),
-      ...Array.map(problems, problem =>
-        h.p(
-          [h.Class('text-sm text-danger')],
-          [explain(problem, nameFinder(context.byPrinting)).text],
-        ),
-      ),
+      problemsView(context, [section], h),
     ],
   )
-}
 
 const ZONE_SHORT_LABELS: Readonly<Record<Deck.Zone, string>> = {
   Main: 'Main',
@@ -279,10 +324,10 @@ const countersView = (
     )
 
     return h.div(
-      [h.Class('flex items-center gap-2')],
+      [h.Class('flex w-full items-center justify-between gap-2')],
       [
         h.span(
-          [h.AriaHidden(true), h.Class('w-9 shrink-0 text-xs text-fg-muted')],
+          [h.AriaHidden(true), h.Class('text-xs text-fg-muted')],
           [ZONE_SHORT_LABELS[countedZone]],
         ),
         QuantityStepper.view(
@@ -311,7 +356,7 @@ const countersView = (
   }
 
   return h.div(
-    [h.Class('flex flex-col items-start gap-1')],
+    [h.Class('flex w-full flex-col gap-1')],
     Array.map(zones, counter),
   )
 }
@@ -361,9 +406,6 @@ const lineStepper = (
         h,
       ),
   })
-
-const versionLabel = (printing: Printing.Printing): string =>
-  `${Printings.VARIANT_LABELS[printing.variant]} · ${printing.publicCode}`
 
 const SHORT_VARIANT_LABELS: Readonly<Record<Printing.Variant, string>> = {
   Base: 'Standard',
@@ -419,22 +461,67 @@ const lineVersionView = (
     },
   })
 
-const lineActions = (
+const championButton = (
   zone: Deck.Zone,
   line: Line,
   h: HtmlBuilder<Message>,
-): ReadonlyArray<Html> =>
+): Html =>
   zone === 'Main' && Option.exists(line.maybeCard, isChampionUnit)
-    ? [
-        smallButton(
-          'Make champion',
-          Message.ClickedMakeChampion({
-            printingId: Array.headNonEmpty(line.cards).printingId,
-          }),
-          h,
-        ),
-      ]
-    : []
+    ? IconButton.view(
+        {
+          icon: 'Star',
+          label: `Make ${line.label} the chosen champion`,
+          size: 'Small',
+          action: {
+            _tag: 'Click',
+            message: Message.ClickedMakeChampion({
+              printingId: Array.headNonEmpty(line.cards).printingId,
+            }),
+          },
+        },
+        h,
+      )
+    : h.empty
+
+const versionCaption = (
+  card: Printing.Card,
+  printingId: Printing.PrintingId,
+  h: HtmlBuilder<Message>,
+): Html =>
+  h.span(
+    [h.Class('min-w-0 flex-1 truncate text-xs text-fg-muted')],
+    [
+      Option.match(
+        Array.findFirst(card.printings, ({ id }) => id === printingId),
+        { onNone: () => '', onSome: shortVersionLabel },
+      ),
+    ],
+  )
+
+const versionRow = (
+  zone: Deck.Zone,
+  line: Line,
+  h: HtmlBuilder<Message>,
+): Html =>
+  h.div(
+    [h.Class('flex h-7 items-center gap-1')],
+    [
+      Option.match(line.maybeCard, {
+        onNone: () => h.empty,
+        onSome: card => {
+          const from = Array.headNonEmpty(line.cards).printingId
+
+          return Array.length(card.printings) > 1
+            ? h.div(
+                [h.Class('min-w-0 flex-1')],
+                [lineVersionView(zone, line, h)],
+              )
+            : versionCaption(card, from, h)
+        },
+      }),
+      championButton(zone, line, h),
+    ],
+  )
 
 const gridLineView = (
   context: Context,
@@ -444,7 +531,7 @@ const gridLineView = (
 ): Html =>
   h.keyed('li')(
     line.key,
-    [h.Class('flex flex-col gap-2')],
+    [h.Class('flex min-w-0 flex-col gap-2')],
     [
       Option.match(line.maybeCard, {
         onNone: () => h.span([h.Class('text-sm')], [line.label]),
@@ -468,14 +555,8 @@ const gridLineView = (
             h,
           ),
       }),
-      lineVersionView(zone, line, h),
+      versionRow(zone, line, h),
       lineStepper(context, zone, line, h),
-      ...Array.match(lineActions(zone, line, h), {
-        onEmpty: () => [],
-        onNonEmpty: actions => [
-          h.div([h.Class('flex flex-wrap gap-1')], actions),
-        ],
-      }),
     ],
   )
 
@@ -518,7 +599,7 @@ const listLineView = (
       ),
       lineVersionView(zone, line, h),
       lineStepper(context, zone, line, h),
-      ...lineActions(zone, line, h),
+      championButton(zone, line, h),
     ],
   )
 
@@ -532,7 +613,9 @@ const zoneView = (
     [
       h.Id(sectionElementId(zone)),
       h.AriaLabel(SECTION_LABELS[zone]),
-      h.Class('flex scroll-mt-16 flex-col gap-3'),
+      h.Class(
+        'flex scroll-mt-20 flex-col gap-4 border-t border-border pt-6 first:border-t-0 first:pt-0',
+      ),
     ],
     [
       sectionHeader(
@@ -688,7 +771,7 @@ const mainLinesView = (
   const maybeLastGroup = Array.last(groups)
 
   return h.div(
-    [h.Class('flex flex-col gap-5')],
+    [h.Class('flex flex-col gap-6')],
     Array.map(groups, ({ group, lines: groupLines }) =>
       h.div(
         [
@@ -698,7 +781,11 @@ const mainLinesView = (
         ],
         [
           h.h3(
-            [h.Class('flex items-baseline gap-2 text-sm font-semibold')],
+            [
+              h.Class(
+                'flex items-baseline gap-2 text-xs font-semibold tracking-wide text-fg-muted uppercase',
+              ),
+            ],
             [
               GROUP_LABELS[group],
               h.span(
@@ -724,22 +811,32 @@ const mainLinesView = (
   )
 }
 
-const slotView = (
+const identitySlotView = (
   context: Context,
   place: 'Legend' | 'ChosenChampion',
   maybePrintingId: Option.Option<Printing.PrintingId>,
   chooseTab: AddTab,
   onClear: Message,
   h: HtmlBuilder<Message>,
-): Html =>
-  h.section(
+): Html => {
+  const noun = place === 'Legend' ? 'legend' : 'champion'
+
+  return h.div(
     [
       h.Id(sectionElementId(place)),
       h.AriaLabel(SECTION_LABELS[place]),
-      h.Class('flex scroll-mt-16 flex-col gap-2'),
+      h.Role('group'),
+      h.Class('flex w-28 shrink-0 scroll-mt-20 flex-col gap-1.5'),
     ],
     [
-      sectionHeader(context, place, Option.none(), h),
+      h.span(
+        [
+          h.Class(
+            'flex items-center justify-between text-xs font-medium text-fg-muted',
+          ),
+        ],
+        [SECTION_LABELS[place], statusIconView(context, place, h)],
+      ),
       Option.match(
         Option.flatMap(maybePrintingId, printingId =>
           Option.map(
@@ -752,25 +849,21 @@ const slotView = (
             h.div(
               [
                 h.Class(
-                  'flex aspect-[744/1039] w-40 flex-col items-center justify-center gap-2 rounded-card border border-dashed border-border p-3 text-center text-sm text-fg-muted',
+                  'flex aspect-[744/1039] w-full flex-col items-center justify-center gap-2 rounded-card border border-dashed border-border p-2 text-center text-xs text-fg-muted',
                 ),
               ],
               [
-                place === 'Legend' ? 'No legend yet' : 'No champion yet',
-                Button.view(
-                  {
-                    content: [
-                      place === 'Legend' ? 'Choose legend' : 'Choose champion',
-                    ],
-                    onClick: Message.SelectedAddTab({ tab: chooseTab }),
-                  },
+                `No ${noun} yet`,
+                smallButton(
+                  'Choose',
+                  Message.SelectedAddTab({ tab: chooseTab }),
                   h,
                 ),
               ],
             ),
           onSome: ({ card, printingId }) =>
             h.div(
-              [h.Class('flex w-40 flex-col gap-2')],
+              [h.Class('flex flex-col gap-1.5')],
               [
                 panelView(
                   context,
@@ -787,22 +880,46 @@ const slotView = (
                   },
                   h,
                 ),
-                versionPickerView(
-                  card,
-                  printingId,
-                  `version-${place}`,
-                  value => Message.SelectedSlotVersion({ place, value }),
-                  h,
-                ),
                 h.div(
-                  [h.Class('flex gap-2')],
+                  [h.Class('flex h-7 items-center gap-1')],
                   [
-                    smallButton(
-                      'Change',
-                      Message.SelectedAddTab({ tab: chooseTab }),
+                    Array.length(card.printings) > 1
+                      ? h.div(
+                          [h.Class('min-w-0 flex-1')],
+                          [
+                            versionPickerView(
+                              card,
+                              printingId,
+                              `version-${place}`,
+                              value =>
+                                Message.SelectedSlotVersion({ place, value }),
+                              h,
+                            ),
+                          ],
+                        )
+                      : versionCaption(card, printingId, h),
+                    IconButton.view(
+                      {
+                        icon: 'ArrowPath',
+                        label: `Change ${noun}`,
+                        size: 'Small',
+                        action: {
+                          _tag: 'Click',
+                          message: Message.SelectedAddTab({ tab: chooseTab }),
+                        },
+                      },
                       h,
                     ),
-                    smallButton('Remove', onClear, h),
+                    IconButton.view(
+                      {
+                        icon: 'Trash',
+                        label: `Remove ${noun}`,
+                        size: 'Small',
+                        variant: 'Danger',
+                        action: { _tag: 'Click', message: onClear },
+                      },
+                      h,
+                    ),
                   ],
                 ),
               ],
@@ -811,6 +928,7 @@ const slotView = (
       ),
     ],
   )
+}
 
 const additionalLegendsView = (
   context: Context,
@@ -825,7 +943,7 @@ const additionalLegendsView = (
         [
           h.Id(sectionElementId('AdditionalLegends')),
           h.AriaLabel(SECTION_LABELS.AdditionalLegends),
-          h.Class('flex scroll-mt-16 flex-col gap-2'),
+          h.Class('flex scroll-mt-20 flex-col gap-2'),
         ],
         [
           sectionHeader(
@@ -1351,57 +1469,109 @@ const exportView = (model: Model, h: HtmlBuilder<Message>): Html =>
     }),
   )
 
-const headerView = (context: Context, h: HtmlBuilder<Message>): Html =>
-  h.header(
-    [h.Class('flex flex-col gap-3')],
+const headerView = (context: Context, h: HtmlBuilder<Message>): Html => {
+  const { contents } = context.deck
+
+  return h.header(
+    [h.Class('flex flex-col gap-4')],
     [
       Link.view({ href: decksRouter(), content: ['← Decks'] }, h),
       h.div(
-        [h.Class('flex flex-wrap items-end justify-between gap-3')],
+        [h.Class('flex flex-wrap items-start gap-4')],
         [
-          h.div(
-            [h.Class('min-w-64 flex-1')],
-            [
-              TextField.view(
-                {
-                  id: 'deck-name',
-                  label: 'Deck name',
-                  field: context.model.name,
-                  onInput: value => Message.UpdatedName({ value }),
-                },
-                h,
-              ),
-            ],
+          identitySlotView(
+            context,
+            'Legend',
+            contents.maybeLegend,
+            'Legend',
+            Message.ClickedClearLegend(),
+            h,
+          ),
+          identitySlotView(
+            context,
+            'ChosenChampion',
+            contents.maybeChosenChampion,
+            'Champion',
+            Message.ClickedClearChampion(),
+            h,
           ),
           h.div(
-            [h.Class('flex items-center gap-3')],
+            [h.Class('flex min-w-64 flex-1 flex-col gap-3')],
             [
-              SegmentedControl.view(
-                {
-                  label: 'Show cards as',
-                  choices: [
-                    { value: 'Grid', label: 'Grid' },
-                    { value: 'List', label: 'List' },
-                  ] satisfies ReadonlyArray<SegmentedControl.Choice<Layout>>,
-                  selected: context.model.layout,
-                  onSelect: layout => Message.SelectedLayout({ layout }),
-                },
-                h,
+              h.div(
+                [h.Class('flex items-start justify-between gap-3')],
+                [
+                  h.div(
+                    [h.Class('min-w-0 flex-1')],
+                    [
+                      TextField.view(
+                        {
+                          id: 'deck-name',
+                          label: 'Deck name',
+                          field: context.model.name,
+                          onInput: value => Message.UpdatedName({ value }),
+                          variant: 'Title',
+                        },
+                        h,
+                      ),
+                    ],
+                  ),
+                  h.div(
+                    [h.Class('flex shrink-0 items-center gap-2')],
+                    [
+                      SegmentedControl.view(
+                        {
+                          label: 'Show cards as',
+                          choices: [
+                            { value: 'Grid', label: 'Grid' },
+                            { value: 'List', label: 'List' },
+                          ] satisfies ReadonlyArray<
+                            SegmentedControl.Choice<Layout>
+                          >,
+                          selected: context.model.layout,
+                          onSelect: layout =>
+                            Message.SelectedLayout({ layout }),
+                        },
+                        h,
+                      ),
+                      IconButton.view(
+                        {
+                          icon: 'DocumentDuplicate',
+                          label: 'Copy deck code',
+                          action: {
+                            _tag: 'Click',
+                            message: Message.ClickedCopyCode(),
+                          },
+                        },
+                        h,
+                      ),
+                    ],
+                  ),
+                ],
               ),
-              Button.view(
-                {
-                  content: ['Copy deck code'],
-                  onClick: Message.ClickedCopyCode(),
-                },
-                h,
-              ),
+              Option.match(context.maybeLegend, {
+                onNone: () =>
+                  h.p(
+                    [h.Class('text-sm text-fg-muted')],
+                    ['Choose a legend to set the deck’s domains.'],
+                  ),
+                onSome: legend =>
+                  h.div(
+                    [h.AriaLabel('Domains'), h.Class('flex flex-wrap gap-1.5')],
+                    Array.map(legend.domains, domain =>
+                      Badge.view({ content: [domain], tone: domain }, h),
+                    ),
+                  ),
+              }),
+              problemsView(context, ['Legend', 'ChosenChampion'], h),
+              exportView(context.model, h),
             ],
           ),
         ],
       ),
-      exportView(context.model, h),
     ],
   )
+}
 
 const missingView = (context: Context, h: HtmlBuilder<Message>): Html =>
   Option.match(CollectionState.maybeOwned(context.collection), {
@@ -1517,29 +1687,8 @@ const deckView = (
         [h.Class('grid gap-8 lg:grid-cols-[minmax(0,1fr)_26rem]')],
         [
           h.div(
-            [h.Class('flex flex-col gap-8')],
+            [h.Class('flex min-w-0 flex-col gap-10')],
             [
-              h.div(
-                [h.Class('flex flex-wrap gap-6')],
-                [
-                  slotView(
-                    context,
-                    'Legend',
-                    contents.maybeLegend,
-                    'Legend',
-                    Message.ClickedClearLegend(),
-                    h,
-                  ),
-                  slotView(
-                    context,
-                    'ChosenChampion',
-                    contents.maybeChosenChampion,
-                    'Champion',
-                    Message.ClickedClearChampion(),
-                    h,
-                  ),
-                ],
-              ),
               zoneView(context, 'Main', contents.main, h),
               zoneView(context, 'Runes', contents.runes, h),
               zoneView(context, 'Battlefields', contents.battlefields, h),

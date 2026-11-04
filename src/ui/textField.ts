@@ -14,15 +14,30 @@ export type ViewConfig<Message> = Readonly<{
   onInput: (value: string) => Message
   type?: Type
   autocomplete?: string
+  variant?: Variant
 }>
+
+export type Variant = 'Default' | 'Title'
 
 const recipe = {
   root: 'flex flex-col gap-1',
-  label: 'text-sm font-medium text-fg',
-  input:
-    'rounded-control border border-border bg-surface px-3 py-2 text-fg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus aria-[invalid=true]:border-danger',
+  label: {
+    Default: 'text-sm font-medium text-fg',
+    Title: 'sr-only',
+  } satisfies Record<Variant, string>,
+  input: {
+    base: 'rounded-control text-fg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus aria-[invalid=true]:border-danger',
+    variants: {
+      Default: 'border border-border bg-surface px-3 py-2',
+      Title:
+        'w-full border border-transparent bg-transparent px-1 py-0.5 text-2xl font-semibold hover:border-border focus:border-border focus:bg-surface',
+    } satisfies Record<Variant, string>,
+  },
   error: 'text-sm text-danger',
-  defaults: { type: 'text' } satisfies Readonly<{ type: Type }>,
+  defaults: { type: 'text', variant: 'Default' } satisfies Readonly<{
+    type: Type
+    variant: Variant
+  }>,
 }
 
 export const view = <Message>(
@@ -33,6 +48,7 @@ export const view = <Message>(
     onInput,
     type = recipe.defaults.type,
     autocomplete,
+    variant = recipe.defaults.variant,
   }: ViewConfig<Message>,
   h: HtmlBuilder<Message>,
 ): Html => {
@@ -54,7 +70,7 @@ export const view = <Message>(
               [
                 ...attributes.label,
                 h.DataAttribute('slot', 'label'),
-                h.Class(recipe.label),
+                h.Class(recipe.label[variant]),
               ],
               [label],
             ),
@@ -64,7 +80,7 @@ export const view = <Message>(
                 ? []
                 : [h.Autocomplete(autocomplete)]),
               h.DataAttribute('slot', 'input'),
-              h.Class(recipe.input),
+              h.Class(`${recipe.input.base} ${recipe.input.variants[variant]}`),
             ]),
             FieldValidation.match(field, {
               onNotValidated: () => h.empty,

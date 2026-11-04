@@ -28,7 +28,7 @@ const recipe = {
   frame: 'relative',
   image:
     'aspect-[744/1039] w-full rounded-card bg-surface-raised object-cover shadow-raised transition-transform group-hover:-translate-y-0.5',
-  text: 'flex min-w-0 flex-col',
+  text: 'flex min-h-14 min-w-0 flex-col',
   title: 'line-clamp-2 text-sm font-semibold text-fg',
   subtitle: 'truncate text-xs text-fg-muted',
   footer: 'flex items-center justify-between gap-2',

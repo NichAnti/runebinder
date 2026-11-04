@@ -15,16 +15,23 @@ export type ViewConfig<Message> = Readonly<{
   label: string
   action: Action<Message>
   variant?: Variant
+  size?: Size
   isDisabled?: boolean
 }>
 
+export type Size = 'Medium' | 'Small'
+
 const recipe = {
-  base: 'inline-flex size-9 cursor-pointer items-center justify-center rounded-control border border-border bg-surface transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50',
+  base: 'inline-flex shrink-0 cursor-pointer items-center justify-center rounded-control border border-border bg-surface transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50',
   variants: {
     Default: 'text-fg hover:not-data-[disabled]:bg-surface-raised',
     Danger: 'text-danger hover:not-data-[disabled]:bg-surface-raised',
   } satisfies Record<Variant, string>,
-  defaults: { variant: 'Default' } satisfies Readonly<{ variant: Variant }>,
+  sizes: { Medium: 'size-9', Small: 'size-7' } satisfies Record<Size, string>,
+  defaults: { variant: 'Default', size: 'Medium' } satisfies Readonly<{
+    variant: Variant
+    size: Size
+  }>,
 }
 
 export const view = <Message>(
@@ -33,6 +40,7 @@ export const view = <Message>(
     label,
     action,
     variant = recipe.defaults.variant,
+    size = recipe.defaults.size,
     isDisabled = false,
   }: ViewConfig<Message>,
   h: HtmlBuilder<Message>,
@@ -41,9 +49,11 @@ export const view = <Message>(
     h.AriaLabel(label),
     h.Title(label),
     h.DataAttribute('slot', 'icon-button'),
-    h.Class(`${recipe.base} ${recipe.variants[variant]}`),
+    h.Class(`${recipe.base} ${recipe.variants[variant]} ${recipe.sizes[size]}`),
   ]
-  const content = [Icon.view({ name: icon })]
+  const content = [
+    Icon.view({ name: icon, size: size === 'Small' ? 'Small' : 'Medium' }),
+  ]
 
   return action._tag === 'External'
     ? h.a(
