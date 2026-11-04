@@ -82,7 +82,7 @@ const lineView = (
     lineKey,
     [
       h.Class(
-        'flex flex-wrap items-center gap-3 rounded-card border border-border bg-surface p-3',
+        'grid grid-cols-[auto_3rem_minmax(0,1fr)] items-center gap-3 rounded-card border border-border bg-surface p-3 sm:grid-cols-[auto_3rem_minmax(0,1fr)_auto]',
       ),
     ],
     [
@@ -99,19 +99,21 @@ const lineView = (
         },
         h,
       ),
-      ...Option.match(maybePrinting, {
-        onNone: () => [],
-        onSome: printing => [
+      Option.match(maybePrinting, {
+        onNone: () =>
+          h.div([
+            h.Class('aspect-[744/1039] w-12 rounded-control bg-surface-raised'),
+          ]),
+        onSome: printing =>
           h.img([
             h.Src(printing.imageUrl),
             h.Alt(''),
             h.Loading('lazy'),
             h.Class('w-12 rounded-control bg-surface-raised'),
           ]),
-        ],
       }),
       h.div(
-        [h.Class('flex min-w-48 flex-1 flex-col gap-0.5')],
+        [h.Class('flex min-w-0 flex-col gap-0.5')],
         [
           h.span(
             [
@@ -161,73 +163,83 @@ const lineView = (
           ),
         ],
       ),
-      ...(section.isCustom
-        ? [
-            QuantityStepper.view(
-              {
-                label: `Wanted: ${label}`,
-                quantity: line.added,
-                max: Collection.MAX_QUANTITY,
-                onDecrement: Message.ClickedStepAdded({
-                  printingId: line.printingId,
-                  step: -1,
-                }),
-                onIncrement: Message.ClickedStepAdded({
-                  printingId: line.printingId,
-                  step: 1,
-                }),
-              },
-              h,
-            ),
-            IconButton.view(
-              {
-                icon: 'Trash',
-                label: `Remove ${label}`,
-                variant: 'Danger',
-                action: {
-                  _tag: 'Click',
-                  message: Message.ClickedRemoveAdded({
-                    printingId: line.printingId,
-                  }),
-                },
-              },
-              h,
-            ),
-          ]
-        : []),
-      ...Option.match(
-        Option.filter(maybeCard, card => Array.length(card.printings) > 1),
-        {
-          onNone: () => [],
-          onSome: card => [
-            Select.view(
-              {
-                id: `version-${lineKey}`,
-                label: 'Arrived as',
-                value: Option.getOrElse(
-                  Record.get(model.versions, lineKey),
-                  () => line.printingId,
+      h.div(
+        [
+          h.Class(
+            'col-span-full flex flex-wrap items-center justify-end gap-2 sm:col-span-1',
+          ),
+        ],
+        [
+          ...Option.match(
+            Option.filter(maybeCard, card => Array.length(card.printings) > 1),
+            {
+              onNone: () => [],
+              onSome: card => [
+                Select.view(
+                  {
+                    id: `version-${lineKey}`,
+                    label: 'Arrived as',
+                    value: Option.getOrElse(
+                      Record.get(model.versions, lineKey),
+                      () => line.printingId,
+                    ),
+                    options: Array.map(card.printings, printing => ({
+                      value: printing.id,
+                      label: versionLabel(printing),
+                    })),
+                    onChange: value =>
+                      Message.SelectedVersion({ lineKey, value }),
+                  },
+                  h,
                 ),
-                options: Array.map(card.printings, printing => ({
-                  value: printing.id,
-                  label: versionLabel(printing),
-                })),
-                onChange: value => Message.SelectedVersion({ lineKey, value }),
-              },
-              h,
-            ),
-          ],
-        },
-      ),
-      Button.view(
-        {
-          content: ['Bought'],
-          variant: 'Secondary',
-          onClick: Message.ClickedBought({
-            purchases: [purchaseOf(model, section, line)],
-          }),
-        },
-        h,
+              ],
+            },
+          ),
+          ...(section.isCustom
+            ? [
+                QuantityStepper.view(
+                  {
+                    label: `Wanted: ${label}`,
+                    quantity: line.added,
+                    max: Collection.MAX_QUANTITY,
+                    onDecrement: Message.ClickedStepAdded({
+                      printingId: line.printingId,
+                      step: -1,
+                    }),
+                    onIncrement: Message.ClickedStepAdded({
+                      printingId: line.printingId,
+                      step: 1,
+                    }),
+                  },
+                  h,
+                ),
+                IconButton.view(
+                  {
+                    icon: 'Trash',
+                    label: `Remove ${label}`,
+                    variant: 'Danger',
+                    action: {
+                      _tag: 'Click',
+                      message: Message.ClickedRemoveAdded({
+                        printingId: line.printingId,
+                      }),
+                    },
+                  },
+                  h,
+                ),
+              ]
+            : []),
+          Button.view(
+            {
+              content: ['Bought'],
+              variant: 'Secondary',
+              onClick: Message.ClickedBought({
+                purchases: [purchaseOf(model, section, line)],
+              }),
+            },
+            h,
+          ),
+        ],
       ),
     ],
   )
