@@ -1,6 +1,6 @@
 # MVP plan
 
-Work happens on the `mvc` branch, locally, without pushing.
+Work happens on the `mvp` branch, locally, without pushing.
 
 ## How each step works
 
@@ -8,7 +8,7 @@ Work happens on the `mvc` branch, locally, without pushing.
 2. The user approves or changes it.
 3. The agent implements only what was approved.
 4. The user runs `bun run check`.
-5. The user reviews and commits on `mvc`.
+5. The user reviews and commits on `mvp`.
 
 🗣 marks a first of its kind (first token, component, page, API route, …).
 Its structure is agreed before any code is written.
@@ -83,7 +83,7 @@ Its structure is agreed before any code is written.
 - [x] 9.1d Deck page: deck stats and card search as tabs, a bottom sheet for them on phones, an identity header with an inline-editable name, one tile per version with capped Main / Side counters, Undo after a removal, Duplicate deck
 - [x] 9.1f Home page at `/` for signed-out visitors: what the app does, how it works in four steps, the four features with real cards, questions, sign-up and sign-in links. The Cards page moves to `/cards`; signed-in visitors at `/` go there
 - [ ] 9.1e Optionally, a way to start playing a second version of a card from its tile
-- [ ] 9.2 Polish and docs refresh
+- [x] 9.2 Polish and docs refresh: dead code removed, the deck page view split by area, README and docs brought up to date
 - [x] 9.3 Riot "Legal Jibber Jabber" notice in the app (site footer, added in 4.3)
 - [ ] 9.4 Register the product on the Riot Developer Portal and apply for a production key
 - [ ] 9.5 Decide about a PR
