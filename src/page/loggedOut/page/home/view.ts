@@ -74,19 +74,32 @@ const tileView = (
 
 const ctaView = (h: HtmlBuilder<Message>): Html =>
   h.div(
-    [h.Class('flex flex-wrap gap-3')],
+    [h.Class('flex flex-col gap-2')],
     [
-      Link.view(
-        {
-          href: signUpRouter(),
-          content: ['Create a free account'],
-          variant: 'Primary',
-        },
-        h,
+      h.div(
+        [h.Class('flex flex-wrap gap-3')],
+        [
+          Link.view(
+            {
+              href: signUpRouter(),
+              content: ['Join with an invite'],
+              variant: 'Primary',
+            },
+            h,
+          ),
+          Link.view(
+            {
+              href: signInRouter(),
+              content: ['Sign in'],
+              variant: 'Secondary',
+            },
+            h,
+          ),
+        ],
       ),
-      Link.view(
-        { href: signInRouter(), content: ['Sign in'], variant: 'Secondary' },
-        h,
+      h.p(
+        [h.Class('text-sm text-fg-muted')],
+        ['Invite only for now: ask a friend who uses it for the code.'],
       ),
     ],
   )
@@ -499,6 +512,11 @@ const QUESTIONS: ReadonlyArray<Readonly<{ question: string; answer: string }>> =
     {
       question: 'Is it free?',
       answer: 'Yes. There are no ads, subscriptions or paid features.',
+    },
+    {
+      question: 'Can anyone join?',
+      answer:
+        'Not yet. Sign-up is invite only for now, so you need an invite code from someone who uses it.',
     },
     {
       question: 'Do I need a CardTrader account?',

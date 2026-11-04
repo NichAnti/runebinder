@@ -10,6 +10,7 @@ describe('reasonFor', () => {
     ['USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL', 'EmailTaken'],
     ['PASSWORD_TOO_SHORT', 'WeakPassword'],
     ['PASSWORD_TOO_LONG', 'WeakPassword'],
+    ['INVALID_INVITE_CODE', 'InvalidInviteCode'],
     ['SOMETHING_ELSE', 'Unknown'],
   ])('%s becomes %s', (code, reason) => {
     expect(reasonFor(Option.some(code))).toBe(reason)

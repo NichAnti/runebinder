@@ -25,6 +25,7 @@ export const Model = Schema.Struct({
   name: Field(Schema.String),
   email: Field(Schema.String),
   password: Field(Schema.String),
+  inviteCode: Field(Schema.String),
   submission: Submission,
 })
 export type Model = typeof Model.Type
@@ -33,6 +34,7 @@ export const init = (): Model => ({
   name: NotValidated({ value: '' }),
   email: NotValidated({ value: '' }),
   password: NotValidated({ value: '' }),
+  inviteCode: NotValidated({ value: '' }),
   submission: Submission.Idle(),
 })
 
@@ -42,6 +44,7 @@ export const Message = defineMessageUnion({
   UpdatedName: { value: Schema.String },
   UpdatedEmail: { value: Schema.String },
   UpdatedPassword: { value: Schema.String },
+  UpdatedInviteCode: { value: Schema.String },
   SubmittedForm: {},
   SucceededSignUp: { user: User.User },
   FailedSignUp: { reason: FailureReason },
@@ -72,15 +75,19 @@ const passwordRules = makeRules({
   ],
 })
 
+const inviteCodeRules = makeRules({ required: 'Invite code is required' })
+
 const validateName = validate(nameRules)
 const validateEmail = validate(emailRules)
 const validatePassword = validate(passwordRules)
+const validateInviteCode = validate(inviteCodeRules)
 
 const isFormValid = (model: Model): boolean =>
   allValid([
     [model.name, nameRules],
     [model.email, emailRules],
     [model.password, passwordRules],
+    [model.inviteCode, inviteCodeRules],
   ])
 
 // COMMAND
@@ -90,16 +97,13 @@ export const SignUp = Command.define('SignUp', {
     name: Schema.String,
     email: Schema.String,
     password: Schema.Redacted(Schema.String),
+    inviteCode: Schema.Redacted(Schema.String),
   },
   messages: [Message.SucceededSignUp, Message.FailedSignUp],
-  execute: ({ name, email, password }) =>
+  execute: ({ name, email, password, inviteCode }) =>
     Effect.gen(function* () {
       const auth = yield* AuthClient
-      const user = yield* auth.signUp({
-        name,
-        email,
-        password: Redacted.value(password),
-      })
+      const user = yield* auth.signUp({ name, email, password, inviteCode })
       return Message.SucceededSignUp({ user })
     }).pipe(
       Effect.catch(error =>
@@ -126,6 +130,12 @@ export const update = (model: Model, message: Message) =>
       model: modifyFields(model, { password: () => validatePassword(value) }),
     }),
 
+    UpdatedInviteCode: ({ value }) => ({
+      model: modifyFields(model, {
+        inviteCode: () => validateInviteCode(value),
+      }),
+    }),
+
     SubmittedForm: () => {
       if (model.submission._tag === 'Submitting') {
         return { model }
@@ -137,6 +147,7 @@ export const update = (model: Model, message: Message) =>
             name: () => validateName(model.name.value),
             email: () => validateEmail(model.email.value),
             password: () => validatePassword(model.password.value),
+            inviteCode: () => validateInviteCode(model.inviteCode.value),
           }),
         }
       }
@@ -150,6 +161,7 @@ export const update = (model: Model, message: Message) =>
             name: model.name.value.trim(),
             email: model.email.value,
             password: Redacted.make(model.password.value),
+            inviteCode: Redacted.make(model.inviteCode.value.trim()),
           }),
         ],
       }
@@ -176,6 +188,12 @@ export const view = Submodel.defineView<Model, Message>((model, h) => {
     [h.Class('flex flex-col gap-6')],
     [
       h.h1([h.Class('text-2xl font-semibold')], ['Create an account']),
+      h.p(
+        [h.Class('text-sm text-fg-muted')],
+        [
+          'Sign-up is invite only for now. Ask the person who invited you for the code.',
+        ],
+      ),
       h.form(
         [
           h.Class('flex flex-col gap-4'),
@@ -212,6 +230,16 @@ export const view = Submodel.defineView<Model, Message>((model, h) => {
               autocomplete: 'new-password',
               field: model.password,
               onInput: value => Message.UpdatedPassword({ value }),
+            },
+            h,
+          ),
+          TextField.view(
+            {
+              id: 'sign-up-invite-code',
+              label: 'Invite code',
+              autocomplete: 'off',
+              field: model.inviteCode,
+              onInput: value => Message.UpdatedInviteCode({ value }),
             },
             h,
           ),

@@ -23,6 +23,11 @@ const failureText = (reason: FailureReason): string =>
       'WeakPassword',
       () => 'Choose a password of at least 8 characters.',
     ),
+    Match.when(
+      'InvalidInviteCode',
+      () =>
+        'This invite code is not valid. Check it with the person who sent it.',
+    ),
     Match.when('Unknown', () => 'Something went wrong. Please try again.'),
     Match.exhaustive,
   )

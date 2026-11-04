@@ -8,5 +8,6 @@ export {
   CurrentUser,
   Unauthorized,
 } from './authentication'
+export { INVALID_INVITE_CODE, INVITE_CODE_HEADER } from './invite'
 export { Health, System } from './system'
 export { LinkedWishlist, Wishlist } from './wishlist'

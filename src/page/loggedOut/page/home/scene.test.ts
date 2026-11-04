@@ -30,7 +30,7 @@ describe('home page', () => {
     scene(
       { update, view },
       given(init()),
-      expect(role('link', { name: 'Create a free account' })).toHaveAttr(
+      expect(role('link', { name: 'Join with an invite' })).toHaveAttr(
         'href',
         '/sign-up',
       ),
