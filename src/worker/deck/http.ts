@@ -14,12 +14,11 @@ export const DecksLive = HttpApiBuilder.group(
     const catalogue = yield* PrintingCatalogue
 
     const wellFormed = (input: DeckInput) =>
-      Array.match(
-        DeckStructure.structureProblems(input.contents, catalogue.find),
-        {
+      Effect.flatMap(catalogue.index, ({ find }) =>
+        Array.match(DeckStructure.structureProblems(input.contents, find), {
           onEmpty: () => Effect.succeed(input),
           onNonEmpty: problems => Effect.fail(new MalformedDeck({ problems })),
-        },
+        }),
       )
 
     return handlers.handleAll({

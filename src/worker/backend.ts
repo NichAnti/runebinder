@@ -4,6 +4,8 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/http'
 
 import { INVALID_INVITE_CODE, INVITE_CODE_HEADER } from '../api'
 import { AUTH_BASE_PATH, Auth, AuthLive } from './auth'
+import { CardDataBucket } from './cardData'
+import { catalogueVersionOf, serveCatalogue } from './catalogue/serve'
 import { AppDatabase } from './database'
 import { HttpLive } from './http'
 import { isInviteCodeValid, isSignUpPath } from './invite'
@@ -22,6 +24,7 @@ export default class Backend extends Cloudflare.Worker<Backend>()(
     const auth = yield* Auth
     const http = yield* HttpRouter.toHttpEffect(HttpLive)
     const inviteCode = yield* Config.Redacted('INVITE_CODE')
+    const cardData = yield* Cloudflare.R2.ReadBucket(yield* CardDataBucket)
 
     const rejectedInvite = HttpServerResponse.jsonUnsafe(
       {
@@ -35,8 +38,11 @@ export default class Backend extends Cloudflare.Worker<Backend>()(
       fetch: Effect.gen(function* () {
         const request = yield* HttpServerRequest.HttpServerRequest
         const { pathname } = new URL(request.url, 'http://localhost')
+        const maybeCatalogueVersion = catalogueVersionOf(pathname)
 
-        if (isSignUpPath(pathname)) {
+        if (Option.isSome(maybeCatalogueVersion)) {
+          return yield* serveCatalogue(cardData, maybeCatalogueVersion.value)
+        } else if (isSignUpPath(pathname)) {
           const isInvited = yield* isInviteCodeValid(
             inviteCode,
             Option.fromNullishOr(request.headers[INVITE_CODE_HEADER]),
@@ -50,5 +56,12 @@ export default class Backend extends Cloudflare.Worker<Backend>()(
         }
       }),
     }
-  }).pipe(Effect.provide(AuthLive.pipe(Layer.provideMerge(AppDatabase.layer)))),
+  }).pipe(
+    Effect.provide(
+      Layer.mergeAll(
+        AuthLive.pipe(Layer.provideMerge(AppDatabase.layer)),
+        Cloudflare.R2.ReadBucketBinding,
+      ),
+    ),
+  ),
 ) {}

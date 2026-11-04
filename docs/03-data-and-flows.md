@@ -75,7 +75,7 @@ erDiagram
 ```
 
 - `user`, `session`, `account` and `verification` are Better Auth's tables (`src/worker/schema/auth.ts`, generated). Only the relevant columns are shown.
-- `collection_item`, `deck`, `deck_card` and `wishlist_item` arrive in Phases 6 to 8; their exact columns are decided then. `printing_id` columns hold a `PrintingId` from the catalogue file (not a foreign key); the Backend checks it on every write against `catalogue/printingIds.json`, a list of every `PrintingId` that `catalogue:build` writes next to `catalogue.json`.
+- `collection_item`, `deck`, `deck_card` and `wishlist_item` arrive in Phases 6 to 8; their exact columns are decided then. `printing_id` columns hold a `PrintingId` from the catalogue file (not a foreign key); the Backend checks it on every write against the printing types the seed writes next to the catalogue in the bucket.
 - Deleting a user cascades to everything they own, and deleting a deck cascades to its cards, additional legends and CardTrader link.
 - A wishlist belongs to the app: one per deck (computed) and the custom one (`wishlist_item`). The two `*cardtrader_wishlist` tables only link an app wishlist to the CardTrader wishlist it was last created or synced as. The links are split by owner so each has a real foreign key (a user for the custom one, a deck for a deck's).
 
@@ -100,38 +100,45 @@ A deck is stored part by part, the way the game describes it, not the way a deck
 - Deck rules come from Riot's [Rules Hub](https://playriftbound.com/en-us/rules-hub/): the Core Rules (section 103, deck construction) and the Tournament Rules for constructed play (402.1: exactly 40 main deck cards with the chosen champion, 1 legend, 12 runes, 3 battlefields with unique names; 601.1.c: a sideboard of 10 or fewer cards, copy limits counted across main deck and sideboard). Both documents were last updated on 9 October 2026. The rules check (`domain/deckRules.ts`) names the rule behind each problem. Format legality (banned cards) is not checked yet.
 - Deck codes are read and written with [`@piltoverarchive/riftbound-deck-codes`](https://www.npmjs.com/package/@piltoverarchive/riftbound-deck-codes), wrapped once so its exceptions become typed errors.
 
-## Catalogue build
+## Catalogue seed
 
 Card data comes from a swappable `CatalogueSource` service:
 
-| Layer        | Data                                                        | Use                                       |
-| ------------ | ----------------------------------------------------------- | ----------------------------------------- |
-| Riot gallery | recorded feed pages in `catalogue/recordings/riot-gallery/` | development, now                          |
-| Riftcodex    | recorded API pages in `catalogue/recordings/riftcodex/`     | development, later (needs conflict rules) |
-| Riot API     | live `riftbound-content-v1` with `RIOT_API_KEY`             | the only source allowed for a public app  |
+| Layer        | Data                                            | Use                                       |
+| ------------ | ----------------------------------------------- | ----------------------------------------- |
+| Riot gallery | live feed pages (recordings only for tests)     | development, now                          |
+| Riftcodex    | API pages                                       | development, later (needs conflict rules) |
+| Riot API     | live `riftbound-content-v1` with `RIOT_API_KEY` | the only source allowed for a public app  |
+
+CardTrader's expansions and blueprint exports come from a `CardTraderCatalogue`
+service the same way (live with `CARDTRADER_TOKEN`, recorded for tests).
 
 ```mermaid
 sequenceDiagram
-  participant B as bun run catalogue:build
-  participant S as CatalogueSource
-  participant A as Vite / Alchemy (dev / deploy)
-  B->>S: printings
-  S->>S: read the recording, parse every record strictly, map to Printing
-  S->>S: run the checks
-  alt every record parses and every check passes
-    S-->>B: printings
-    B->>B: write catalogue/catalogue.json (committed)
-  else anything fails
-    S-->>B: every failing record
-    B->>B: write nothing; the previous catalogue stays
+  participant D as alchemy deploy / dev
+  participant S as CatalogueSeed
+  participant R as R2 cardtrader-data
+  participant C as Sources
+  D->>S: version (src/api/catalogue.ts)
+  S->>R: is catalogue/<version>/catalogue.json there?
+  alt already there
+    S-->>D: nothing to do
+  else missing
+    S->>C: gallery pages, CardTrader expansions and blueprints
+    S->>S: parse every record strictly, run the checks, link blueprints
+    alt everything passes
+      S->>R: put printingTypes.json, then catalogue.json
+    else anything fails
+      S-->>D: fail the deploy; the bucket is unchanged
+    end
   end
-  A->>A: publish catalogue.json as a hashed static asset
 ```
 
 **Checks:** every record matches the source's schema exactly (unknown fields
 are an error); the id parses; set and collector number agree with the id;
 every printing has a `card_id`; every id is unique. Any failure rejects the
-whole build (all or nothing). A test fails when the committed `catalogue.json` no longer matches the recordings.
+whole seed (all or nothing). Tests run the same checks against local
+recordings when they exist.
 
 ## CardTrader
 
@@ -140,8 +147,7 @@ Base URL `https://api.cardtrader.com/api/v2`, `Authorization: Bearer <token>`,
 created in the settings page of the user's CardTrader profile and gives full
 access to their account, including buying.
 
-**Riftbound on CardTrader:** `game_id` 22. Expansions, recorded in
-`catalogue/recordings/cardtrader/`:
+**Riftbound on CardTrader:** `game_id` 22. Expansions:
 
 | Set   | `expansion_id` |
 | ----- | -------------- |
@@ -198,7 +204,7 @@ under "On CardTrader". **Delete** (after a confirmation) deletes on CardTrader
 and then clears the link. `/info` responses include `shared_secret`; the
 client drops it when decoding and they are never recorded.
 
-**Import.** `catalogue:build` stores, per printing, its CardTrader blueprint
+**Import.** The catalogue seed stores, per printing, its CardTrader blueprint
 id, the slug of the blueprint name (`metaName`, e.g. `ahri-alluring` for
 "Ahri - Alluring") and the expansion code from `expansions.json`. A
 CardTrader line is matched on `metaName` + `expansion_code`; it becomes that

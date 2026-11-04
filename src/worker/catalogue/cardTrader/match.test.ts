@@ -6,6 +6,7 @@ import { assert, layer } from '@effect/vitest'
 
 import { Printing } from '../../../domain'
 import { printing } from '../../../testing'
+import { HAS_RECORDINGS } from '../recorded'
 import { RecordedRiotGallery } from '../riotGallery/layer'
 import { CatalogueSource } from '../source'
 import {
@@ -153,38 +154,40 @@ describe('matchPrinting', () => {
   })
 })
 
-layer(RecordedRiotGallery.pipe(Layer.provideMerge(NodeServices.layer)))(
-  'the recordings',
-  it => {
-    it.effect('every recorded CardTrader file parses strictly', () =>
-      Effect.gen(function* () {
-        const blueprintsBySet = yield* readBlueprints(RECORDING_DIRECTORY)
-        assert.deepStrictEqual(
-          Array.sort(Object.keys(blueprintsBySet), (a: string, b: string) =>
-            a < b ? -1 : 1,
-          ),
-          ['OGN', 'OGS', 'RAD', 'SFD', 'UNL', 'VEN'],
-        )
-      }),
-    )
+describe.skipIf(!HAS_RECORDINGS)('with the recorded card data', () => {
+  layer(RecordedRiotGallery.pipe(Layer.provideMerge(NodeServices.layer)))(
+    'the recordings',
+    it => {
+      it.effect('every recorded CardTrader file parses strictly', () =>
+        Effect.gen(function* () {
+          const blueprintsBySet = yield* readBlueprints(RECORDING_DIRECTORY)
+          assert.deepStrictEqual(
+            Array.sort(Object.keys(blueprintsBySet), (a: string, b: string) =>
+              a < b ? -1 : 1,
+            ),
+            ['OGN', 'OGS', 'RAD', 'SFD', 'UNL', 'VEN'],
+          )
+        }),
+      )
 
-    it.effect('every printing matches exactly one CardTrader blueprint', () =>
-      Effect.gen(function* () {
-        const source = yield* CatalogueSource
-        const printings = yield* source.printings
-        const blueprintsBySet = yield* readBlueprints(RECORDING_DIRECTORY)
-        const expansionCodes = yield* readExpansionCodes(RECORDING_DIRECTORY)
-        const report = Result.getOrThrow(
-          withBlueprints(printings, blueprintsBySet, expansionCodes),
-        )
+      it.effect('every printing matches exactly one CardTrader blueprint', () =>
+        Effect.gen(function* () {
+          const source = yield* CatalogueSource
+          const printings = yield* source.printings
+          const blueprintsBySet = yield* readBlueprints(RECORDING_DIRECTORY)
+          const expansionCodes = yield* readExpansionCodes(RECORDING_DIRECTORY)
+          const report = Result.getOrThrow(
+            withBlueprints(printings, blueprintsBySet, expansionCodes),
+          )
 
-        assert.deepStrictEqual(report.unmatched, [])
-        assert.isTrue(
-          Array.every(report.printings, ({ maybeCardTrader }) =>
-            Option.isSome(maybeCardTrader),
-          ),
-        )
-      }),
-    )
-  },
-)
+          assert.deepStrictEqual(report.unmatched, [])
+          assert.isTrue(
+            Array.every(report.printings, ({ maybeCardTrader }) =>
+              Option.isSome(maybeCardTrader),
+            ),
+          )
+        }),
+      )
+    },
+  )
+})

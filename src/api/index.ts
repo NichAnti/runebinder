@@ -1,5 +1,12 @@
 export { Account } from './account'
 export { Api } from './api'
+export {
+  CATALOGUE_PATH,
+  CATALOGUE_VERSION,
+  catalogueHref,
+  catalogueKey,
+  printingTypesKey,
+} from './catalogue'
 export { Collection, SetQuantity, UnknownPrinting } from './collection'
 export { DeckInput, DeckNotFound, Decks, MalformedDeck } from './deck'
 export {

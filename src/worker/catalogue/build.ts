@@ -2,11 +2,7 @@ import { Effect, Result } from 'effect'
 
 import { Catalogue, Printing } from '../../domain'
 import { withBlueprints } from './cardTrader/match'
-import {
-  RECORDING_DIRECTORY,
-  readBlueprints,
-  readExpansionCodes,
-} from './cardTrader/recording'
+import { CardTraderCatalogue } from './cardTrader/source'
 import { CatalogueSource, RejectedRecords } from './source'
 
 export type BuildResult = Readonly<{
@@ -17,8 +13,9 @@ export type BuildResult = Readonly<{
 export const buildCatalogue = Effect.gen(function* () {
   const source = yield* CatalogueSource
   const printings = yield* source.printings
-  const blueprintsBySet = yield* readBlueprints(RECORDING_DIRECTORY)
-  const expansionCodes = yield* readExpansionCodes(RECORDING_DIRECTORY)
+  const cardTrader = yield* CardTraderCatalogue
+  const blueprintsBySet = yield* cardTrader.blueprintsBySet
+  const expansionCodes = yield* cardTrader.expansionCodes
 
   const report = yield* Result.match(
     withBlueprints(printings, blueprintsBySet, expansionCodes),

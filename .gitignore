@@ -36,8 +36,6 @@ Thumbs.db
 # Local caches (Riot API responses)
 .cache/
 
-# Card data: built or recorded locally, never committed
-catalogue/catalogue.json
-catalogue/printingTypes.json
-catalogue/recordings/
-catalogue/recordings.tar.gz
+# Card data is never committed: deploys seed it into R2. Local recordings of
+# the sources, if any, only feed the tests that check the real data.
+/catalogue/

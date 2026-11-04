@@ -10,7 +10,7 @@ layer(
 )('the printing catalogue', it => {
   it.effect('knows the listed printings and nothing else', () =>
     Effect.gen(function* () {
-      const catalogue = yield* PrintingCatalogue
+      const catalogue = yield* (yield* PrintingCatalogue).index
 
       assert.isTrue(catalogue.has(Printing.PrintingId.make('ogn-066a-298')))
       assert.isFalse(catalogue.has(Printing.PrintingId.make('ogn-067-298')))

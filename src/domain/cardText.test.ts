@@ -1,11 +1,7 @@
-import { Array, Effect, FileSystem, Option, Result, Schema } from 'effect'
+import { Option, Result } from 'effect'
 import { describe, expect, test } from 'vitest'
 
-import { NodeServices } from '@effect/platform-node'
-import { assert, layer } from '@effect/vitest'
-
 import * as CardText from './cardText'
-import * as Catalogue from './catalogue'
 
 const parsedOrThrow = (html: string) =>
   Result.getOrThrowWith(CardText.parse(html), error => new Error(error))
@@ -83,35 +79,4 @@ describe('keywords and plainText', () => {
       'Tank Assault 2 Tank Exhaust exhaust for any rune.',
     )
   })
-})
-
-layer(NodeServices.layer)('the real catalogue', it => {
-  it.effect('every rules and effect text parses', () =>
-    Effect.gen(function* () {
-      const fs = yield* FileSystem.FileSystem
-      const catalogue = yield* fs
-        .readFileString('catalogue/catalogue.json')
-        .pipe(Effect.flatMap(Schema.decodeEffect(Catalogue.CatalogueJson)))
-
-      const failures = Array.filterMap(catalogue.printings, printing =>
-        Array.match(
-          Array.getSomes([printing.maybeText, printing.maybeEffect]),
-          {
-            onEmpty: () => Result.failVoid,
-            onNonEmpty: texts =>
-              Array.findFirst(texts, html =>
-                Result.isFailure(CardText.parse(html)),
-              ).pipe(
-                Option.match({
-                  onNone: () => Result.failVoid,
-                  onSome: () => Result.succeed(printing.id),
-                }),
-              ),
-          },
-        ),
-      )
-
-      assert.deepStrictEqual(failures, [])
-    }),
-  )
 })

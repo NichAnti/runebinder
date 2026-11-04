@@ -20,7 +20,9 @@ export const WishlistLive = HttpApiBuilder.group(
         }),
       setItem: ({ params: { printingId }, payload: { quantity } }) =>
         Effect.gen(function* () {
-          if (!catalogue.has(printingId)) {
+          const { has } = yield* catalogue.index
+
+          if (!has(printingId)) {
             return yield* new UnknownPrinting({ printingId })
           }
 

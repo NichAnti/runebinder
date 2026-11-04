@@ -22,48 +22,90 @@ const BLUEPRINT_FILE = /^blueprints-([a-z0-9]+)\.json$/
 
 const EXPANSION_FILE = 'expansions.json'
 
+export type BlueprintsBySet = Readonly<Record<string, ReadonlyArray<Blueprint>>>
+
+/** One blueprint export as text, labelled for error messages. */
+export type BlueprintText = Readonly<{
+  label: string
+  set: string
+  json: string
+}>
+
 const decodeExpansions = Schema.decodeUnknownEffect(
   Schema.fromJsonString(ExpansionExport),
   { onExcessProperty: 'error' },
 )
 
-export const readExpansionCodes = (directory: string) =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem
-    const path = yield* Path.Path
-    const json = yield* fs.readFileString(path.join(directory, EXPANSION_FILE))
-    const expansions = yield* decodeExpansions(json).pipe(
-      Effect.mapError(
-        error =>
-          new RejectedRecords({
-            issues: [
-              CatalogueIssue.cases.InvalidRecord.make({
-                index: 0,
-                message: `${EXPANSION_FILE}: ${error.message}`,
-              }),
-            ],
-          }),
-      ),
-    )
-
-    return Record.fromEntries(
-      Array.map(expansions, ({ id, code }): readonly [string, string] => [
-        `${id}`,
-        code,
-      ]),
-    )
-  }).pipe(
-    Effect.catchTag('PlatformError', error =>
-      Effect.fail(
-        new UnreadableRecording({ message: globalThis.String(error) }),
-      ),
-    ),
-  )
-
 const decodeExport = Schema.decodeUnknownResult(
   Schema.fromJsonString(BlueprintExport),
   { onExcessProperty: 'error' },
 )
+
+/** Expansion ids to codes, from the text of CardTrader's `/expansions`. */
+export const expansionCodesFrom = (json: string) =>
+  decodeExpansions(json).pipe(
+    Effect.map(expansions =>
+      Record.fromEntries(
+        Array.map(expansions, ({ id, code }): readonly [string, string] => [
+          `${id}`,
+          code,
+        ]),
+      ),
+    ),
+    Effect.mapError(
+      error =>
+        new RejectedRecords({
+          issues: [
+            CatalogueIssue.cases.InvalidRecord.make({
+              index: 0,
+              message: `${EXPANSION_FILE}: ${error.message}`,
+            }),
+          ],
+        }),
+    ),
+  )
+
+/** Every blueprint export parsed strictly; any failure rejects them all. */
+export const blueprintsFrom = (
+  texts: ReadonlyArray<BlueprintText>,
+): Effect.Effect<BlueprintsBySet, RejectedRecords> => {
+  const [sets, issues] = Array.separate(
+    Array.map(texts, ({ label, set, json }, index) =>
+      Result.mapError(
+        Result.map(
+          decodeExport(json),
+          (blueprints): readonly [string, ReadonlyArray<Blueprint>] => [
+            set,
+            blueprints,
+          ],
+        ),
+        error =>
+          CatalogueIssue.cases.InvalidRecord.make({
+            index,
+            message: `${label}: ${error.message}`,
+          }),
+      ),
+    ),
+  )
+
+  return Array.isReadonlyArrayNonEmpty(issues)
+    ? Effect.fail(new RejectedRecords({ issues }))
+    : Effect.succeed(Record.fromEntries(sets))
+}
+
+const unreadable = (error: unknown) =>
+  new UnreadableRecording({ message: globalThis.String(error) })
+
+export const readExpansionCodes = (directory: string) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem
+    const path = yield* Path.Path
+    const json = yield* fs
+      .readFileString(path.join(directory, EXPANSION_FILE))
+      .pipe(Effect.mapError(unreadable))
+
+    return yield* expansionCodesFrom(json)
+  })
 
 export const readBlueprints = (directory: string) =>
   Effect.gen(function* () {
@@ -71,7 +113,7 @@ export const readBlueprints = (directory: string) =>
     const path = yield* Path.Path
 
     const files = pipe(
-      yield* fs.readDirectory(directory),
+      yield* fs.readDirectory(directory).pipe(Effect.mapError(unreadable)),
       Array.filterMap(file =>
         Result.fromOption(
           Option.map(
@@ -86,38 +128,12 @@ export const readBlueprints = (directory: string) =>
       ),
     )
 
-    const decoded = yield* Effect.forEach(files, ({ file, set }, index) =>
+    const texts = yield* Effect.forEach(files, ({ file, set }) =>
       fs.readFileString(path.join(directory, file)).pipe(
-        Effect.map(json =>
-          Result.mapError(
-            Result.map(
-              decodeExport(json),
-              (blueprints): readonly [string, ReadonlyArray<Blueprint>] => [
-                set,
-                blueprints,
-              ],
-            ),
-            error =>
-              CatalogueIssue.cases.InvalidRecord.make({
-                index,
-                message: `${file}: ${error.message}`,
-              }),
-          ),
-        ),
+        Effect.map((json): BlueprintText => ({ label: file, set, json })),
+        Effect.mapError(unreadable),
       ),
     )
 
-    const [sets, issues] = Array.separate(decoded)
-
-    if (Array.isReadonlyArrayNonEmpty(issues)) {
-      return yield* new RejectedRecords({ issues })
-    } else {
-      return Record.fromEntries(sets)
-    }
-  }).pipe(
-    Effect.catchTag('PlatformError', error =>
-      Effect.fail(
-        new UnreadableRecording({ message: globalThis.String(error) }),
-      ),
-    ),
-  )
+    return yield* blueprintsFrom(texts)
+  })
