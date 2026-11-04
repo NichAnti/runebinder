@@ -168,6 +168,9 @@ describe('deck page', () => {
       { update: update(Option.some(deck)), view: sceneView() },
       given(loaded),
       expect(role('group', { name: 'Legend' })).toContainText('No legend yet'),
+      expect(
+        within(role('group', { name: 'Chosen champion' }), text('Champion')),
+      ).toExist(),
       expect(text('Choose a legend.')).toExist(),
       expect(mainDeck).toContainText('3 / 40'),
     )

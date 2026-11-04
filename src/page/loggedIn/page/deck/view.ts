@@ -834,10 +834,13 @@ const identitySlotView = (
       h.span(
         [
           h.Class(
-            'flex items-center justify-between text-xs font-medium text-fg-muted',
+            'flex items-center justify-between gap-1 text-xs font-medium whitespace-nowrap text-fg-muted',
           ),
         ],
-        [SECTION_LABELS[place], statusIconView(context, place, h)],
+        [
+          place === 'Legend' ? 'Legend' : 'Champion',
+          statusIconView(context, place, h),
+        ],
       ),
       Option.match(
         Option.flatMap(maybePrintingId, printingId =>
