@@ -98,7 +98,7 @@ const optionalField = <K extends string, A>(
     onSome: value => Record.singleton(key, value),
   })
 
-export const toDocument = (card: Printing.Card) => {
+const toDocument = (card: Printing.Card) => {
   const base = Printing.basePrinting(card)
   const text = [...parsedText(base.maybeText), ...parsedText(base.maybeEffect)]
   const keywords = Array.fromIterable(CardText.keywords(text))

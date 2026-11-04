@@ -51,7 +51,7 @@ export const copiesUsedBy = (
     (counts, { printingId, copies }) => add(counts, printingId, copies),
   )
 
-export const neededAcross = (
+const neededAcross = (
   decks: ReadonlyArray<Deck>,
 ): Readonly<Record<PrintingId, number>> =>
   Array.reduce(decks, Record.empty<PrintingId, number>(), (most, deck) =>

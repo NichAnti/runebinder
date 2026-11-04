@@ -48,12 +48,12 @@ export const Range = Schema.Struct({
 })
 export type Range = typeof Range.Type
 
-export const anyRange: Range = {
+const anyRange: Range = {
   maybeMin: Option.none(),
   maybeMax: Option.none(),
 }
 
-export const isAnyRange = (range: Range): boolean =>
+const isAnyRange = (range: Range): boolean =>
   Option.isNone(range.maybeMin) && Option.isNone(range.maybeMax)
 
 // OWNERSHIP
@@ -201,7 +201,7 @@ const parseBound = (raw: string): Option.Option<Option.Option<number>> =>
         Option.map(Option.some),
       )
 
-export const parseRange = (raw: string): Range =>
+const parseRange = (raw: string): Range =>
   pipe(
     String.split(RANGE_SEPARATOR)(raw),
     parts =>
@@ -220,7 +220,7 @@ export const parseRange = (raw: string): Range =>
     Option.getOrElse(() => anyRange),
   )
 
-export const formatRange = (range: Range): Option.Option<string> =>
+const formatRange = (range: Range): Option.Option<string> =>
   isAnyRange(range)
     ? Option.none()
     : Option.some(

@@ -11,7 +11,7 @@ export const Submission = defineTaggedUnion({
 })
 export type Submission = typeof Submission.Type
 
-export const failureText = (reason: FailureReason): string =>
+const failureText = (reason: FailureReason): string =>
   Match.value(reason).pipe(
     Match.withReturnType<string>(),
     Match.when('InvalidCredentials', () => 'Email or password is incorrect.'),

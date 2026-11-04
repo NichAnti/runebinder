@@ -61,7 +61,7 @@ export const wantedOf = (model: Model): Option.Option<Wishlist.Wanted> =>
       )
     : Option.none()
 
-export const contextOf = (
+const contextOf = (
   { _tag, ...query }: CatalogueRoute,
   model: Model,
 ): CataloguePage.Context => ({

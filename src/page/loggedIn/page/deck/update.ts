@@ -336,7 +336,7 @@ export type CopyInfo = Readonly<{
   maybeLimit: Option.Option<number>
 }>
 
-export const copyInfoOf = (
+const copyInfoOf = (
   model: Model,
   cardId: Printing.CardId,
 ): Option.Option<CopyInfo> =>
@@ -593,7 +593,7 @@ const editFor = (
   )
 }
 
-export const isChoiceTab = (tab: AddTab): boolean =>
+const isChoiceTab = (tab: AddTab): boolean =>
   tab === 'Legend' || tab === 'Champion' || tab === 'AdditionalLegend'
 
 const addedText = (tab: AddTab, card: Printing.Card): string => {

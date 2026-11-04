@@ -97,17 +97,6 @@ export const versionLinesOf = (
     Array.sort(Order.combine(byLabel, byKey)),
   )
 
-export const quantitiesOf = (
-  printingIds: ReadonlyArray<Printing.PrintingId>,
-): Readonly<Record<string, number>> =>
-  Array.reduce(printingIds, Record.empty<string, number>(), (counts, id) =>
-    Record.set(
-      counts,
-      id,
-      Option.getOrElse(Record.get(counts, id), () => 0) + 1,
-    ),
-  )
-
 export const isChampionUnit = (card: Printing.Card): boolean => {
   const base = Printing.basePrinting(card)
 
@@ -125,10 +114,7 @@ const energyOf = ({ maybeCard }: Line): number =>
 
 const byEnergy = Order.mapInput(Order.Number, energyOf)
 
-export const byEnergyThenLabel: Order.Order<Line> = Order.combine(
-  byEnergy,
-  byLabel,
-)
+const byEnergyThenLabel: Order.Order<Line> = Order.combine(byEnergy, byLabel)
 
 export const TypeGroup = Schema.Literals(['Unit', 'Spell', 'Gear', 'Other'])
 export type TypeGroup = typeof TypeGroup.Type

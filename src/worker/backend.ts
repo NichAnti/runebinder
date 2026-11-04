@@ -6,7 +6,7 @@ import { AUTH_BASE_PATH, Auth, AuthLive } from './auth'
 import { AppDatabase } from './database'
 import { HttpLive } from './http'
 
-export const isAuthPath = (pathname: string): boolean =>
+const isAuthPath = (pathname: string): boolean =>
   pathname === AUTH_BASE_PATH || pathname.startsWith(`${AUTH_BASE_PATH}/`)
 
 export default class Backend extends Cloudflare.Worker<Backend>()(

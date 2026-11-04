@@ -5,7 +5,6 @@ import { modifyFields } from 'foldkit/struct'
 
 import {
   CatalogueQuery,
-  CatalogueSearch,
   Collection,
   Printing,
   Wishlist,
@@ -210,11 +209,3 @@ export const update = (context: Context) => {
       GotCardPanelMessage: ({ message }) => foldCardPanel(model, message),
     })
 }
-
-export const currentResult = (
-  model: Model,
-): Option.Option<CatalogueSearch.SearchResult> =>
-  Results.match(model.results, {
-    Waiting: () => Option.none(),
-    Showing: ({ result }) => Option.some(result),
-  })

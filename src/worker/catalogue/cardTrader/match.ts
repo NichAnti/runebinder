@@ -105,7 +105,7 @@ const decodeExpansionCode = Schema.decodeOption(
   Printing.CardTraderExpansionCode,
 )
 
-export const cardTraderBlueprintOf = (
+const cardTraderBlueprintOf = (
   blueprint: Blueprint,
   expansionCodes: Readonly<Record<string, string>>,
 ): Option.Option<Printing.CardTraderBlueprint> =>
