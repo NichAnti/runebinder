@@ -1,51 +1,36 @@
-import { Array, Match, Number, Option } from 'effect'
+import { Array, Number, Option, Record } from 'effect'
 import { Submodel } from 'foldkit'
 import type { Html, HtmlBuilder } from 'foldkit/html'
 
-import {
-  Deck,
-  type DeckCode,
-  DeckRules,
-  Missing,
-  type Printing,
-} from '../../../../domain'
+import { Deck, DeckRules, Missing, type Printing } from '../../../../domain'
 import { deckRouter } from '../../../../route'
 import {
   Badge,
   Button,
   Dialog,
   Icon,
+  IconButton,
   Link,
   Notice,
   TextField,
+  Toast,
 } from '../../../../ui'
 import * as CollectionState from '../../collection'
 import * as DecksState from '../../decks'
 import { cardsByPrinting } from '../deck/lines'
 import { Message } from './message'
-import { IMPORT_DIALOG_ID, type Model, NEW_DECK_DIALOG_ID } from './model'
+import {
+  DELETE_DIALOG_ID,
+  IMPORT_DIALOG_ID,
+  type Model,
+  NEW_DECK_DIALOG_ID,
+} from './model'
+import { problemText } from './problemText'
 
 export type ViewInputs = Readonly<{
   decks: DecksState.Model
   collection: CollectionState.Model
 }>
-
-export const problemText = (problem: DeckCode.DeckCodeProblem): string =>
-  Match.value(problem).pipe(
-    Match.withReturnType<string>(),
-    Match.tagsExhaustive({
-      Unreadable: () => 'This is not a deck code.',
-      UnknownCard: ({ cardCode }) => `${cardCode} is not in the catalogue.`,
-      TooManyCopies: ({ cardCode }) => `${cardCode} has too many copies.`,
-      SeveralLegends: () =>
-        'The code has more than one starting legend, so it cannot tell which one leads the deck.',
-      ChampionNotInMainDeck: ({ cardCode }) =>
-        `The chosen champion ${cardCode} is not in the main deck.`,
-      NotEncodable: ({ printingId }) =>
-        `${printingId} cannot be written in a deck code.`,
-      RejectedByFormat: () => 'The deck code format rejected this deck.',
-    }),
-  )
 
 type DeckSummary = Readonly<{
   maybeLegend: Option.Option<Printing.Printing>
@@ -105,9 +90,74 @@ const summaryOf = (
 const progressText = (deck: Deck.Deck): string =>
   `Main ${Deck.mainDeckSize(deck.contents)} / ${DeckRules.CONSTRUCTED_MAIN_DECK_SIZE} · Runes ${Deck.copiesIn(deck.contents.runes)} / ${DeckRules.RUNE_DECK_SIZE} · Battlefields ${Deck.copiesIn(deck.contents.battlefields)} / ${DeckRules.CONSTRUCTED_BATTLEFIELDS}`
 
+const actionsView = (
+  deck: Deck.Deck,
+  maybeRemoval: Option.Option<DecksState.Removal>,
+  h: HtmlBuilder<Message>,
+): Html =>
+  h.div(
+    [
+      h.Class(
+        'flex items-center justify-end gap-1 border-t border-border pt-3',
+      ),
+    ],
+    [
+      ...(Option.exists(maybeRemoval, removal => removal === 'Failed')
+        ? [
+            h.span(
+              [h.Role('alert'), h.Class('mr-auto text-xs text-danger')],
+              ['Could not delete. Try again.'],
+            ),
+          ]
+        : []),
+      IconButton.view(
+        {
+          icon: 'ClipboardDocument',
+          label: `Copy the deck code of ${deck.name}`,
+          size: 'Small',
+          action: {
+            _tag: 'Click',
+            message: Message.ClickedCopyCode({ deckId: deck.id }),
+          },
+        },
+        h,
+      ),
+      IconButton.view(
+        {
+          icon: 'DocumentDuplicate',
+          label: `Duplicate ${deck.name}`,
+          size: 'Small',
+          action: {
+            _tag: 'Click',
+            message: Message.ClickedDuplicate({ deckId: deck.id }),
+          },
+        },
+        h,
+      ),
+      IconButton.view(
+        {
+          icon: 'Trash',
+          label: `Delete ${deck.name}`,
+          size: 'Small',
+          variant: 'Danger',
+          isDisabled: Option.exists(
+            maybeRemoval,
+            removal => removal === 'Removing',
+          ),
+          action: {
+            _tag: 'Click',
+            message: Message.ClickedDelete({ deckId: deck.id }),
+          },
+        },
+        h,
+      ),
+    ],
+  )
+
 const deckCardView = (
   deck: Deck.Deck,
   summary: DeckSummary,
+  maybeRemoval: Option.Option<DecksState.Removal>,
   h: HtmlBuilder<Message>,
 ): Html =>
   h.keyed('li')(
@@ -188,6 +238,7 @@ const deckCardView = (
               ),
             ],
           ),
+          actionsView(deck, maybeRemoval, h),
         ],
       ),
     ],
@@ -195,11 +246,11 @@ const deckCardView = (
 
 const listView = (
   model: Model,
-  decks: ReadonlyArray<Deck.Deck>,
+  ready: typeof DecksState.Model.Ready.Type,
   collection: CollectionState.Model,
   h: HtmlBuilder<Message>,
 ): Html =>
-  Array.match(decks, {
+  Array.match(ready.decks, {
     onEmpty: () =>
       Notice.view(
         {
@@ -221,7 +272,12 @@ const listView = (
           h.Class('grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-4'),
         ],
         Array.map(nonEmpty, deck =>
-          deckCardView(deck, summaryOf(deck, model, collection), h),
+          deckCardView(
+            deck,
+            summaryOf(deck, model, collection),
+            Record.get(ready.removals, deck.id),
+            h,
+          ),
         ),
       ),
   })
@@ -340,6 +396,29 @@ const importView = (model: Model, h: HtmlBuilder<Message>): Html =>
     h,
   )
 
+const deleteView = (model: Model, h: HtmlBuilder<Message>): Html =>
+  Dialog.view(
+    {
+      slotId: DELETE_DIALOG_ID,
+      model: model.deleteDialog,
+      toParentMessage: message => Message.GotDeleteDialogMessage({ message }),
+      title: Option.match(model.maybePendingDelete, {
+        onNone: () => 'Delete the deck?',
+        onSome: ({ name }) => `Delete “${name}”?`,
+      }),
+      description: [
+        'The deck and its CardTrader link are deleted. This cannot be undone.',
+      ],
+      actions: [
+        Button.view(
+          { content: ['Delete'], onClick: Message.ClickedConfirmDelete() },
+          h,
+        ),
+      ],
+    },
+    h,
+  )
+
 export const view = Submodel.defineView<Model, Message, ViewInputs>(
   (model, { decks, collection }, h) =>
     h.section(
@@ -405,12 +484,21 @@ export const view = Submodel.defineView<Model, Message, ViewInputs>(
                       h,
                     )
                   : h.empty,
-                listView(model, ready.decks, collection, h),
+                listView(model, ready, collection, h),
                 newDeckView(model, ready, h),
               ],
             ),
         }),
         importView(model, h),
+        deleteView(model, h),
+        Toast.view(
+          {
+            slotId: 'deck-list-toast',
+            model: model.toast,
+            toParentMessage: message => Message.GotToastMessage({ message }),
+          },
+          h,
+        ),
       ],
     ),
 )

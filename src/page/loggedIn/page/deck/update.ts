@@ -33,6 +33,7 @@ import {
   CatalogueIndex,
   CatalogueIndexResource,
   type CatalogueIndexService,
+  Clipboard,
 } from '../../../../service'
 import { Tabs, Toast } from '../../../../ui'
 import * as CardPanel from '../../cardPanel'
@@ -216,7 +217,7 @@ export const CopyDeckCode = Command.define('CopyDeckCode', {
   args: { code: DeckCode.DeckCode },
   messages: [Message.CompletedCopyDeckCode, Message.FailedCopyDeckCode],
   execute: ({ code }) =>
-    Effect.tryPromise(() => navigator.clipboard.writeText(code)).pipe(
+    Clipboard.writeText(code).pipe(
       Effect.as(Message.CompletedCopyDeckCode({ code })),
       Effect.catch(() => Effect.succeed(Message.FailedCopyDeckCode({ code }))),
     ),

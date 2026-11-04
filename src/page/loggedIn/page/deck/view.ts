@@ -36,7 +36,7 @@ import * as CardPanel from '../../cardPanel'
 import * as CollectionState from '../../collection'
 import * as DecksState from '../../decks'
 import * as Printings from '../../printings'
-import { problemText } from '../deckList/view'
+import { problemText } from '../deckList/problemText'
 import { copiesIn, copyStepOf, roomIn } from './copies'
 import {
   CURVE_TOP,

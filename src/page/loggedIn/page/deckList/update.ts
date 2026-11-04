@@ -18,10 +18,12 @@ import {
   CatalogueIndex,
   CatalogueIndexResource,
   type CatalogueIndexService,
+  Clipboard,
 } from '../../../../service'
-import { Dialog } from '../../../../ui'
+import { Dialog, Toast } from '../../../../ui'
 import { Message, OutMessage } from './message'
 import { Import, type Model, init } from './model'
+import { problemText } from './problemText'
 
 type UpdateReturn = Update.ReturnWithOutMessage<
   Model,
@@ -99,6 +101,43 @@ export const LoadDeckListCards = Command.define('LoadDeckListCards', {
     ),
 })
 
+export const CopyDeckCode = Command.define('CopyDeckCode', {
+  args: { code: DeckCode.DeckCode },
+  messages: [Message.CompletedCopyDeckCode, Message.FailedCopyDeckCode],
+  execute: ({ code }) =>
+    Clipboard.writeText(code).pipe(
+      Effect.as(Message.CompletedCopyDeckCode({ code })),
+      Effect.catch(() => Effect.succeed(Message.FailedCopyDeckCode({ code }))),
+    ),
+})
+
+// TOAST
+
+const toastFold = {
+  read: (model: Model) => Option.some(model.toast),
+  write: (model: Model, nextToast: Toast.Model): Model =>
+    modifyFields(model, { toast: () => nextToast }),
+  toParentMessage: (message: Toast.Message) =>
+    Message.GotToastMessage({ message }),
+  foldOutMessage: Toast.Notification.OutMessage.match<
+    Update.Step<Model, Message>
+  >({
+    DismissedToast: () => stepModel => ({ model: stepModel }),
+  }),
+}
+
+const foldToast = Update.foldChild({
+  update: Toast.Notification.update,
+  ...toastFold,
+})
+const showToast = Update.foldChild({
+  update: Toast.Notification.show,
+  ...toastFold,
+})
+
+const toastWith = (model: Model, text: string): UpdateReturn =>
+  showToast(model, { variant: 'Success', payload: { text } })
+
 // DIALOGS
 
 const dialogFold = (
@@ -141,6 +180,35 @@ const closeNewDeckDialog = Update.foldChildStep({
   update: Dialog.close,
   ...newDeckDialogFold,
 })
+const deleteDialogFold = {
+  read: (model: Model) => Option.some(model.deleteDialog),
+  write: (model: Model, nextDialog: Dialog.Model): Model =>
+    modifyFields(model, { deleteDialog: () => nextDialog }),
+  toParentMessage: (message: Dialog.Message) =>
+    Message.GotDeleteDialogMessage({ message }),
+  foldOutMessage: Dialog.OutMessage.match<Update.Step<Model, Message>>({
+    Opened: () => stepModel => ({ model: stepModel }),
+    Closed: () => stepModel => ({
+      model: modifyFields(stepModel, {
+        maybePendingDelete: () => Option.none(),
+      }),
+    }),
+  }),
+}
+
+const foldDeleteDialog = Update.foldChild({
+  update: Dialog.update,
+  ...deleteDialogFold,
+})
+const openDeleteDialog = Update.foldChildStep({
+  update: Dialog.open,
+  ...deleteDialogFold,
+})
+const closeDeleteDialog = Update.foldChildStep({
+  update: Dialog.close,
+  ...deleteDialogFold,
+})
+
 const foldImportDialog = Update.foldChild({
   update: Dialog.update,
   ...importDialogFold,
@@ -198,109 +266,181 @@ export const enter = (
 
 // UPDATE
 
-export const update = (model: Model, message: Message) =>
-  Message.match<UpdateReturn>(message, {
-    SucceededLoadDeckListCards: ({ cards }) => ({
-      model: modifyFields(model, {
-        cards: existing =>
-          Array.reduce(cards, existing, (known, card) =>
-            Record.set(known, card.id, card),
-          ),
-      }),
-    }),
+const findDeck = (
+  decks: ReadonlyArray<Deck.Deck>,
+  deckId: Deck.DeckId,
+): Option.Option<Deck.Deck> => Array.findFirst(decks, ({ id }) => id === deckId)
 
-    SkippedLoadDeckListCards: () => ({ model }),
+export const update =
+  (decks: ReadonlyArray<Deck.Deck>) => (model: Model, message: Message) =>
+    Message.match<UpdateReturn>(message, {
+      ClickedCopyCode: ({ deckId }) =>
+        Option.match(findDeck(decks, deckId), {
+          onNone: () => ({ model }),
+          onSome: deck =>
+            Result.match(DeckCode.encode(deck.contents), {
+              onSuccess: code => ({
+                model,
+                commands: [CopyDeckCode({ code })],
+              }),
+              onFailure: problem => toastWith(model, problemText(problem)),
+            }),
+        }),
 
-    ClickedNewDeck: () => openNewDeckDialog(model),
+      CompletedCopyDeckCode: () => toastWith(model, 'Copied the deck code.'),
 
-    ClickedImportCode: () => openImportDialog(model),
+      FailedCopyDeckCode: ({ code }) =>
+        toastWith(model, `Copy the deck code by hand: ${code}`),
 
-    GotNewDeckDialogMessage: ({ message }) => foldNewDeckDialog(model, message),
-
-    GotImportDialogMessage: ({ message }) => foldImportDialog(model, message),
-
-    UpdatedNewName: ({ value }) => ({
-      model: modifyFields(model, { newName: () => validateName(value) }),
-    }),
-
-    SubmittedNewDeck: () =>
-      Option.match(Deck.parseName(model.newName.value), {
-        onNone: () => ({
-          model: modifyFields(model, {
-            newName: () => validateName(model.newName.value),
+      ClickedDuplicate: ({ deckId }) =>
+        Option.match(findDeck(decks, deckId), {
+          onNone: () => ({ model }),
+          onSome: deck => ({
+            model,
+            outMessage: OutMessage.RequestedCreateDeck({
+              name: Option.getOrElse(
+                Deck.parseName(`${deck.name} (copy)`),
+                () => deck.name,
+              ),
+              contents: deck.contents,
+            }),
           }),
         }),
-        onSome: name => {
-          const dialogClose = closeNewDeckDialog(
-            modifyFields(model, { newName: () => init().newName }),
-          )
 
-          return pipe(
-            dialogClose,
-            Update.withOutMessage(
-              OutMessage.RequestedCreateDeck({ name, contents: Deck.empty }),
+      ClickedDelete: ({ deckId }) =>
+        Option.match(findDeck(decks, deckId), {
+          onNone: () => ({ model }),
+          onSome: deck =>
+            openDeleteDialog(
+              modifyFields(model, {
+                maybePendingDelete: () =>
+                  Option.some({ deckId: deck.id, name: deck.name }),
+              }),
             ),
-          )
-        },
+        }),
+
+      ClickedConfirmDelete: () =>
+        Option.match(model.maybePendingDelete, {
+          onNone: () => ({ model }),
+          onSome: ({ deckId }) =>
+            pipe(
+              closeDeleteDialog(
+                modifyFields(model, {
+                  maybePendingDelete: () => Option.none(),
+                }),
+              ),
+              Update.withOutMessage(OutMessage.RequestedRemoveDeck({ deckId })),
+            ),
+        }),
+
+      GotDeleteDialogMessage: ({ message }) => foldDeleteDialog(model, message),
+
+      GotToastMessage: ({ message }) => foldToast(model, message),
+
+      SucceededLoadDeckListCards: ({ cards }) => ({
+        model: modifyFields(model, {
+          cards: existing =>
+            Array.reduce(cards, existing, (known, card) =>
+              Record.set(known, card.id, card),
+            ),
+        }),
       }),
 
-    UpdatedImportName: ({ value }) => ({
-      model: modifyFields(model, { importName: () => validateName(value) }),
-    }),
+      SkippedLoadDeckListCards: () => ({ model }),
 
-    UpdatedImportCode: ({ value }) => ({
-      model: modifyFields(model, {
-        importCode: () => validateCode(value),
-        import: () => Import.Idle(),
+      ClickedNewDeck: () => openNewDeckDialog(model),
+
+      ClickedImportCode: () => openImportDialog(model),
+
+      GotNewDeckDialogMessage: ({ message }) =>
+        foldNewDeckDialog(model, message),
+
+      GotImportDialogMessage: ({ message }) => foldImportDialog(model, message),
+
+      UpdatedNewName: ({ value }) => ({
+        model: modifyFields(model, { newName: () => validateName(value) }),
       }),
-    }),
 
-    SubmittedImport: () => {
-      const maybeName = Deck.parseName(model.importName.value)
-      const code = model.importCode.value
-
-      if (Option.isNone(maybeName) || String.isEmpty(String.trim(code))) {
-        return {
-          model: modifyFields(model, {
-            importName: () => validateName(model.importName.value),
-            importCode: () => validateCode(code),
+      SubmittedNewDeck: () =>
+        Option.match(Deck.parseName(model.newName.value), {
+          onNone: () => ({
+            model: modifyFields(model, {
+              newName: () => validateName(model.newName.value),
+            }),
           }),
-        }
-      } else {
-        return {
-          model: modifyFields(model, { import: () => Import.Reading() }),
-          commands: [ReadDeckCode({ name: maybeName.value, code })],
-        }
-      }
-    },
+          onSome: name => {
+            const dialogClose = closeNewDeckDialog(
+              modifyFields(model, { newName: () => init().newName }),
+            )
 
-    SucceededReadDeckCode: ({ name, contents }) => {
-      const dialogClose = closeImportDialog(
-        modifyFields(model, {
-          importName: () => init().importName,
-          importCode: () => init().importCode,
+            return pipe(
+              dialogClose,
+              Update.withOutMessage(
+                OutMessage.RequestedCreateDeck({ name, contents: Deck.empty }),
+              ),
+            )
+          },
+        }),
+
+      UpdatedImportName: ({ value }) => ({
+        model: modifyFields(model, { importName: () => validateName(value) }),
+      }),
+
+      UpdatedImportCode: ({ value }) => ({
+        model: modifyFields(model, {
+          importCode: () => validateCode(value),
           import: () => Import.Idle(),
         }),
-      )
+      }),
 
-      return pipe(
-        dialogClose,
-        Update.withOutMessage(
-          OutMessage.RequestedCreateDeck({ name, contents }),
-        ),
-      )
-    },
+      SubmittedImport: () => {
+        const maybeName = Deck.parseName(model.importName.value)
+        const code = model.importCode.value
 
-    FailedReadDeckCode: ({ problem }) => ({
-      model: modifyFields(model, { import: () => Import.Failed({ problem }) }),
-    }),
+        if (Option.isNone(maybeName) || String.isEmpty(String.trim(code))) {
+          return {
+            model: modifyFields(model, {
+              importName: () => validateName(model.importName.value),
+              importCode: () => validateCode(code),
+            }),
+          }
+        } else {
+          return {
+            model: modifyFields(model, { import: () => Import.Reading() }),
+            commands: [ReadDeckCode({ name: maybeName.value, code })],
+          }
+        }
+      },
 
-    SkippedReadDeckCode: () => ({
-      model: modifyFields(model, { import: () => Import.Idle() }),
-    }),
+      SucceededReadDeckCode: ({ name, contents }) => {
+        const dialogClose = closeImportDialog(
+          modifyFields(model, {
+            importName: () => init().importName,
+            importCode: () => init().importCode,
+            import: () => Import.Idle(),
+          }),
+        )
 
-    ClickedRetryLoadDecks: () => ({
-      model,
-      outMessage: OutMessage.RequestedRetryLoadDecks(),
-    }),
-  })
+        return pipe(
+          dialogClose,
+          Update.withOutMessage(
+            OutMessage.RequestedCreateDeck({ name, contents }),
+          ),
+        )
+      },
+
+      FailedReadDeckCode: ({ problem }) => ({
+        model: modifyFields(model, {
+          import: () => Import.Failed({ problem }),
+        }),
+      }),
+
+      SkippedReadDeckCode: () => ({
+        model: modifyFields(model, { import: () => Import.Idle() }),
+      }),
+
+      ClickedRetryLoadDecks: () => ({
+        model,
+        outMessage: OutMessage.RequestedRetryLoadDecks(),
+      }),
+    })

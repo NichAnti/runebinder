@@ -313,6 +313,7 @@ const foldDeckListPageOutMessage = DeckListPage.OutMessage.match<
   Update.Step<Model, Message, ApiClient>
 >({
   RequestedCreateDeck: newDeck => createDeck(newDeck),
+  RequestedRemoveDeck: ({ deckId }) => removeDeck(deckId),
   RequestedRetryLoadDecks: () => retryDecks,
 })
 
@@ -339,14 +340,15 @@ const enterDeckListPage: Update.Step<
     ...deckListPageSlot,
   })(stepModel)
 
-const foldDeckListPage = Update.foldChild({
-  update: DeckListPage.update,
-  read: (model: Model) => Option.some(model.deckListPage),
-  write: (model: Model, nextPage: DeckListPage.Model): Model =>
-    modifyFields(model, { deckListPage: () => nextPage }),
-  toParentMessage: message => Message.GotDeckListPageMessage({ message }),
-  foldOutMessage: foldDeckListPageOutMessage,
-})
+const foldDeckListPage = (decks: ReadonlyArray<Deck.Deck>) =>
+  Update.foldChild({
+    update: DeckListPage.update(decks),
+    read: (model: Model) => Option.some(model.deckListPage),
+    write: (model: Model, nextPage: DeckListPage.Model): Model =>
+      modifyFields(model, { deckListPage: () => nextPage }),
+    toParentMessage: message => Message.GotDeckListPageMessage({ message }),
+    foldOutMessage: foldDeckListPageOutMessage,
+  })
 
 const foldDeckPageOutMessage = DeckPage.OutMessage.match<
   Update.Step<Model, Message, Requirements>
@@ -824,7 +826,11 @@ export const update = (model: Model, message: Message) =>
           ])
         : foldDecks(model, message),
 
-    GotDeckListPageMessage: ({ message }) => foldDeckListPage(model, message),
+    GotDeckListPageMessage: ({ message }) =>
+      foldDeckListPage(model.decks._tag === 'Ready' ? model.decks.decks : [])(
+        model,
+        message,
+      ),
 
     GotDeckPageMessage: ({ message }) =>
       Match.value(model.route).pipe(

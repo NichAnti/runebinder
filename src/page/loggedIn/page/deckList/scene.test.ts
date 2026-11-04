@@ -58,7 +58,7 @@ const opened = [
 describe('decks page', () => {
   test('shows each deck as a card linking to it, with its progress', () => {
     scene(
-      { update, view: sceneView() },
+      { update: update([deck]), view: sceneView() },
       given(init()),
       expect(role('link', { name: 'Vi aggro' })).toHaveAttr(
         'href',
@@ -96,7 +96,7 @@ describe('decks page', () => {
 
     scene(
       {
-        update,
+        update: update([withLegend]),
         view: withViewInputs(view, {
           collection: CollectionState.Model.Ready({
             owned: {},
@@ -131,7 +131,7 @@ describe('decks page', () => {
 
   test('a new deck is created from its dialog and needs a name', () => {
     scene(
-      { update, view: sceneView() },
+      { update: update([deck]), view: sceneView() },
       given(init()),
       click(role('button', { name: 'New deck' })),
       ...opened,
@@ -155,7 +155,7 @@ describe('decks page', () => {
 
   test('an import that fails says why in its dialog', () => {
     scene(
-      { update, view: sceneView() },
+      { update: update([deck]), view: sceneView() },
       given(init()),
       click(role('button', { name: 'Import code' })),
       ...opened,
@@ -169,6 +169,37 @@ describe('decks page', () => {
         }),
       ),
       expect(importForm).toContainText('OGN-200 is not in the catalogue.'),
+    )
+  })
+
+  test('a deck is deleted after confirming', () => {
+    scene(
+      { update: update([deck]), view: sceneView() },
+      given(init()),
+      click(role('button', { name: 'Delete Vi aggro' })),
+      ...opened,
+      expect(role('heading', { name: 'Delete “Vi aggro”?' })).toExist(),
+      click(role('button', { name: 'Delete' })),
+      expectOutMessage(OutMessage.RequestedRemoveDeck({ deckId: deck.id })),
+      Command.resolve(
+        Dialog.CloseDialog,
+        Dialog.Message.CompletedCloseDialog(),
+      ),
+      Mount.expectEnded(Dialog.AcquireResources),
+    )
+  })
+
+  test('a deck can be duplicated from its card', () => {
+    scene(
+      { update: update([deck]), view: sceneView() },
+      given(init()),
+      click(role('button', { name: 'Duplicate Vi aggro' })),
+      expectOutMessage(
+        OutMessage.RequestedCreateDeck({
+          name: Deck.DeckName.make('Vi aggro (copy)'),
+          contents: deck.contents,
+        }),
+      ),
     )
   })
 })
