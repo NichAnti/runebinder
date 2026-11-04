@@ -12,7 +12,7 @@ import {
   decksRouter,
   wishlistsRouter,
 } from './route'
-import { Button, Icon, Link } from './ui'
+import { Button, Icon, IconButton, Link } from './ui'
 
 const title = (route: AppRoute): string =>
   AppRoute.match(route, {
@@ -45,7 +45,12 @@ const footerView = (h: HtmlBuilder<Message>): Html =>
 
 const navView = (loggedIn: LoggedIn.Model, h: HtmlBuilder<Message>): Html =>
   h.nav(
-    [h.AriaLabel('Main'), h.Class('flex items-center gap-2')],
+    [
+      h.AriaLabel('Main'),
+      h.Class(
+        'order-last flex w-full items-center gap-2 overflow-x-auto sm:order-none sm:w-auto',
+      ),
+    ],
     [
       Link.view(
         {
@@ -90,29 +95,61 @@ const cardTraderStatusView = (
     ? Link.view(
         {
           href: cardTraderRouter(),
-          content: ['CardTrader: connected'],
+          content: [
+            h.span([h.Class('sm:hidden')], ['CardTrader']),
+            h.span([h.Class('hidden sm:inline')], ['CardTrader: connected']),
+          ],
           variant: 'Nav',
           isCurrent: loggedIn.route._tag === 'CardTrader',
         },
         h,
       )
-    : Button.view(
-        {
-          content: [
-            Icon.view({ name: 'LockClosed', size: 'Small' }),
-            'Connect CardTrader',
-          ],
-          variant: 'Secondary',
-          onClick: Message.ClickedConnectCardTrader(),
-        },
-        h,
+    : h.div(
+        [],
+        [
+          h.div(
+            [h.Class('sm:hidden')],
+            [
+              IconButton.view(
+                {
+                  icon: 'LockClosed',
+                  label: 'Connect CardTrader',
+                  action: {
+                    _tag: 'Click',
+                    message: Message.ClickedConnectCardTrader(),
+                  },
+                },
+                h,
+              ),
+            ],
+          ),
+          h.div(
+            [h.Class('hidden sm:block')],
+            [
+              Button.view(
+                {
+                  content: [
+                    Icon.view({ name: 'LockClosed', size: 'Small' }),
+                    'Connect CardTrader',
+                  ],
+                  variant: 'Secondary',
+                  onClick: Message.ClickedConnectCardTrader(),
+                },
+                h,
+              ),
+            ],
+          ),
+        ],
       )
 
 const accountView = (loggedIn: LoggedIn.Model, h: HtmlBuilder<Message>): Html =>
   h.div(
     [h.Class('flex items-center gap-3')],
     [
-      h.span([h.Class('text-sm text-fg-muted')], [loggedIn.user.name]),
+      h.span(
+        [h.Class('hidden text-sm text-fg-muted md:inline')],
+        [loggedIn.user.name],
+      ),
       Button.view(
         {
           content: ['Sign out'],
@@ -139,7 +176,11 @@ const headerView = (model: Model, h: HtmlBuilder<Message>): Html =>
     [h.Class('border-b border-border bg-surface')],
     [
       h.div(
-        [h.Class('mx-auto flex max-w-5xl items-center gap-6 px-4 py-3')],
+        [
+          h.Class(
+            'mx-auto flex max-w-5xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3',
+          ),
+        ],
         [
           h.span([h.Class('font-semibold')], [APP_NAME]),
           ...Match.value(model.auth).pipe(
@@ -150,7 +191,7 @@ const headerView = (model: Model, h: HtmlBuilder<Message>): Html =>
               LoggedIn: loggedIn => [
                 navView(loggedIn, h),
                 h.div(
-                  [h.Class('ml-auto flex items-center gap-3')],
+                  [h.Class('ml-auto flex items-center gap-2 sm:gap-3')],
                   [
                     cardTraderStatusView(loggedIn, h),
                     themeToggleView(model, h),

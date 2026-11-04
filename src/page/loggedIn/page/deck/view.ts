@@ -77,6 +77,8 @@ type Context = Readonly<{
   maybeWanted: Option.Option<Wishlist.Wanted>
 }>
 
+const TILE_GRID = 'grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-3'
+
 const SECTION_LABELS: Readonly<Record<DeckRules.Section, string>> = {
   Legend: 'Legend',
   ChosenChampion: 'Chosen champion',
@@ -280,11 +282,12 @@ const countersView = (
       [h.Class('flex items-center gap-2')],
       [
         h.span(
-          [h.AriaHidden(true), h.Class('w-10 text-xs text-fg-muted')],
+          [h.AriaHidden(true), h.Class('w-9 shrink-0 text-xs text-fg-muted')],
           [ZONE_SHORT_LABELS[countedZone]],
         ),
         QuantityStepper.view(
           {
+            size: 'Small',
             label: `In ${SECTION_LABELS[countedZone]}: ${label}`,
             quantity: copies,
             max: canAdd ? copies + 1 : copies,
@@ -362,6 +365,16 @@ const lineStepper = (
 const versionLabel = (printing: Printing.Printing): string =>
   `${Printings.VARIANT_LABELS[printing.variant]} · ${printing.publicCode}`
 
+const SHORT_VARIANT_LABELS: Readonly<Record<Printing.Variant, string>> = {
+  Base: 'Standard',
+  AlternateArt: 'Alt art',
+  Signature: 'Signed',
+  Overnumbered: 'Overnumbered',
+}
+
+const shortVersionLabel = (printing: Printing.Printing): string =>
+  `${SHORT_VARIANT_LABELS[printing.variant]} · ${String.replace(/\/\d+$/, '')(printing.publicCode)}`
+
 const versionPickerView = (
   card: Printing.Card,
   printingId: Printing.PrintingId,
@@ -377,9 +390,10 @@ const versionPickerView = (
           value: printingId,
           options: Array.map(card.printings, printing => ({
             value: printing.id,
-            label: versionLabel(printing),
+            label: shortVersionLabel(printing),
           })),
           onChange,
+          variant: 'Compact',
         },
         h,
       )
@@ -628,7 +642,7 @@ const linesView = (
 ): Html =>
   context.model.layout === 'Grid'
     ? h.ul(
-        [h.Class('grid grid-cols-3 gap-3 sm:grid-cols-4 xl:grid-cols-5')],
+        [h.Class(TILE_GRID)],
         [
           ...Array.map(lines, line => gridLineView(context, zone, line, h)),
           ...extra,
@@ -965,7 +979,7 @@ const resultView = (
 
   return h.keyed('li')(
     card.id,
-    [h.Class('flex flex-col items-center gap-2')],
+    [h.Class('flex min-w-0 flex-col gap-2')],
     [
       CardTile.view(
         {
@@ -1064,10 +1078,7 @@ const addCardsView = (
         h.p([h.Class('text-sm text-fg-muted')], ['No cards found.']),
       onNonEmpty: nonEmpty =>
         h.ul(
-          [
-            h.AriaLabel('Cards to add'),
-            h.Class('grid grid-cols-2 gap-3 sm:grid-cols-3'),
-          ],
+          [h.AriaLabel('Cards to add'), h.Class(TILE_GRID)],
           Array.map(nonEmpty, card => resultView(context, card, h)),
         ),
     }),
@@ -1292,7 +1303,7 @@ const progressView = (context: Context, h: HtmlBuilder<Message>): Html =>
     [
       h.AriaLabel('Deck progress'),
       h.Class(
-        'sticky top-0 z-10 -mx-4 flex flex-wrap items-center gap-2 border-b border-border bg-canvas px-4 py-2',
+        'sticky top-0 z-10 -mx-4 flex items-center gap-2 overflow-x-auto border-b border-border bg-canvas px-4 py-2 lg:flex-wrap',
       ),
     ],
     [
@@ -1308,7 +1319,10 @@ const progressView = (context: Context, h: HtmlBuilder<Message>): Html =>
         ),
       ),
       h.p(
-        [h.Role('status'), h.Class('ml-auto text-sm text-fg-muted')],
+        [
+          h.Role('status'),
+          h.Class('ml-auto shrink-0 whitespace-nowrap text-sm text-fg-muted'),
+        ],
         [rulesText(context)],
       ),
     ],

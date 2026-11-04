@@ -28,13 +28,13 @@ const recipe = {
   frame: 'relative',
   image:
     'aspect-[744/1039] w-full rounded-card bg-surface-raised object-cover shadow-raised transition-transform group-hover:-translate-y-0.5',
-  text: 'flex flex-col',
-  title: 'text-sm font-semibold text-fg',
-  subtitle: 'text-xs text-fg-muted',
+  text: 'flex min-w-0 flex-col',
+  title: 'line-clamp-2 text-sm font-semibold text-fg',
+  subtitle: 'truncate text-xs text-fg-muted',
   footer: 'flex items-center justify-between gap-2',
   dots: 'flex gap-1',
   dot: 'size-2.5 rounded-full',
-  meta: 'text-xs text-fg-muted',
+  meta: 'truncate text-xs text-fg-muted',
   highlights: 'absolute top-2 right-2 flex flex-col items-end gap-1',
   highlight:
     'rounded-control bg-accent px-2 py-0.5 text-xs font-semibold text-accent-fg shadow-raised',
@@ -90,7 +90,11 @@ export const view = <Message>(
         [h.Class(recipe.text)],
         [
           h.span(
-            [h.DataAttribute('slot', 'title'), h.Class(recipe.title)],
+            [
+              h.DataAttribute('slot', 'title'),
+              h.Title(title),
+              h.Class(recipe.title),
+            ],
             [title],
           ),
           Option.match(maybeSubtitle, {

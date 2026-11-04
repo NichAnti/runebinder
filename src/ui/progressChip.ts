@@ -24,7 +24,7 @@ const STATUS_MARK: Readonly<Record<Status, string>> = {
 }
 
 const recipe = {
-  base: 'inline-flex cursor-pointer items-center gap-1.5 rounded-control border px-2.5 py-1 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus',
+  base: 'inline-flex shrink-0 cursor-pointer items-center whitespace-nowrap gap-1.5 rounded-control border px-2.5 py-1 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus',
   variants: {
     Done: 'border-success bg-surface text-fg hover:bg-surface-raised',
     Unfinished:
