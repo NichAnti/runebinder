@@ -555,8 +555,10 @@ const gridLineView = (
             h,
           ),
       }),
-      versionRow(zone, line, h),
-      lineStepper(context, zone, line, h),
+      h.div(
+        [h.Class('mt-auto flex flex-col gap-2')],
+        [versionRow(zone, line, h), lineStepper(context, zone, line, h)],
+      ),
     ],
   )
 
@@ -1120,28 +1122,40 @@ const resultView = (
         h,
       ),
       isChoice
-        ? Button.view(
-            {
-              content: [
-                tab === 'AdditionalLegend' ? `Add ${label}` : `Choose ${label}`,
-              ],
-              variant: 'Secondary',
-              onClick: Message.ClickedAddCard({
-                cardId: card.id,
-                target: 'Deck',
-              }),
-            },
-            h,
+        ? h.div(
+            [h.Class('mt-auto')],
+            [
+              Button.view(
+                {
+                  content: [
+                    tab === 'AdditionalLegend'
+                      ? `Add ${label}`
+                      : `Choose ${label}`,
+                  ],
+                  variant: 'Secondary',
+                  onClick: Message.ClickedAddCard({
+                    cardId: card.id,
+                    target: 'Deck',
+                  }),
+                },
+                h,
+              ),
+            ],
           )
-        : countersView(
-            context,
-            card.id,
-            card.printingIds,
-            card.maybeCopyLimit,
-            Option.none(),
-            zoneOfTab(tab),
-            label,
-            h,
+        : h.div(
+            [h.Class('mt-auto')],
+            [
+              countersView(
+                context,
+                card.id,
+                card.printingIds,
+                card.maybeCopyLimit,
+                Option.none(),
+                zoneOfTab(tab),
+                label,
+                h,
+              ),
+            ],
           ),
     ],
   )
