@@ -8,4 +8,5 @@ export {
   enter,
   update,
 } from './update'
-export { type ViewInputs, view } from './view'
+export type { ViewInputs } from './context'
+export { view } from './view'
