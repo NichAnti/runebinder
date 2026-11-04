@@ -41,19 +41,25 @@ bun run format  # fix formatting
 The card catalogue is never committed. It works like a database with a seed:
 
 - `alchemy.run.ts` declares the R2 bucket `runebinder-data`, shared by every
-  stage; destroying a stage keeps it.
-- On every deploy (and the first `bun run dev`), the `CatalogueSeed` action
-  checks whether the bucket already has the catalogue version in
-  `src/api/catalogue.ts`. If it does, nothing happens. If not, it fetches the
-  cards from the sources (Riot's gallery feed and CardTrader's blueprints,
-  with `CARDTRADER_TOKEN`), checks them strictly, and uploads the catalogue.
-  `bun run dev` seeds Alchemy's local stand-in bucket the same way.
+  stage and by `bun run dev` (it uses the real bucket, not a local stand-in);
+  destroying a stage keeps it.
+- The first deploy or dev run of each stage runs the `CatalogueSeed` action
+  once for the catalogue version in `src/api/catalogue.ts`. It checks whether
+  the bucket already has that version. If it does, nothing happens. If not, it
+  fetches the cards from the sources (Riot's gallery feed and CardTrader's
+  blueprints, with `CARDTRADER_TOKEN`), checks them strictly, and uploads the
+  catalogue. So the catalogue is fetched and uploaded once for all stages.
 - The browser loads the catalogue from `/api/catalogue/<version>` and keeps it;
   the Backend reads the card types from the bucket to check card ids.
 
 To pick up new cards (a new set), change `CATALOGUE_VERSION` in
 `src/api/catalogue.ts`. The next deploy seeds the new version; older versions
 stay in the bucket.
+
+Alchemy remembers, per stage, that the seed ran for a version and does not run
+it again. If the bucket ever loses the catalogue (for example, it was deleted by
+hand), run one deploy or dev run with `--force` (for example
+`bun alchemy dev --force`), or bump the version.
 
 The data comes from Riot's gallery feed, which is for development only. Until
 the official Riftbound API replaces it, sign-up stays invite only and the app is

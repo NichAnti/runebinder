@@ -25,14 +25,10 @@ export default Alchemy.Stack(
     state: Cloudflare.state(),
   },
   Effect.gen(function* () {
-    // An Action only runs when its input changes, but the seed must look at
-    // the bucket on every deploy and dev run (it may have been emptied, or
-    // this may be the first run against it). `checkedAt` makes it run each
-    // time; the seed itself uploads only when the catalogue is missing.
-    const catalogue = yield* CatalogueSeed({
-      version: CATALOGUE_VERSION,
-      checkedAt: new Date().toISOString(),
-    })
+    // Alchemy runs the seed once per stage and catalogue version (again only
+    // if a run failed); the seed fetches and uploads only if the shared bucket
+    // lacks that version, so the catalogue is fetched and uploaded once.
+    const catalogue = yield* CatalogueSeed({ version: CATALOGUE_VERSION })
     const worker = yield* Website
 
     return {

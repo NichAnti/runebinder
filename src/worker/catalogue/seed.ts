@@ -23,12 +23,7 @@ export const CatalogueSeed = Alchemy.Action(
   Effect.gen(function* () {
     const bucket = yield* Cloudflare.R2.ReadWriteBucket(yield* CardDataBucket)
 
-    return Effect.fn(function* ({
-      version,
-    }: {
-      version: string
-      checkedAt: string
-    }) {
+    return Effect.fn(function* ({ version }: { version: string }) {
       const existing = yield* bucket.head(catalogueKey(version))
 
       if (existing !== null) {
