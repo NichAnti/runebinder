@@ -287,6 +287,9 @@ describe('wishlists page', () => {
       click(role('checkbox', { name: 'Select Test Unit, Tester' })),
       expect(role('group', { name: 'Bought' })).toContainText('1 selected'),
       expect(role('button', { name: 'Mark selected as bought' })).toBeEnabled(),
+      expect(
+        role('button', { name: 'Mark Test Unit, Tester as bought' }),
+      ).toExist(),
     )
   })
 

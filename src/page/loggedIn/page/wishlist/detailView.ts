@@ -153,28 +153,6 @@ const lineView = (
         ],
         [
           ...Option.match(
-            Option.flatMap(
-              maybePrinting,
-              ({ maybeCardTrader }) => maybeCardTrader,
-            ),
-            {
-              onNone: () => [],
-              onSome: blueprint => [
-                IconButton.view(
-                  {
-                    icon: 'ArrowTopRightOnSquare',
-                    label: `Open this version of ${label} on CardTrader`,
-                    action: {
-                      _tag: 'External',
-                      href: Wishlist.cardTraderCardUrl(blueprint.id),
-                    },
-                  },
-                  h,
-                ),
-              ],
-            },
-          ),
-          ...Option.match(
             Option.filter(maybeCard, card => Array.length(card.printings) > 1),
             {
               onNone: () => [],
@@ -233,15 +211,40 @@ const lineView = (
                 ),
               ]
             : []),
-          Button.view(
+          IconButton.view(
             {
-              content: ['Bought'],
-              variant: 'Secondary',
-              onClick: Message.ClickedBought({
-                purchases: [purchaseOf(model, section, line)],
-              }),
+              icon: 'Check',
+              label: `Mark ${label} as bought`,
+              action: {
+                _tag: 'Click',
+                message: Message.ClickedBought({
+                  purchases: [purchaseOf(model, section, line)],
+                }),
+              },
             },
             h,
+          ),
+          ...Option.match(
+            Option.flatMap(
+              maybePrinting,
+              ({ maybeCardTrader }) => maybeCardTrader,
+            ),
+            {
+              onNone: () => [],
+              onSome: blueprint => [
+                IconButton.view(
+                  {
+                    icon: 'ArrowTopRightOnSquare',
+                    label: `Open this version of ${label} on CardTrader`,
+                    action: {
+                      _tag: 'External',
+                      href: Wishlist.cardTraderCardUrl(blueprint.id),
+                    },
+                  },
+                  h,
+                ),
+              ],
+            },
           ),
         ],
       ),
@@ -337,7 +340,7 @@ const markBoughtView = (
       h.AriaLabel('Bought'),
       h.Role('group'),
       h.Class(
-        'sticky bottom-2 z-10 flex flex-wrap items-center gap-2 rounded-card border border-border bg-surface px-4 py-3 shadow-raised',
+        'sticky top-2 z-10 flex flex-wrap items-center gap-2 rounded-card border border-border bg-surface px-4 py-3 shadow-raised',
       ),
     ],
     [
@@ -444,6 +447,7 @@ export const detailView = (
           h.div(
             [h.Class('flex flex-col gap-2')],
             [
+              markBoughtView(model, section, lines, h),
               h.ul(
                 [
                   h.AriaLabel(`${section.title} cards`),
@@ -453,7 +457,6 @@ export const detailView = (
                   lineView(model, section, line, h),
                 ),
               ),
-              markBoughtView(model, section, lines, h),
             ],
           ),
       }),
