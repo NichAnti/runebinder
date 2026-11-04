@@ -35,3 +35,8 @@ Thumbs.db
 
 # Local caches (Riot API responses)
 .cache/
+
+# Card data: built or recorded locally, never committed
+catalogue/catalogue.json
+catalogue/printingTypes.json
+catalogue/recordings/
