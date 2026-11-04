@@ -68,4 +68,4 @@ flowchart LR
 - `RIOT_API_KEY`: the Riot Developer Portal key, used only by the official-API `CatalogueSource` layer once a key has access.
 - Better Auth's signing secret is generated and kept by Alchemy (`Alchemy.Random`).
 - `INVITE_CODE`: the code sign-up needs while the app is invite only. Read by the Backend at startup, so Alchemy binds it as a Worker secret; locally from `.env`, in CI from the repository secret.
-- Card data: not a secret, but never committed. Packed recordings live in the private R2 bucket `cardtrader-data` (`alchemy.data.ts`); CI downloads them with `CLOUDFLARE_API_TOKEN`.
+- Card data: not a secret, but never committed. Packed recordings live in the private R2 bucket `cardtrader-data` (declared in `alchemy.run.ts`, shared by every stage); CI downloads them with `CLOUDFLARE_API_TOKEN`.

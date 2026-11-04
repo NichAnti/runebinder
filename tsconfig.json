@@ -13,5 +13,5 @@
     "resolveJsonModule": true,
     "noEmit": true
   },
-  "include": ["src/**/*", "scripts/**/*", "alchemy.run.ts", "alchemy.data.ts"]
+  "include": ["src/**/*", "scripts/**/*", "alchemy.run.ts"]
 }

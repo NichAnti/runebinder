@@ -10,7 +10,6 @@
     "catalogue:pack": "tar -czf catalogue/recordings.tar.gz -C catalogue recordings",
     "catalogue:unpack": "tar -xzf catalogue/recordings.tar.gz -C catalogue",
     "deploy": "alchemy deploy",
-    "data:deploy": "alchemy deploy alchemy.data.ts --stage shared",
     "destroy": "alchemy destroy",
     "typecheck": "tsc --noEmit",
     "format": "oxfmt",

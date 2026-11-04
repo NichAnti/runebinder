@@ -16,6 +16,11 @@ export class Website extends Cloudflare.Website.Foldkit<Website>()('Website', {
 
 export type WebsiteEnv = Cloudflare.InferEnv<typeof Website>
 
+// The private bucket that holds the packed card data, which is never committed
+// (see README, "Card data"). Every stage declares the same bucket: the first
+// deploy creates it, later ones find it, and destroying a stage keeps it.
+const CARD_DATA_BUCKET = 'cardtrader-data'
+
 export default Alchemy.Stack(
   'Cardtrader',
   {
@@ -24,9 +29,13 @@ export default Alchemy.Stack(
   },
   Effect.gen(function* () {
     const worker = yield* Website
+    const cardData = yield* Cloudflare.R2.Bucket('CardData', {
+      name: CARD_DATA_BUCKET,
+    }).pipe(Alchemy.RemovalPolicy.retain())
 
     return {
       url: worker.url,
+      cardData: cardData.bucketName,
     }
   }),
 )
