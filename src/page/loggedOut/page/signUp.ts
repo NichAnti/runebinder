@@ -82,6 +82,10 @@ const validateEmail = validate(emailRules)
 const validatePassword = validate(passwordRules)
 const validateInviteCode = validate(inviteCodeRules)
 
+/** Fills in the invite code from an invite link. */
+export const withInviteCode = (model: Model, inviteCode: string): Model =>
+  modifyFields(model, { inviteCode: () => validateInviteCode(inviteCode) })
+
 const isFormValid = (model: Model): boolean =>
   allValid([
     [model.name, nameRules],
@@ -191,7 +195,7 @@ export const view = Submodel.defineView<Model, Message>((model, h) => {
       h.p(
         [h.Class('text-sm text-fg-muted')],
         [
-          'Sign-up is invite only for now. Ask the person who invited you for the code.',
+          'Sign-up is invite only for now. An invite link fills in the code; otherwise ask the person who invited you for it.',
         ],
       ),
       h.form(

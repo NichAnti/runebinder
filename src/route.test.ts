@@ -7,6 +7,7 @@ import {
   cardTraderWishlistRouter,
   catalogueRouter,
   deckRouter,
+  signUpRouter,
   urlToAppRoute,
   wishlistHref,
 } from './route'
@@ -22,6 +23,15 @@ const routeOf = (path: string) =>
   })
 
 describe('routes', () => {
+  test('/sign-up takes an optional invite code', () => {
+    expect(routeOf('/sign-up')).toStrictEqual(
+      AppRoute.SignUp({ invite: Option.none() }),
+    )
+    expect(signUpRouter({ invite: Option.some('friends-2026') })).toBe(
+      '/sign-up?invite=friends-2026',
+    )
+  })
+
   test('/ is the home page and the cards live at /cards', () => {
     expect(routeOf('/')).toStrictEqual(AppRoute.Home())
     expect(routeOf('/cards')._tag).toBe('Catalogue')

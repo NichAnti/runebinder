@@ -62,9 +62,15 @@ not promoted.
 ## Invites
 
 Sign-up needs the invite code, which the Backend compares with its
-`INVITE_CODE` secret. Share the code with the people you invite. To stop new
-sign-ups with an old code, change the `INVITE_CODE` repository secret and
-redeploy; existing accounts keep working.
+`INVITE_CODE` secret. Send people an invite link, which fills in the code:
+
+```
+https://<app address>/sign-up?invite=<the code>
+```
+
+or give them the code to type in. To stop new sign-ups with an old code,
+change the `INVITE_CODE` repository secret and redeploy; existing accounts keep
+working.
 
 ## Layout
 

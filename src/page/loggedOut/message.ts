@@ -7,6 +7,7 @@ import * as SignUp from './page/signUp'
 
 export const Message = defineMessageUnion({
   GotHomeMessage: { message: Home.Message },
+  CompletedForgetInvite: {},
   GotSignInMessage: { message: SignIn.Message },
   GotSignUpMessage: { message: SignUp.Message },
 })

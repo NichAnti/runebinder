@@ -1,3 +1,4 @@
+import { Option } from 'effect'
 import { expect, given, role, scene, text } from 'foldkit/scene'
 import { describe, test } from 'vitest'
 
@@ -48,7 +49,7 @@ describe('shell', () => {
   test('the sign-up page links back to sign in', () => {
     scene(
       { update, view },
-      given(loggedOutAt(AppRoute.SignUp())),
+      given(loggedOutAt(AppRoute.SignUp({ invite: Option.none() }))),
       expect(role('heading', { name: 'Create an account' })).toExist(),
       expect(role('link', { name: 'Sign in' })).toHaveAttr('href', '/sign-in'),
     )

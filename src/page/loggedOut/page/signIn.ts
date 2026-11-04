@@ -12,7 +12,7 @@ import { defineMessageUnion } from 'foldkit/message'
 import { modifyFields } from 'foldkit/struct'
 
 import { User } from '../../../domain'
-import { signUpRouter } from '../../../route'
+import { signUpHref } from '../../../route'
 import { AuthClient, FailureReason } from '../../../service'
 import { Button, Link, TextField } from '../../../ui'
 import { Submission, failureView } from '../submission'
@@ -188,7 +188,7 @@ export const view = Submodel.defineView<Model, Message>((model, h) => {
         [h.Class('text-sm text-fg-muted')],
         [
           'No account yet? ',
-          Link.view({ href: signUpRouter(), content: ['Create one'] }, h),
+          Link.view({ href: signUpHref(), content: ['Create one'] }, h),
         ],
       ),
     ],

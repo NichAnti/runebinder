@@ -3,7 +3,7 @@ import { Submodel } from 'foldkit'
 import type { Html, HtmlBuilder } from 'foldkit/html'
 
 import type { Printing } from '../../../../domain'
-import { signInRouter, signUpRouter } from '../../../../route'
+import { signInRouter, signUpHref } from '../../../../route'
 import { Badge, CardTile, Icon, Link } from '../../../../ui'
 import type { Message } from './message'
 import type { Model } from './model'
@@ -81,7 +81,7 @@ const ctaView = (h: HtmlBuilder<Message>): Html =>
         [
           Link.view(
             {
-              href: signUpRouter(),
+              href: signUpHref(),
               content: ['Join with an invite'],
               variant: 'Primary',
             },
@@ -99,7 +99,7 @@ const ctaView = (h: HtmlBuilder<Message>): Html =>
       ),
       h.p(
         [h.Class('text-sm text-fg-muted')],
-        ['Invite only for now: ask a friend who uses it for the code.'],
+        ['Invite only for now: ask a friend who uses it for an invite link.'],
       ),
     ],
   )
@@ -516,7 +516,7 @@ const QUESTIONS: ReadonlyArray<Readonly<{ question: string; answer: string }>> =
     {
       question: 'Can anyone join?',
       answer:
-        'Not yet. Sign-up is invite only for now, so you need an invite code from someone who uses it.',
+        'Not yet. Sign-up is invite only for now, so you need an invite link or code from someone who uses it.',
     },
     {
       question: 'Do I need a CardTrader account?',

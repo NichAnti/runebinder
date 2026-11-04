@@ -81,6 +81,28 @@ describe('ChangedUrl', () => {
     )
   })
 
+  test('an invite link fills in the code and leaves the address bar', () => {
+    story(
+      update,
+      given(loggedOut),
+      message(
+        Message.ChangedUrl({
+          url: urlOrThrow('http://localhost/sign-up?invite=friends-2026'),
+        }),
+      ),
+      Command.expectExact(LoggedOut.ForgetInvite),
+      Command.resolve(
+        LoggedOut.ForgetInvite,
+        LoggedOut.Message.CompletedForgetInvite(),
+      ),
+      model(next => {
+        expect(
+          next.auth._tag === 'LoggedOut' && next.auth.signUp.inviteCode.value,
+        ).toBe('friends-2026')
+      }),
+    )
+  })
+
   test('a signed-out user can open the sign-up page', () => {
     story(
       update,
@@ -90,7 +112,9 @@ describe('ChangedUrl', () => {
       ),
       Command.expectNone(),
       model(next => {
-        expect(next.auth.route).toStrictEqual(AppRoute.SignUp())
+        expect(next.auth.route).toStrictEqual(
+          AppRoute.SignUp({ invite: Option.none() }),
+        )
       }),
     )
   })

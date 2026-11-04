@@ -7,7 +7,7 @@ import { CatalogueQuery, Deck, Printing, Wishlist } from './domain'
 export const AppRoute = defineRouteUnion({
   Home: {},
   SignIn: {},
-  SignUp: {},
+  SignUp: { invite: Schema.Option(Schema.NonEmptyString) },
   Catalogue: CatalogueQuery.Query.fields,
   Card: {
     cardId: Printing.CardId,
@@ -70,10 +70,14 @@ export const signInRouter = pipe(
   literal('sign-in'),
   Route.mapTo(AppRoute.SignIn),
 )
+// `/sign-up?invite=CODE` fills in the invite code, so an invite can be a link.
 export const signUpRouter = pipe(
   literal('sign-up'),
+  Route.query(Schema.Struct({ invite: validParam(Schema.NonEmptyString) })),
   Route.mapTo(AppRoute.SignUp),
 )
+
+export const signUpHref = (): string => signUpRouter({ invite: Option.none() })
 export const cardTraderRouter = pipe(
   literal('cardtrader'),
   Route.mapTo(AppRoute.CardTrader),
