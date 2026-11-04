@@ -19,6 +19,7 @@ import {
   CardTile,
   Checkbox,
   ColumnChart,
+  Dialog,
   Icon,
   IconButton,
   Link,
@@ -53,6 +54,7 @@ import {
 import { Message } from './message'
 import {
   type AddTab,
+  DELETE_DIALOG_ID,
   type Layout,
   type Model,
   SideTabs,
@@ -68,6 +70,7 @@ export type ViewInputs = Readonly<{
 }>
 
 type Context = Readonly<{
+  removal: Option.Option<DecksState.Removal>
   model: Model
   deck: Deck.Deck
   collection: CollectionState.Model
@@ -1611,6 +1614,22 @@ const headerView = (context: Context, h: HtmlBuilder<Message>): Html => {
                         },
                         h,
                       ),
+                      IconButton.view(
+                        {
+                          icon: 'Trash',
+                          label: 'Delete deck',
+                          variant: 'Danger',
+                          isDisabled: Option.exists(
+                            context.removal,
+                            state => state === 'Removing',
+                          ),
+                          action: {
+                            _tag: 'Click',
+                            message: Message.ClickedDelete(),
+                          },
+                        },
+                        h,
+                      ),
                     ],
                   ),
                 ],
@@ -1631,6 +1650,7 @@ const headerView = (context: Context, h: HtmlBuilder<Message>): Html => {
               }),
               problemsView(context, ['Legend', 'ChosenChampion'], h),
               exportView(context.model, h),
+              removalFailedView(context.removal, h),
             ],
           ),
         ],
@@ -1713,33 +1733,38 @@ const undoView = (model: Model, h: HtmlBuilder<Message>): Html =>
 
 const deleteView = (
   model: Model,
+  deck: Deck.Deck,
+  h: HtmlBuilder<Message>,
+): Html =>
+  Dialog.view(
+    {
+      slotId: DELETE_DIALOG_ID,
+      model: model.deleteDialog,
+      toParentMessage: message => Message.GotDeleteDialogMessage({ message }),
+      title: `Delete “${deck.name}”?`,
+      description: [
+        'The deck and its CardTrader link are deleted. This cannot be undone.',
+      ],
+      actions: [
+        Button.view(
+          { content: ['Delete'], onClick: Message.ClickedConfirmDelete() },
+          h,
+        ),
+      ],
+    },
+    h,
+  )
+
+const removalFailedView = (
   removal: Option.Option<DecksState.Removal>,
   h: HtmlBuilder<Message>,
 ): Html =>
-  h.section(
-    [
-      h.AriaLabel('Delete deck'),
-      h.Class('flex flex-wrap items-center gap-3 border-t border-border pt-6'),
-    ],
-    [
-      ...(model.isConfirmingDelete
-        ? [
-            h.span(
-              [h.Class('text-sm text-fg')],
-              ['Delete this deck for good?'],
-            ),
-            smallButton('Delete for good', Message.ClickedConfirmDelete(), h),
-            smallButton('Keep it', Message.ClickedCancelDelete(), h),
-          ]
-        : [smallButton('Delete deck', Message.ClickedDelete(), h)]),
-      Option.exists(removal, state => state === 'Failed')
-        ? h.p(
-            [h.Role('alert'), h.Class('text-sm text-danger')],
-            ['The deck could not be deleted. Try again.'],
-          )
-        : h.empty,
-    ],
-  )
+  Option.exists(removal, state => state === 'Failed')
+    ? h.p(
+        [h.Role('alert'), h.Class('text-sm text-danger')],
+        ['The deck could not be deleted. Try again.'],
+      )
+    : h.empty
 
 const deckView = (
   model: Model,
@@ -1753,6 +1778,7 @@ const deckView = (
   const rules = DeckRules.check(deck.contents, find)
   const { contents } = deck
   const context: Context = {
+    removal,
     model,
     deck,
     collection,
@@ -1799,7 +1825,7 @@ const deckView = (
           sidePanelView(context, h),
         ],
       ),
-      deleteView(model, removal, h),
+      deleteView(model, deck, h),
       undoView(model, h),
       Toast.view(
         {

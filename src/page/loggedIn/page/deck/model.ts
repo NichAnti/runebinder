@@ -11,7 +11,7 @@ import {
   DeckStructure,
   Printing,
 } from '../../../../domain'
-import { Tabs, Toast } from '../../../../ui'
+import { Dialog, Tabs, Toast } from '../../../../ui'
 import * as CardPanel from '../../cardPanel'
 
 export const Export = defineTaggedUnion({
@@ -62,6 +62,8 @@ export type SidePanel = typeof SidePanel.Type
 
 export const SideTabs = Tabs.create<SidePanel>()
 
+export const DELETE_DIALOG_ID = 'delete-deck-dialog'
+
 export const Layout = Schema.Literals(['Grid', 'List'])
 export type Layout = typeof Layout.Type
 
@@ -79,7 +81,7 @@ export const Model = Schema.Struct({
   isSheetOpen: Schema.Boolean,
   panels: Schema.Record(DeckStructure.Place, CardPanel.Model),
   toast: Toast.Notification.Model,
-  isConfirmingDelete: Schema.Boolean,
+  deleteDialog: Dialog.Model,
   maybeUndo: Schema.Option(Undo),
   nextUndoId: Schema.Int,
   export: Export,
@@ -118,7 +120,7 @@ export const init = (): Model => ({
     AdditionalLegends: CardPanel.init(),
   },
   toast: Toast.init('deck-toast'),
-  isConfirmingDelete: false,
+  deleteDialog: Dialog.init(DELETE_DIALOG_ID),
   maybeUndo: Option.none(),
   nextUndoId: 0,
   export: Export.Idle(),

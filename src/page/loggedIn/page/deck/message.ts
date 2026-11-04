@@ -10,7 +10,7 @@ import {
   DeckStructure,
   Printing,
 } from '../../../../domain'
-import { Tabs, Toast } from '../../../../ui'
+import { Dialog, Tabs, Toast } from '../../../../ui'
 import * as CardPanel from '../../cardPanel'
 import { AddTab, AddTarget, Layout } from './model'
 
@@ -76,7 +76,7 @@ export const Message = defineMessageUnion({
   CompletedCopyDeckCode: { code: DeckCode.DeckCode },
   FailedCopyDeckCode: { code: DeckCode.DeckCode },
   ClickedDelete: {},
-  ClickedCancelDelete: {},
+  GotDeleteDialogMessage: { message: Dialog.Message },
   ClickedConfirmDelete: {},
   ClickedRetryLoadDecks: {},
 })

@@ -19,6 +19,7 @@ import { describe, test } from 'vitest'
 
 import { Collection, Deck, Printing, Wishlist } from '../../../../domain'
 import { searchResult, testCard } from '../../../../testing'
+import { Dialog } from '../../../../ui'
 import * as CardPanel from '../../cardPanel'
 import * as CollectionState from '../../collection'
 import * as DecksState from '../../decks'
@@ -493,13 +494,24 @@ describe('deck page', () => {
     )
   })
 
-  test('deleting asks first', () => {
+  test('deleting from the header asks first', () => {
     scene(
       { update: update(Option.some(deck)), view: sceneView() },
       given(loaded),
       click(role('button', { name: 'Delete deck' })),
-      click(role('button', { name: 'Delete for good' })),
+      Command.resolve(Dialog.ShowDialog, Dialog.Message.SucceededShowDialog()),
+      Mount.resolve(
+        Dialog.AcquireResources,
+        Dialog.Message.SucceededAcquireResources(),
+      ),
+      expect(role('heading', { name: 'Delete “Test deck”?' })).toExist(),
+      click(role('button', { name: 'Delete' })),
       expectOutMessage(OutMessage.RequestedRemoveDeck({ deckId: deck.id })),
+      Command.resolve(
+        Dialog.CloseDialog,
+        Dialog.Message.CompletedCloseDialog(),
+      ),
+      Mount.expectEnded(Dialog.AcquireResources),
     )
   })
 

@@ -9,6 +9,7 @@ import {
   Result,
   Schema,
   String,
+  pipe,
 } from 'effect'
 import { Command, Dom, Update } from 'foldkit'
 import {
@@ -35,7 +36,7 @@ import {
   type CatalogueIndexService,
   Clipboard,
 } from '../../../../service'
-import { Tabs, Toast } from '../../../../ui'
+import { Dialog, Tabs, Toast } from '../../../../ui'
 import * as CardPanel from '../../cardPanel'
 import { copyStepOf } from './copies'
 import { cardsByPrinting, nameOf } from './lines'
@@ -254,6 +255,33 @@ const foldToast = Update.foldChild({
 const showToast = Update.foldChild({
   update: Toast.Notification.show,
   ...toastFold,
+})
+
+// DELETE DIALOG
+
+const deleteDialogFold = {
+  read: (model: Model) => Option.some(model.deleteDialog),
+  write: (model: Model, nextDialog: Dialog.Model): Model =>
+    modifyFields(model, { deleteDialog: () => nextDialog }),
+  toParentMessage: (message: Dialog.Message) =>
+    Message.GotDeleteDialogMessage({ message }),
+  foldOutMessage: Dialog.OutMessage.match<Update.Step<Model, Message>>({
+    Opened: () => stepModel => ({ model: stepModel }),
+    Closed: () => stepModel => ({ model: stepModel }),
+  }),
+}
+
+const foldDeleteDialog = Update.foldChild({
+  update: Dialog.update,
+  ...deleteDialogFold,
+})
+const openDeleteDialog = Update.foldChildStep({
+  update: Dialog.open,
+  ...deleteDialogFold,
+})
+const closeDeleteDialog = Update.foldChildStep({
+  update: Dialog.close,
+  ...deleteDialogFold,
 })
 
 // SIDE TABS
@@ -1002,22 +1030,21 @@ export const update =
         }),
       }),
 
-      ClickedDelete: () => ({
-        model: modifyFields(model, { isConfirmingDelete: () => true }),
-      }),
-
-      ClickedCancelDelete: () => ({
-        model: modifyFields(model, { isConfirmingDelete: () => false }),
-      }),
+      ClickedDelete: () => openDeleteDialog(model),
 
       ClickedConfirmDelete: () =>
         Option.match(maybeDeck, {
           onNone: () => ({ model }),
-          onSome: deck => ({
-            model,
-            outMessage: OutMessage.RequestedRemoveDeck({ deckId: deck.id }),
-          }),
+          onSome: deck =>
+            pipe(
+              closeDeleteDialog(model),
+              Update.withOutMessage(
+                OutMessage.RequestedRemoveDeck({ deckId: deck.id }),
+              ),
+            ),
         }),
+
+      GotDeleteDialogMessage: ({ message }) => foldDeleteDialog(model, message),
 
       ClickedRetryLoadDecks: () => ({
         model,
