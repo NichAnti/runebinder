@@ -43,7 +43,7 @@ flowchart TD
 
 ## In the MVP
 
-- A public home page at `/` explains the app; everything else is behind sign-in (email and password accounts with a display name)
+- A public home page at `/` explains the app; everything else is behind sign-in (email and password accounts with a display name). Sign-up is invite only for now: it needs the invite code
 - Card catalogue: browse and search every printing
 - Collection: owned printings with quantities, changed from the card page or the card panel (hover or tap any card). The Cards page (`/cards`) is both the catalogue and the collection: a switch shows All cards, My collection (with a summary per set) or Wanted (what decks miss plus the custom wishlist); each card shows how many you own and how many you need
 - The catalogue, the collection and decks show one entry per card; every printing of a card is in its panel and page

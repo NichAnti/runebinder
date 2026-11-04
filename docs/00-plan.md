@@ -85,8 +85,16 @@ Its structure is agreed before any code is written.
 - [ ] 9.1e Optionally, a way to start playing a second version of a card from its tile
 - [x] 9.2 Polish and docs refresh: dead code removed, the deck page view split by area, README and docs brought up to date
 - [x] 9.3 Riot "Legal Jibber Jabber" notice in the app (site footer, added in 4.3)
+- [x] 9.3b Going live safely: card data out of git (packed in the private R2 bucket `cardtrader-data`, downloaded by CI), invite-only sign-up (`INVITE_CODE`)
 - [ ] 9.4 Register the product on the Riot Developer Portal and apply for a production key
 - [ ] 9.5 Decide about a PR
+
+## Before opening sign-up to everyone
+
+- Card data from the official Riftbound API (9.4), replacing the gallery recordings
+- A privacy page (what is stored: email, display name, collection, decks; the CardTrader token stays in the browser)
+- Password reset and email verification
+- Account deletion from the app
 
 ## Follow-ups (not scheduled)
 

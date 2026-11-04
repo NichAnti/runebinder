@@ -21,6 +21,19 @@ bun alchemy profile edit --add Cloudflare
 `bun install` also installs the pre-push hook, which runs `bun run check`.
 Push from inside `nix develop` so the hook can find `bun`.
 
+Then create `.env` (git-ignored) with the invite code for local sign-ups:
+
+```sh
+INVITE_CODE=<any long random string>
+```
+
+and get the card data (see "Card data" below):
+
+```sh
+bun run catalogue:unpack   # after putting recordings.tar.gz in catalogue/
+bun run catalogue:build
+```
+
 ## Daily work
 
 ```sh
@@ -28,7 +41,40 @@ bun run dev              # Vite dev server on stage dev_$USER
 bun run check            # format check, lint, typecheck, tests
 bun run format           # fix formatting
 bun run catalogue:build  # rebuild catalogue/catalogue.json from the recordings
+bun run catalogue:pack   # pack catalogue/recordings/ into recordings.tar.gz
 ```
+
+## Card data
+
+Card data is never committed. `catalogue/recordings/` (the recorded source
+responses) and the files built from it are git-ignored. The recordings are kept
+packed as `recordings.tar.gz` in the private R2 bucket `cardtrader-data`, and
+CI downloads them before every check and deploy.
+
+To change the card data, update the recordings, then:
+
+```sh
+bun run catalogue:build
+bun run catalogue:pack
+curl --fail --request PUT \
+  --header "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+  --header "Content-Type: application/gzip" \
+  --data-binary @catalogue/recordings.tar.gz \
+  "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/r2/buckets/cardtrader-data/objects/recordings.tar.gz"
+```
+
+(or upload the file in the Cloudflare dashboard, R2, `cardtrader-data`).
+
+The data comes from Riot's gallery feed, which is for development only. Until
+the official Riftbound API replaces it, sign-up stays invite only and the app is
+not promoted.
+
+## Invites
+
+Sign-up needs the invite code, which the Backend compares with its
+`INVITE_CODE` secret. Share the code with the people you invite. To stop new
+sign-ups with an old code, change the `INVITE_CODE` repository secret and
+redeploy; existing accounts keep working.
 
 ## Layout
 
@@ -63,8 +109,9 @@ CI (`.github/workflows/deploy.yml`) owns every deploy:
 | PR opened / updated | `pr-<n>` | Preview deploy    |
 | PR closed           | `pr-<n>` | Preview destroyed |
 
-Every deploy runs `bun run check` first. The workflow reads the repository
-secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
+Every deploy downloads the card data and runs `bun run check` first. The
+workflow reads the repository secrets `CLOUDFLARE_API_TOKEN` (which also needs
+R2 read access), `CLOUDFLARE_ACCOUNT_ID` and `INVITE_CODE`.
 
 Do not deploy or destroy `prod` from a local machine.
 

@@ -7,6 +7,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "catalogue:build": "bun scripts/catalogue/build.ts",
+    "catalogue:pack": "tar -czf catalogue/recordings.tar.gz -C catalogue recordings",
+    "catalogue:unpack": "tar -xzf catalogue/recordings.tar.gz -C catalogue",
     "deploy": "alchemy deploy",
     "destroy": "alchemy destroy",
     "typecheck": "tsc --noEmit",

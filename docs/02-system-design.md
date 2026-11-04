@@ -35,14 +35,14 @@ flowchart LR
 
 ## Components
 
-| Component       | Where                    | Does                                                                                         |
-| --------------- | ------------------------ | -------------------------------------------------------------------------------------------- |
-| Foldkit SPA     | `src/` (client code)     | The whole UI. Talks only to its own origin and, with the user's token, to CardTrader.        |
-| Website Worker  | `src/worker/gateway.ts`  | Serves the static assets and forwards `/api` and `/api/*` to the Backend.                    |
-| Backend Worker  | `src/worker/backend.ts`  | Private (no public URL). Runs Better Auth and the `HttpApi`.                                 |
-| API contract    | `src/api/`               | `HttpApi` definition shared by the Backend and the browser's `ApiClient`.                    |
-| Catalogue build | `scripts/catalogue/`     | Reads a `CatalogueSource`, checks the data, writes the committed `catalogue/catalogue.json`. |
-| AppDb           | D1, `src/worker/schema/` | One database for Better Auth's tables and the app's tables. Drizzle defines both.            |
+| Component       | Where                    | Does                                                                                                                                      |
+| --------------- | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Foldkit SPA     | `src/` (client code)     | The whole UI. Talks only to its own origin and, with the user's token, to CardTrader.                                                     |
+| Website Worker  | `src/worker/gateway.ts`  | Serves the static assets and forwards `/api` and `/api/*` to the Backend.                                                                 |
+| Backend Worker  | `src/worker/backend.ts`  | Private (no public URL). Runs Better Auth and the `HttpApi`.                                                                              |
+| API contract    | `src/api/`               | `HttpApi` definition shared by the Backend and the browser's `ApiClient`.                                                                 |
+| Catalogue build | `scripts/catalogue/`     | Reads a `CatalogueSource`, checks the data, writes `catalogue/catalogue.json` (git-ignored; CI builds it from the recordings kept in R2). |
+| AppDb           | D1, `src/worker/schema/` | One database for Better Auth's tables and the app's tables. Drizzle defines both.                                                         |
 
 ## What lives where
 
@@ -67,3 +67,5 @@ flowchart LR
 
 - `RIOT_API_KEY`: the Riot Developer Portal key, used only by the official-API `CatalogueSource` layer once a key has access.
 - Better Auth's signing secret is generated and kept by Alchemy (`Alchemy.Random`).
+- `INVITE_CODE`: the code sign-up needs while the app is invite only. Read by the Backend at startup, so Alchemy binds it as a Worker secret; locally from `.env`, in CI from the repository secret.
+- Card data: not a secret, but never committed. Packed recordings live in the private R2 bucket `cardtrader-data`; CI downloads them with `CLOUDFLARE_API_TOKEN`.
