@@ -13,7 +13,7 @@ concurrency:
 env:
   STAGE: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || (github.ref == 'refs/heads/main' && 'prod' || github.ref_name) }}
   # Card data is never committed: CI downloads it from a private R2 bucket
-  # (see README, "Card data").
+  # (see README, "Card data"). The bucket is defined in alchemy.data.ts.
   CARD_DATA_BUCKET: cardtrader-data
   CARD_DATA_OBJECT: recordings.tar.gz
 
