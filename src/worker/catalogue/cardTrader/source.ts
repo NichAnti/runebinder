@@ -34,7 +34,7 @@ export class CardTraderCatalogue extends Context.Service<
       CatalogueSourceError
     >
   }
->()('cardtrader/worker/catalogue/CardTraderCatalogue') {}
+>()('runebinder/worker/catalogue/CardTraderCatalogue') {}
 
 export const RecordedCardTrader = Layer.effect(
   CardTraderCatalogue,

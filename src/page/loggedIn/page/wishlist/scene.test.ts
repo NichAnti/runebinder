@@ -75,8 +75,8 @@ const readyWishlist = (links = {}) =>
 
 const listed = CardTraderWishlists.Listing.Ready({
   wishlists: [
-    { id: linkedId, name: 'Vi aggro (cardtrader app)' },
-    { id: otherId, name: 'Old deck (cardtrader app)' },
+    { id: linkedId, name: 'Vi aggro (Runebinder)' },
+    { id: otherId, name: 'Old deck (Runebinder)' },
   ],
 })
 
@@ -169,7 +169,7 @@ describe('wishlists page', () => {
       expectOutMessage(
         OutMessage.RequestedCreate({
           wishlist: Wishlist.deckWishlist(deck.id),
-          name: 'Vi aggro (cardtrader app)',
+          name: 'Vi aggro (Runebinder)',
           lines: [{ blueprintId, quantity: 2 }],
         }),
       ),
@@ -198,7 +198,7 @@ describe('wishlists page', () => {
       expectOutMessage(
         OutMessage.RequestedSync({
           wishlist: Wishlist.deckWishlist(deck.id),
-          name: 'Vi aggro (cardtrader app)',
+          name: 'Vi aggro (Runebinder)',
           lines: [{ blueprintId, quantity: 2 }],
         }),
       ),
@@ -219,17 +219,17 @@ describe('wishlists page', () => {
       expect(
         within(
           role('list', { name: 'Wishlists on CardTrader' }),
-          role('link', { name: 'Vi aggro (cardtrader app)' }),
+          role('link', { name: 'Vi aggro (Runebinder)' }),
         ),
       ).not.toExist(),
-      expect(role('link', { name: 'Old deck (cardtrader app)' })).toHaveAttr(
+      expect(role('link', { name: 'Old deck (Runebinder)' })).toHaveAttr(
         'href',
         `/cardtrader/wishlists/${otherId}`,
       ),
       expect(text('Made by this app')).toExist(),
       click(
         role('button', {
-          name: 'Delete Old deck (cardtrader app) on CardTrader',
+          name: 'Delete Old deck (Runebinder) on CardTrader',
         }),
       ),
       ...openedConfirm,

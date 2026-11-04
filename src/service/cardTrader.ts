@@ -52,7 +52,7 @@ export class TokenStore extends Context.Service<
     ) => Effect.Effect<void>
     readonly clear: Effect.Effect<void>
   }
->()('cardtrader/service/TokenStore') {
+>()('runebinder/service/TokenStore') {
   static readonly layer = Layer.effect(
     TokenStore,
     Effect.gen(function* () {
@@ -204,7 +204,7 @@ export class CardTraderClient extends Context.Service<
       wishlistId: Wishlist.CardTraderWishlistId,
     ) => Effect.Effect<CardTraderImport.RemoteWishlist, CardTraderError>
   }
->()('cardtrader/service/CardTraderClient') {
+>()('runebinder/service/CardTraderClient') {
   static readonly layerWith = Layer.effect(
     CardTraderClient,
     Effect.gen(function* () {

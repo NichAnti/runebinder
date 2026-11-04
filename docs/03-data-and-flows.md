@@ -36,7 +36,7 @@ erDiagram
   }
   collection_item {
     text user_id PK, FK
-    text printing_id PK "PrintingId, checked against printingIds.json"
+    text printing_id PK "PrintingId, checked against the catalogue's printing types"
     int quantity "1 to 999; 0 deletes the row"
   }
   deck {
@@ -117,7 +117,7 @@ service the same way (live with `CARDTRADER_TOKEN`, recorded for tests).
 sequenceDiagram
   participant D as alchemy deploy / dev
   participant S as CatalogueSeed
-  participant R as R2 cardtrader-data
+  participant R as R2 runebinder-data
   participant C as Sources
   D->>S: version (src/api/catalogue.ts)
   S->>R: is catalogue/<version>/catalogue.json there?
@@ -289,7 +289,7 @@ sequenceDiagram
   S->>S: update the screen at once
   Note over S: wait until the printing has had no change for a short pause
   S->>W: PUT /api/collection/{printingId} {quantity}
-  W->>W: printingId in printingIds.json?
+  W->>W: printingId in the catalogue's printing types?
   W->>DB: upsert, or delete when quantity is 0
   W-->>S: ok
 ```

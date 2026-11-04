@@ -56,7 +56,7 @@ export class DeckRepository extends Context.Service<
       deckId: Deck.DeckId,
     ) => Effect.Effect<void, DeckNotFound>
   }
->()('cardtrader/worker/DeckRepository') {
+>()('runebinder/worker/DeckRepository') {
   static readonly layer = Layer.effect(
     DeckRepository,
     Effect.gen(function* () {

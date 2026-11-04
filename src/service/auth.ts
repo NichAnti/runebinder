@@ -80,7 +80,7 @@ export class AuthClient extends Context.Service<
     readonly signIn: (input: SignInInput) => Effect.Effect<User.User, AuthError>
     readonly signOut: Effect.Effect<void, AuthError>
   }
->()('cardtrader/service/AuthClient') {
+>()('runebinder/service/AuthClient') {
   static readonly layer = Layer.sync(AuthClient, () => {
     const client = createAuthClient()
 

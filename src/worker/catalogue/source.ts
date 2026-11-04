@@ -24,4 +24,4 @@ export class CatalogueSource extends Context.Service<
       CatalogueSourceError
     >
   }
->()('cardtrader/worker/catalogue/CatalogueSource') {}
+>()('runebinder/worker/catalogue/CatalogueSource') {}

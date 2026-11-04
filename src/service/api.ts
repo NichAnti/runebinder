@@ -7,7 +7,7 @@ import { Api } from '../api'
 export class ApiClient extends Context.Service<
   ApiClient,
   HttpApiClient.ForApi<typeof Api>
->()('cardtrader/service/ApiClient') {
+>()('runebinder/service/ApiClient') {
   static readonly layer = Layer.effect(
     ApiClient,
     Effect.gen(function* () {

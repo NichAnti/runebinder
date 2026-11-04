@@ -204,7 +204,7 @@ describe('CardTraderClient wishlist list', () => {
     Effect.runPromise(
       Effect.gen(function* () {
         const fake = yield* fakeCardTrader(200, [
-          { id: 3572164, name: 'Vi aggro (cardtrader app)', game_id: 22 },
+          { id: 3572164, name: 'Vi aggro (Runebinder)', game_id: 22 },
         ])
         const wishlists = yield* Effect.gen(function* () {
           const client = yield* CardTraderClient
@@ -213,7 +213,7 @@ describe('CardTraderClient wishlist list', () => {
         const request = yield* Ref.get(fake.seenRequest)
 
         expect(wishlists).toStrictEqual([
-          { id: 3572164, name: 'Vi aggro (cardtrader app)' },
+          { id: 3572164, name: 'Vi aggro (Runebinder)' },
         ])
         expect(Option.map(request, ({ url }) => url)).toStrictEqual(
           Option.some(

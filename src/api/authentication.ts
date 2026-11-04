@@ -16,12 +16,12 @@ export class AuthenticationUnavailable extends Schema.TaggedError<Authentication
 ) {}
 
 export class CurrentUser extends Context.Service<CurrentUser, User.User>()(
-  'cardtrader/api/CurrentUser',
+  'runebinder/api/CurrentUser',
 ) {}
 
 export class Authentication extends HttpApiMiddleware.Service<
   Authentication,
   { provides: CurrentUser }
->()('cardtrader/api/Authentication', {
+>()('runebinder/api/Authentication', {
   error: [Unauthorized, AuthenticationUnavailable],
 }) {}

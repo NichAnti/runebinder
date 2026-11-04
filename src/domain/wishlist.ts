@@ -61,7 +61,7 @@ export const Wishlist = Schema.Struct({
 })
 export type Wishlist = typeof Wishlist.Type
 
-const APP_NAME_SUFFIX = ' (cardtrader app)'
+const APP_NAME_SUFFIX = ' (Runebinder)'
 
 export const cardTraderNameOf = (ref: WishlistRef, deckName: string): string =>
   ref._tag === 'Custom'

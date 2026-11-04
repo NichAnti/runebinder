@@ -13,7 +13,7 @@ import { RecordedRiotGallery } from './riotGallery/layer'
 // strict checks on the live data anyway.
 export const HAS_RECORDINGS = existsSync('catalogue/recordings')
 
-export const RecordedSources = Layer.mergeAll(
+const RecordedSources = Layer.mergeAll(
   RecordedRiotGallery,
   RecordedCardTrader,
 ).pipe(Layer.provideMerge(NodeServices.layer))

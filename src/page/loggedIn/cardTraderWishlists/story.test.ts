@@ -25,7 +25,7 @@ const listed = {
   ...init(),
   listing: Listing.Ready({
     wishlists: [
-      { id: first, name: 'Vi aggro (cardtrader app)' },
+      { id: first, name: 'Vi aggro (Runebinder)' },
       { id: second, name: 'Bought at the fair' },
     ],
   }),
@@ -84,7 +84,7 @@ describe('CardTrader wishlists', () => {
       model(next => {
         expect(next.listing).toStrictEqual(
           Listing.Ready({
-            wishlists: [{ id: first, name: 'Vi aggro (cardtrader app)' }],
+            wishlists: [{ id: first, name: 'Vi aggro (Runebinder)' }],
           }),
         )
         expect(deletionOf(next, second)).toStrictEqual(Option.none())

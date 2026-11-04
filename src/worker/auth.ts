@@ -18,7 +18,7 @@ const makeAuth = BetterAuth({
 export class Auth extends Context.Service<
   Auth,
   Effect.Success<typeof makeAuth>
->()('cardtrader/worker/Auth') {}
+>()('runebinder/worker/Auth') {}
 
 const AuthDatabase = Layer.unwrap(
   Effect.gen(function* () {

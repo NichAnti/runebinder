@@ -69,7 +69,7 @@ export class WishlistRepository extends Context.Service<
       deckId: Deck.DeckId,
     ) => Effect.Effect<void, DeckNotFound>
   }
->()('cardtrader/worker/WishlistRepository') {
+>()('runebinder/worker/WishlistRepository') {
   static readonly layer = Layer.effect(
     WishlistRepository,
     Effect.gen(function* () {

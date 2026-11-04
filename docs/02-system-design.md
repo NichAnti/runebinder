@@ -14,7 +14,7 @@ flowchart LR
     Auth[Better Auth /api/auth/*]
     Api[HttpApi /api/*]
     Seed[CatalogueSeed<br>runs on deploy]
-    Bucket[(R2 cardtrader-data)]
+    Bucket[(R2 runebinder-data)]
     DB[(D1 AppDb)]
   end
 
@@ -52,7 +52,7 @@ flowchart LR
 | -------------------------------------------- | -------------------------------------------------- | ------------------- |
 | Account (display name, email, password hash) | D1 (Better Auth)                                   | yes                 |
 | Session                                      | D1 + cookie                                        | yes                 |
-| Card catalogue                               | R2 bucket `cardtrader-data`, served by the Backend | yes                 |
+| Card catalogue                               | R2 bucket `runebinder-data`, served by the Backend | yes                 |
 | Collection, decks, wishlist                  | D1                                                 | yes                 |
 | CardTrader token                             | user's browser only                                | **never**           |
 

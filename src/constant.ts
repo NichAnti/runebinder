@@ -1,4 +1,4 @@
-export const APP_NAME = 'Cardtrader'
+export const APP_NAME = 'Runebinder'
 
 export const THEME_STORAGE_KEY = 'theme-preference'
 

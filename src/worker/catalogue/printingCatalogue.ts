@@ -24,7 +24,7 @@ const indexOf = (types: Catalogue.PrintingTypes): PrintingIndex => {
 export class PrintingCatalogue extends Context.Service<
   PrintingCatalogue,
   { readonly index: Effect.Effect<PrintingIndex> }
->()('cardtrader/worker/PrintingCatalogue') {
+>()('runebinder/worker/PrintingCatalogue') {
   static readonly layerFrom = (json: unknown) =>
     Layer.effect(
       PrintingCatalogue,

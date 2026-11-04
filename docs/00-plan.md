@@ -85,7 +85,7 @@ Its structure is agreed before any code is written.
 - [ ] 9.1e Optionally, a way to start playing a second version of a card from its tile
 - [x] 9.2 Polish and docs refresh: dead code removed, the deck page view split by area, README and docs brought up to date
 - [x] 9.3 Riot "Legal Jibber Jabber" notice in the app (site footer, added in 4.3)
-- [x] 9.3b Going live safely: card data out of git, seeded on deploy into the R2 bucket `cardtrader-data` (`CatalogueSeed`) and served by the Backend; invite-only sign-up (`INVITE_CODE`)
+- [x] 9.3b Going live safely: card data out of git, seeded on deploy into the R2 bucket `runebinder-data` (`CatalogueSeed`) and served by the Backend; invite-only sign-up (`INVITE_CODE`)
 - [ ] 9.4 Register the product on the Riot Developer Portal and apply for a production key
 - [ ] 9.5 Decide about a PR
 

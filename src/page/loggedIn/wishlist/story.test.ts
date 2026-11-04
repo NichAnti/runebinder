@@ -37,7 +37,7 @@ const lines: Array.NonEmptyReadonlyArray<Wishlist.CardTraderLine> = [
 ]
 const outgoing = {
   wishlist: Wishlist.CUSTOM,
-  name: 'Custom wishlist (cardtrader app)',
+  name: 'Custom wishlist (Runebinder)',
   lines,
 }
 const linked = Model.Ready({

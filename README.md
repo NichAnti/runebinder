@@ -1,4 +1,4 @@
-# Cardtrader
+# Runebinder
 
 A Riftbound companion: track the cards you own, build decks that follow the
 official deckbuilding rules, keep a wishlist of what each deck is missing, and
@@ -40,7 +40,7 @@ bun run format  # fix formatting
 
 The card catalogue is never committed. It works like a database with a seed:
 
-- `alchemy.run.ts` declares the R2 bucket `cardtrader-data`, shared by every
+- `alchemy.run.ts` declares the R2 bucket `runebinder-data`, shared by every
   stage; destroying a stage keeps it.
 - On every deploy (and the first `bun run dev`), the `CatalogueSeed` action
   checks whether the bucket already has the catalogue version in

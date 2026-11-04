@@ -16,7 +16,7 @@ export const AppDb = Effect.gen(function* () {
 export class AppDatabase extends Context.Service<
   AppDatabase,
   Cloudflare.D1.QueryDatabaseClient
->()('cardtrader/worker/AppDatabase') {
+>()('runebinder/worker/AppDatabase') {
   static readonly layer = Layer.effect(
     AppDatabase,
     Cloudflare.D1.QueryDatabase(AppDb),

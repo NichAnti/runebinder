@@ -19,7 +19,7 @@ export class Website extends Cloudflare.Website.Foldkit<Website>()('Website', {
 export type WebsiteEnv = Cloudflare.InferEnv<typeof Website>
 
 export default Alchemy.Stack(
-  'Cardtrader',
+  'Runebinder',
   {
     providers: Layer.mergeAll(Cloudflare.providers(), Drizzle.providers()),
     state: Cloudflare.state(),

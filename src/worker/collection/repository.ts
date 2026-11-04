@@ -37,7 +37,7 @@ export class CollectionRepository extends Context.Service<
       quantity: Collection.Quantity,
     ) => Effect.Effect<void>
   }
->()('cardtrader/worker/CollectionRepository') {
+>()('runebinder/worker/CollectionRepository') {
   static readonly layer = Layer.effect(
     CollectionRepository,
     Effect.gen(function* () {
