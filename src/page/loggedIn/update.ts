@@ -316,6 +316,29 @@ const foldDeckListPageOutMessage = DeckListPage.OutMessage.match<
   RequestedRetryLoadDecks: () => retryDecks,
 })
 
+const deckListPageSlot = {
+  read: (model: Model) => Option.some(model.deckListPage),
+  write: (model: Model, nextPage: DeckListPage.Model): Model =>
+    modifyFields(model, { deckListPage: () => nextPage }),
+  toParentMessage: (message: DeckListPage.Message) =>
+    Message.GotDeckListPageMessage({ message }),
+}
+
+const enterDeckListPage: Update.Step<
+  Model,
+  Message,
+  CatalogueIndexService
+> = stepModel =>
+  Update.foldChildStep({
+    update: (page: DeckListPage.Model) =>
+      DeckListPage.enter(
+        page,
+        stepModel.decks._tag === 'Ready' ? stepModel.decks.decks : [],
+        stepModel.catalogue._tag === 'Ready',
+      ),
+    ...deckListPageSlot,
+  })(stepModel)
+
 const foldDeckListPage = Update.foldChild({
   update: DeckListPage.update,
   read: (model: Model) => Option.some(model.deckListPage),
@@ -609,7 +632,12 @@ const enterPage = (model: Model, route: LoggedInRoute): UpdateReturn => {
           ensureDecks,
         ]),
       CardTrader: () => verifyCardTrader(model),
-      Decks: () => ensureDecks(model),
+      Decks: () =>
+        Update.combine<Model, Message, Requirements>(model, [
+          ensureDecks,
+          ensureCollection,
+          enterDeckListPage,
+        ]),
       Deck: ({ deckId }) =>
         Update.combine<Model, Message, Requirements>(model, [
           ensureDecks,
@@ -651,7 +679,10 @@ const isWantedView = (route: LoggedInRoute): boolean =>
   route._tag === 'Catalogue' && route.ownership === 'Wanted'
 
 const isWaitingForDecks = (route: LoggedInRoute): boolean =>
-  route._tag === 'Deck' || isWishlistRoute(route) || isWantedView(route)
+  route._tag === 'Decks' ||
+  route._tag === 'Deck' ||
+  isWishlistRoute(route) ||
+  isWantedView(route)
 
 const isWaitingForCollection = (route: LoggedInRoute): boolean =>
   isWishlistRoute(route) ||

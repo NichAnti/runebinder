@@ -1,9 +1,16 @@
 import { Schema } from 'effect'
 import { defineMessageUnion } from 'foldkit/message'
 
-import { Deck, DeckCode } from '../../../../domain'
+import { Deck, DeckCode, Printing } from '../../../../domain'
+import { Dialog } from '../../../../ui'
 
 export const Message = defineMessageUnion({
+  SucceededLoadDeckListCards: { cards: Schema.Array(Printing.Card) },
+  SkippedLoadDeckListCards: {},
+  ClickedNewDeck: {},
+  ClickedImportCode: {},
+  GotNewDeckDialogMessage: { message: Dialog.Message },
+  GotImportDialogMessage: { message: Dialog.Message },
   UpdatedNewName: { value: Schema.String },
   SubmittedNewDeck: {},
   UpdatedImportName: { value: Schema.String },

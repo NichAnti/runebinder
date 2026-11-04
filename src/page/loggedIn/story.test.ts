@@ -328,6 +328,7 @@ describe('decks', () => {
 
     expect(entered.commands?.map(({ name }) => name)).toStrictEqual([
       DecksState.LoadDecks.name,
+      CollectionState.LoadCollection.name,
     ])
   })
 
@@ -441,6 +442,7 @@ describe('CardTrader connection', () => {
     expect(entered.commands?.map(({ name }) => name)).toStrictEqual([
       CardTraderState.ReadStoredToken.name,
       DecksState.LoadDecks.name,
+      CollectionState.LoadCollection.name,
     ])
     expect(again.commands ?? []).toStrictEqual([])
   })

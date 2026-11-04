@@ -163,7 +163,7 @@ export const view = Submodel.defineView<Model, Message>((model, h) =>
               slotId: 'deck-list-page',
               model: model.deckListPage,
               view: DeckListPage.view,
-              viewInputs: { decks: model.decks },
+              viewInputs: { decks: model.decks, collection: model.collection },
               toParentMessage: message =>
                 Message.GotDeckListPageMessage({ message }),
             }),

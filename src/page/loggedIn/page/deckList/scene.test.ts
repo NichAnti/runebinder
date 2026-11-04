@@ -1,5 +1,7 @@
+import { Option } from 'effect'
 import {
   Command,
+  Mount,
   click,
   expect,
   expectOutMessage,
@@ -7,13 +9,18 @@ import {
   label,
   role,
   scene,
+  text,
   type,
   withViewInputs,
   within,
 } from 'foldkit/scene'
+import { modifyFields } from 'foldkit/struct'
 import { describe, test } from 'vitest'
 
-import { Deck } from '../../../../domain'
+import { Deck, Printing } from '../../../../domain'
+import { printing, testCard } from '../../../../testing'
+import { Dialog } from '../../../../ui'
+import * as CollectionState from '../../collection'
 import * as DecksState from '../../decks'
 import { Message, OutMessage } from './message'
 import { init } from './model'
@@ -30,6 +37,7 @@ const newForm = role('form', { name: 'New deck' })
 const importForm = role('form', { name: 'Import a deck code' })
 
 const sceneView = withViewInputs(view, {
+  collection: CollectionState.init(),
   decks: DecksState.Model.Ready({
     decks: [deck],
     saves: {},
@@ -39,8 +47,16 @@ const sceneView = withViewInputs(view, {
   }),
 })
 
+const opened = [
+  Command.resolve(Dialog.ShowDialog, Dialog.Message.SucceededShowDialog()),
+  Mount.resolve(
+    Dialog.AcquireResources,
+    Dialog.Message.SucceededAcquireResources(),
+  ),
+]
+
 describe('decks page', () => {
-  test('lists decks with a link to each', () => {
+  test('shows each deck as a card linking to it, with its progress', () => {
     scene(
       { update, view: sceneView() },
       given(init()),
@@ -48,18 +64,79 @@ describe('decks page', () => {
         'href',
         `/decks/${deck.id}`,
       ),
-      expect(role('list', { name: 'Your decks' })).toContainText('0 cards'),
+      expect(role('list', { name: 'Your decks' })).toContainText(
+        'Main 0 / 40 · Runes 0 / 12 · Battlefields 0 / 3',
+      ),
+      expect(role('list', { name: 'Your decks' })).toContainText(
+        'No legend yet',
+      ),
     )
   })
 
-  test('a new deck needs a name', () => {
+  test('a deck with a legend shows its art, domains, status and need', () => {
+    const legend = printing({
+      id: Printing.PrintingId.make('tst-050-010'),
+      cardId: Printing.CardId.make('test-legend'),
+      maybeType: Option.some('Legend'),
+      domains: ['Fury', 'Calm'],
+    })
+    const withLegend: Deck.Deck = {
+      ...deck,
+      contents: {
+        ...Deck.empty,
+        maybeLegend: Option.some(legend.id),
+        main: [
+          {
+            printingId: Printing.PrintingId.make('tst-001-010'),
+            copies: Deck.Copies.make(2),
+          },
+        ],
+      },
+    }
+
+    scene(
+      {
+        update,
+        view: withViewInputs(view, {
+          collection: CollectionState.Model.Ready({
+            owned: {},
+            saves: {},
+            nextRevision: 0,
+          }),
+          decks: DecksState.Model.Ready({
+            decks: [withLegend],
+            saves: {},
+            nextRevision: 0,
+            creation: DecksState.Creation.Idle(),
+            removals: {},
+          }),
+        })(),
+      },
+      given(
+        modifyFields(init(), {
+          cards: () => ({
+            [legend.cardId]: { id: legend.cardId, printings: [legend] },
+            [testCard.id]: testCard,
+          }),
+        }),
+      ),
+      expect(role('list', { name: 'Your decks' })).toContainText('Fury'),
+      expect(role('list', { name: 'Your decks' })).toContainText('Calm'),
+      expect(role('list', { name: 'Your decks' })).toContainText(
+        'Not finished',
+      ),
+      expect(text('Need 3')).toExist(),
+    )
+  })
+
+  test('a new deck is created from its dialog and needs a name', () => {
     scene(
       { update, view: sceneView() },
       given(init()),
+      click(role('button', { name: 'New deck' })),
+      ...opened,
       click(role('button', { name: 'Create deck' })),
-      expect(role('form', { name: 'New deck' })).toContainText(
-        'Give the deck a name',
-      ),
+      expect(newForm).toContainText('Give the deck a name'),
       type(within(newForm, label('Name')), 'Jinx burn'),
       click(role('button', { name: 'Create deck' })),
       expectOutMessage(
@@ -68,13 +145,20 @@ describe('decks page', () => {
           contents: Deck.empty,
         }),
       ),
+      Command.resolve(
+        Dialog.CloseDialog,
+        Dialog.Message.CompletedCloseDialog(),
+      ),
+      Mount.expectEnded(Dialog.AcquireResources),
     )
   })
 
-  test('an import that fails says why', () => {
+  test('an import that fails says why in its dialog', () => {
     scene(
       { update, view: sceneView() },
       given(init()),
+      click(role('button', { name: 'Import code' })),
+      ...opened,
       type(within(importForm, label('Name')), 'Imported'),
       type(label('Deck code'), 'NOTACODE'),
       click(role('button', { name: 'Import' })),
@@ -84,9 +168,7 @@ describe('decks page', () => {
           problem: { _tag: 'UnknownCard', cardCode: 'OGN-200' },
         }),
       ),
-      expect(role('form', { name: 'Import a deck code' })).toContainText(
-        'OGN-200 is not in the catalogue.',
-      ),
+      expect(importForm).toContainText('OGN-200 is not in the catalogue.'),
     )
   })
 })
