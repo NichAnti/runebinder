@@ -27,7 +27,6 @@ import { type AddTab, init } from './model'
 import {
   LoadCardToAdd,
   ScrollToSection,
-  ScrollToSidePanel,
   SearchCardsToAdd,
   update,
 } from './update'
@@ -382,7 +381,7 @@ describe('deck page', () => {
           role('button', { name: 'Battlefields' }),
         ),
       ),
-      Command.expectExact(SearchCardsToAdd, ScrollToSidePanel),
+      Command.expectExact(SearchCardsToAdd),
       Command.resolve(
         SearchCardsToAdd,
         Message.SucceededSearchCardsToAdd({
@@ -391,7 +390,6 @@ describe('deck page', () => {
           cards: [],
         }),
       ),
-      Command.resolve(ScrollToSidePanel, Message.CompletedScrollToSidePanel()),
       expect(role('tab', { name: 'Add cards' })).toHaveAttr(
         'aria-selected',
         'true',

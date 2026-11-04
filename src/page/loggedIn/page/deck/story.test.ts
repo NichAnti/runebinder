@@ -16,7 +16,12 @@ import { Deck, Printing } from '../../../../domain'
 import { printing, testCard } from '../../../../testing'
 import { Message, OutMessage } from './message'
 import { type AddTab, init } from './model'
-import { FindRunes, SearchCardsToAdd, update } from './update'
+import {
+  FindRunes,
+  SearchCardsToAdd,
+  WaitBeforeClearingUndo,
+  update,
+} from './update'
 
 const base = Printing.PrintingId.make('tst-001-010')
 const deck: Deck.Deck = {
@@ -178,5 +183,102 @@ describe('runes', () => {
         ),
       ),
     ).toBe(6)
+  })
+})
+
+describe('undo and the sheet', () => {
+  const base = Printing.PrintingId.make('tst-001-010')
+  const oneCopy: Deck.Deck = {
+    ...deck,
+    contents: {
+      ...deck.contents,
+      main: [{ printingId: base, copies: Deck.Copies.make(1) }],
+    },
+  }
+  const withCard = modifyFields(init(), {
+    maybeDeckId: () => Option.some(deck.id),
+    cards: () => ({ [testCard.id]: testCard }),
+  })
+
+  test('removing the last copy can be undone for a while', () => {
+    const removed = update(Option.some(oneCopy))(
+      withCard,
+      Message.ClickedStepCopies({
+        cardId: testCard.id,
+        maybeVersion: Option.some(base),
+        zone: 'Main',
+        step: -1,
+      }),
+    )
+
+    expect(
+      Option.map(removed.model.maybeUndo, ({ text }) => text),
+    ).toStrictEqual(
+      Option.some('Removed Test Unit, Tester from the main deck.'),
+    )
+    expect(removed.commands?.map(({ name }) => name)).toStrictEqual([
+      WaitBeforeClearingUndo.name,
+    ])
+
+    const undone = update(Option.some({ ...oneCopy, contents: deck.contents }))(
+      removed.model,
+      Message.ClickedUndo(),
+    )
+
+    expect(undone.outMessage).toStrictEqual(
+      OutMessage.EditedDeck({
+        deckId: deck.id,
+        edits: [
+          { _tag: 'StepCopies', zone: 'Main', printingId: base, step: 1 },
+        ],
+      }),
+    )
+    expect(undone.model.maybeUndo).toStrictEqual(Option.none())
+
+    const expired = update(Option.some(oneCopy))(
+      removed.model,
+      Message.CompletedWaitBeforeClearingUndo({ id: 0 }),
+    )
+
+    expect(expired.model.maybeUndo).toStrictEqual(Option.none())
+  })
+
+  test('removing one of several copies offers no undo', () => {
+    const removed = update(Option.some(oneCopy))(
+      modifyFields(withCard, {}),
+      Message.ClickedStepCopies({
+        cardId: testCard.id,
+        maybeVersion: Option.some(base),
+        zone: 'Sideboard',
+        step: -1,
+      }),
+    )
+
+    expect(removed.model.maybeUndo).toStrictEqual(Option.none())
+  })
+
+  test('asking to add cards opens the sheet, and it can be closed', () => {
+    const opened = update(Option.some(oneCopy))(
+      withCard,
+      Message.SelectedAddTab({ tab: 'Spell' }),
+    )
+
+    expect(opened.model.isSheetOpen).toBe(true)
+    expect(
+      update(Option.some(oneCopy))(opened.model, Message.ClickedToggleSheet())
+        .model.isSheetOpen,
+    ).toBe(false)
+  })
+
+  test('duplicating asks for a copy with the same cards', () => {
+    expect(
+      update(Option.some(oneCopy))(withCard, Message.ClickedDuplicate())
+        .outMessage,
+    ).toStrictEqual(
+      OutMessage.RequestedDuplicateDeck({
+        name: Deck.DeckName.make('Test deck (copy)'),
+        contents: oneCopy.contents,
+      }),
+    )
   })
 })

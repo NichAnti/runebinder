@@ -331,6 +331,31 @@ describe('decks', () => {
     ])
   })
 
+  test('duplicating a deck creates the copy', () => {
+    const onDeck = modifyFields(init(AppRoute.Deck({ deckId }), ada), {
+      decks: () =>
+        DecksState.Model.Ready({
+          decks: [deck],
+          saves: {},
+          nextRevision: 0,
+          creation: DecksState.Creation.Idle(),
+          removals: {},
+        }),
+      deckPage: page =>
+        modifyFields(page, { maybeDeckId: () => Option.some(deckId) }),
+    })
+    const duplicated = update(
+      onDeck,
+      Message.GotDeckPageMessage({
+        message: DeckPage.Message.ClickedDuplicate(),
+      }),
+    )
+
+    expect(duplicated.commands?.map(({ name }) => name)).toStrictEqual([
+      DecksState.CreateDeck.name,
+    ])
+  })
+
   test('creating a deck opens it', () => {
     story(
       update,

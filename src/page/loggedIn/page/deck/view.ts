@@ -55,7 +55,6 @@ import {
   type AddTab,
   type Layout,
   type Model,
-  SIDE_PANEL_ID,
   SideTabs,
   sectionElementId,
 } from './model'
@@ -1320,16 +1319,51 @@ const statsView = (
 
 // SIDE PANEL
 
+const sheetContent = (
+  context: Context,
+  content: ReadonlyArray<Html>,
+  h: HtmlBuilder<Message>,
+): ReadonlyArray<Html> => [
+  h.div(
+    [
+      h.Class(
+        context.model.isSheetOpen
+          ? 'flex flex-col gap-3'
+          : 'hidden flex-col gap-3 lg:flex',
+      ),
+    ],
+    content,
+  ),
+]
+
+const sheetToggleView = (context: Context, h: HtmlBuilder<Message>): Html =>
+  h.div(
+    [h.Class('flex justify-end lg:hidden')],
+    [
+      IconButton.view(
+        {
+          icon: context.model.isSheetOpen ? 'XMark' : 'ChevronUp',
+          label: context.model.isSheetOpen
+            ? 'Hide deck tools'
+            : 'Show deck tools',
+          size: 'Small',
+          action: { _tag: 'Click', message: Message.ClickedToggleSheet() },
+        },
+        h,
+      ),
+    ],
+  )
+
 const sidePanelView = (context: Context, h: HtmlBuilder<Message>): Html =>
   h.aside(
     [
-      h.Id(SIDE_PANEL_ID),
       h.AriaLabel('Deck tools'),
       h.Class(
-        'flex scroll-mt-20 flex-col gap-3 rounded-card border border-border bg-surface p-4 lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto',
+        `fixed inset-x-0 bottom-0 z-20 flex flex-col gap-2 overflow-y-auto rounded-t-card border-t border-border bg-surface p-4 shadow-raised lg:sticky lg:top-20 lg:z-auto lg:max-h-[calc(100vh-6rem)] lg:gap-3 lg:rounded-card lg:border lg:shadow-none ${context.model.isSheetOpen ? 'max-h-[75vh]' : ''}`,
       ),
     ],
     [
+      sheetToggleView(context, h),
       Tabs.view(
         {
           bundle: SideTabs,
@@ -1343,9 +1377,13 @@ const sidePanelView = (context: Context, h: HtmlBuilder<Message>): Html =>
           ],
           selected: context.model.sidePanel,
           panel: panel =>
-            panel === 'Stats'
-              ? statsView(context, h)
-              : addCardsView(context, h),
+            sheetContent(
+              context,
+              panel === 'Stats'
+                ? statsView(context, h)
+                : addCardsView(context, h),
+              h,
+            ),
         },
         h,
       ),
@@ -1553,11 +1591,22 @@ const headerView = (context: Context, h: HtmlBuilder<Message>): Html => {
                       ),
                       IconButton.view(
                         {
-                          icon: 'DocumentDuplicate',
+                          icon: 'ClipboardDocument',
                           label: 'Copy deck code',
                           action: {
                             _tag: 'Click',
                             message: Message.ClickedCopyCode(),
+                          },
+                        },
+                        h,
+                      ),
+                      IconButton.view(
+                        {
+                          icon: 'DocumentDuplicate',
+                          label: 'Duplicate deck',
+                          action: {
+                            _tag: 'Click',
+                            message: Message.ClickedDuplicate(),
                           },
                         },
                         h,
@@ -1628,6 +1677,40 @@ const missingView = (context: Context, h: HtmlBuilder<Message>): Html =>
     },
   })
 
+const undoView = (model: Model, h: HtmlBuilder<Message>): Html =>
+  Option.match(model.maybeUndo, {
+    onNone: () => h.empty,
+    onSome: ({ text }) =>
+      h.div(
+        [
+          h.Role('status'),
+          h.Class(
+            'fixed inset-x-4 bottom-20 z-30 mx-auto flex max-w-md items-center gap-3 rounded-card border border-border bg-surface-raised px-4 py-3 text-sm text-fg shadow-raised lg:bottom-4',
+          ),
+        ],
+        [
+          h.span([h.Class('min-w-0 flex-1')], [text]),
+          Button.view(
+            {
+              content: ['Undo'],
+              variant: 'Secondary',
+              onClick: Message.ClickedUndo(),
+            },
+            h,
+          ),
+          IconButton.view(
+            {
+              icon: 'XMark',
+              label: 'Dismiss',
+              size: 'Small',
+              action: { _tag: 'Click', message: Message.ClickedDismissUndo() },
+            },
+            h,
+          ),
+        ],
+      ),
+  })
+
 const deleteView = (
   model: Model,
   removal: Option.Option<DecksState.Removal>,
@@ -1696,7 +1779,7 @@ const deckView = (
   }
 
   return h.article(
-    [h.Class('flex flex-col gap-6')],
+    [h.Class('flex flex-col gap-6 pb-28 lg:pb-0')],
     [
       headerView(context, h),
       progressView(context, h),
@@ -1717,6 +1800,7 @@ const deckView = (
         ],
       ),
       deleteView(model, removal, h),
+      undoView(model, h),
       Toast.view(
         {
           slotId: 'deck-toast',

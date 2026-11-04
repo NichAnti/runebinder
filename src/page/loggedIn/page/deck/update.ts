@@ -1,5 +1,6 @@
 import {
   Array,
+  Duration,
   Effect,
   HashSet,
   Match,
@@ -43,7 +44,6 @@ import {
   AddTarget,
   Export,
   type Model,
-  SIDE_PANEL_ID,
   type SidePanel,
   SideTabs,
   TAB_FOR_SECTION,
@@ -171,6 +171,17 @@ export const LoadCardToAdd = Command.define('LoadCardToAdd', {
     ),
 })
 
+const UNDO_DURATION = Duration.seconds(8)
+
+export const WaitBeforeClearingUndo = Command.define('WaitBeforeClearingUndo', {
+  args: { id: Schema.Int },
+  messages: [Message.CompletedWaitBeforeClearingUndo],
+  execute: ({ id }) =>
+    Effect.sleep(UNDO_DURATION).pipe(
+      Effect.as(Message.CompletedWaitBeforeClearingUndo({ id })),
+    ),
+})
+
 export const FindRunes = Command.define('FindRunes', {
   args: { domains: Schema.Array(Printing.Domain) },
   messages: [Message.SucceededFindRunes, Message.SkippedLoadCatalogue],
@@ -220,14 +231,6 @@ export const ScrollToSection = Command.define('ScrollToSection', {
     }).pipe(Effect.ignore, Effect.as(Message.CompletedScrollToSection())),
 })
 
-export const ScrollToSidePanel = Command.define('ScrollToSidePanel', {
-  messages: [Message.CompletedScrollToSidePanel],
-  execute: Dom.scrollIntoView(`#${SIDE_PANEL_ID}`).pipe(
-    Effect.ignore,
-    Effect.as(Message.CompletedScrollToSidePanel()),
-  ),
-})
-
 // TOAST
 
 const toastFold = {
@@ -261,7 +264,10 @@ const foldSideTabsOutMessage = Tabs.OutMessage.match<
   Selected:
     ({ value }) =>
     stepModel => ({
-      model: modifyFields(stepModel, { sidePanel: () => value }),
+      model: modifyFields(stepModel, {
+        sidePanel: () => value,
+        isSheetOpen: () => true,
+      }),
     }),
 })
 
@@ -428,6 +434,77 @@ export const enter = (
 
 // EDITS
 
+const withUndo = (
+  result: UpdateReturn,
+  text: string,
+  maybeEdits: Option.Option<Array.NonEmptyReadonlyArray<DeckEdit.DeckEdit>>,
+): UpdateReturn =>
+  Option.match(maybeEdits, {
+    onNone: () => result,
+    onSome: edits =>
+      result.outMessage === undefined
+        ? result
+        : {
+            ...result,
+            model: modifyFields(result.model, {
+              maybeUndo: () =>
+                Option.some({ id: result.model.nextUndoId, text, edits }),
+              nextUndoId: id => id + 1,
+            }),
+            commands: [
+              ...(result.commands ?? []),
+              WaitBeforeClearingUndo({ id: result.model.nextUndoId }),
+            ],
+          },
+  })
+
+const nameOfPrinting = (
+  model: Model,
+  printingId: Printing.PrintingId,
+): string =>
+  Option.match(
+    Option.fromNullishOr(cardsByPrinting(model.cards).get(printingId)),
+    { onNone: () => printingId, onSome: nameOf },
+  )
+
+const removalUndo = (
+  deck: Deck.Deck,
+  edits: Array.NonEmptyReadonlyArray<DeckEdit.DeckEdit>,
+): Option.Option<
+  Readonly<{
+    printingId: Printing.PrintingId
+    zone: Deck.Zone
+    edits: Array.NonEmptyReadonlyArray<DeckEdit.DeckEdit>
+  }>
+> => {
+  const [edit, ...rest] = edits
+
+  return edit._tag === 'StepCopies' &&
+    edit.step === -1 &&
+    Array.isReadonlyArrayEmpty(rest) &&
+    DeckEdit.copiesOf(deck.contents, edit.zone, edit.printingId) === 1
+    ? Option.some({
+        printingId: edit.printingId,
+        zone: edit.zone,
+        edits: [
+          {
+            _tag: 'StepCopies',
+            zone: edit.zone,
+            printingId: edit.printingId,
+            step: 1,
+          },
+        ],
+      })
+    : Option.none()
+}
+
+const ZONE_NAMES: Readonly<Record<Deck.Zone, string>> = {
+  Main: 'the main deck',
+  Runes: 'the runes',
+  Battlefields: 'the battlefields',
+  Sideboard: 'the sideboard',
+}
+
 const edited = (
   model: Model,
   maybeDeck: Option.Option<Deck.Deck>,
@@ -566,10 +643,11 @@ export const update =
           addTab: () => tab,
           searchResults: () => [],
           sidePanel: () => 'Add',
+          isSheetOpen: () => true,
         })
         return {
           model: nextModel,
-          commands: [searchFor(nextModel, maybeDeck), ScrollToSidePanel()],
+          commands: [searchFor(nextModel, maybeDeck)],
         }
       },
 
@@ -579,6 +657,7 @@ export const update =
           addTab: () => tab,
           searchResults: results => (tab === model.addTab ? results : []),
           sidePanel: () => 'Add',
+          isSheetOpen: () => true,
         })
 
         return {
@@ -592,7 +671,9 @@ export const update =
 
       CompletedScrollToSection: () => ({ model }),
 
-      CompletedScrollToSidePanel: () => ({ model }),
+      ClickedToggleSheet: () => ({
+        model: modifyFields(model, { isSheetOpen: isOpen => !isOpen }),
+      }),
 
       ToggledOnlyLegal: ({ isChecked }) => ({
         model: modifyFields(model, { isOnlyLegal: () => isChecked }),
@@ -637,7 +718,21 @@ export const update =
                       }),
                     ],
                   }
-                : edited(model, maybeDeck, () => copyStep.edits),
+                : Option.match(
+                    Option.flatMap(maybeDeck, deck =>
+                      removalUndo(deck, copyStep.edits),
+                    ),
+                    {
+                      onNone: () =>
+                        edited(model, maybeDeck, () => copyStep.edits),
+                      onSome: removal =>
+                        withUndo(
+                          edited(model, maybeDeck, () => copyStep.edits),
+                          `Removed ${nameOfPrinting(model, removal.printingId)} from ${ZONE_NAMES[removal.zone]}.`,
+                          Option.some(removal.edits),
+                        ),
+                    },
+                  ),
           },
         ),
 
@@ -744,16 +839,95 @@ export const update =
       ClickedMakeChampion: ({ printingId }) =>
         edited(model, maybeDeck, () => [{ _tag: 'MakeChampion', printingId }]),
 
-      ClickedClearLegend: () =>
-        edited(model, maybeDeck, () => [{ _tag: 'ClearLegend' }]),
+      ClickedClearLegend: () => {
+        const maybeLegend = Option.flatMap(
+          maybeDeck,
+          ({ contents }) => contents.maybeLegend,
+        )
 
-      ClickedClearChampion: () =>
-        edited(model, maybeDeck, () => [{ _tag: 'ClearChampion' }]),
+        return withUndo(
+          edited(model, maybeDeck, () => [{ _tag: 'ClearLegend' }]),
+          `Removed the legend ${Option.match(maybeLegend, {
+            onNone: () => '',
+            onSome: printingId => nameOfPrinting(model, printingId),
+          })}.`,
+          Option.map(
+            maybeLegend,
+            (printingId): Array.NonEmptyReadonlyArray<DeckEdit.DeckEdit> => [
+              {
+                _tag: 'AddCard',
+                printingId,
+                maybeType: Option.some('Legend'),
+              },
+            ],
+          ),
+        )
+      },
 
-      ClickedRemoveAdditionalLegend: ({ position }) =>
-        edited(model, maybeDeck, () => [
-          { _tag: 'RemoveAdditionalLegend', position },
-        ]),
+      ClickedClearChampion: () => {
+        const maybeChampion = Option.flatMap(
+          maybeDeck,
+          ({ contents }) => contents.maybeChosenChampion,
+        )
+
+        return withUndo(
+          edited(model, maybeDeck, () => [{ _tag: 'ClearChampion' }]),
+          `${Option.match(maybeChampion, {
+            onNone: () => 'The champion',
+            onSome: printingId => nameOfPrinting(model, printingId),
+          })} is no longer the chosen champion; it is back in the main deck.`,
+          Option.map(
+            maybeChampion,
+            (printingId): Array.NonEmptyReadonlyArray<DeckEdit.DeckEdit> => [
+              { _tag: 'MakeChampion', printingId },
+            ],
+          ),
+        )
+      },
+
+      ClickedRemoveAdditionalLegend: ({ position }) => {
+        const maybeLegend = Option.flatMap(maybeDeck, ({ contents }) =>
+          Array.get(contents.additionalLegends, position),
+        )
+
+        return withUndo(
+          edited(model, maybeDeck, () => [
+            { _tag: 'RemoveAdditionalLegend', position },
+          ]),
+          `Removed ${Option.match(maybeLegend, {
+            onNone: () => 'the additional legend',
+            onSome: printingId => nameOfPrinting(model, printingId),
+          })}.`,
+          Option.map(
+            maybeLegend,
+            (printingId): Array.NonEmptyReadonlyArray<DeckEdit.DeckEdit> => [
+              { _tag: 'AddAdditionalLegend', printingId },
+            ],
+          ),
+        )
+      },
+
+      ClickedUndo: () =>
+        Option.match(model.maybeUndo, {
+          onNone: () => ({ model }),
+          onSome: ({ edits }) =>
+            edited(
+              modifyFields(model, { maybeUndo: () => Option.none() }),
+              maybeDeck,
+              () => edits,
+            ),
+        }),
+
+      ClickedDismissUndo: () => ({
+        model: modifyFields(model, { maybeUndo: () => Option.none() }),
+      }),
+
+      CompletedWaitBeforeClearingUndo: ({ id }) => ({
+        model: modifyFields(model, {
+          maybeUndo: maybeUndo =>
+            Option.filter(maybeUndo, undo => undo.id !== id),
+        }),
+      }),
 
       ClickedSplitRunes: () =>
         Option.match(legendOf(model, maybeDeck), {
@@ -784,6 +958,21 @@ export const update =
           }),
         )
       },
+
+      ClickedDuplicate: () =>
+        Option.match(maybeDeck, {
+          onNone: () => ({ model }),
+          onSome: deck => ({
+            model,
+            outMessage: OutMessage.RequestedDuplicateDeck({
+              name: Option.getOrElse(
+                Deck.parseName(`${deck.name} (copy)`),
+                () => deck.name,
+              ),
+              contents: deck.contents,
+            }),
+          }),
+        }),
 
       ClickedCopyCode: () =>
         Option.match(maybeDeck, {
