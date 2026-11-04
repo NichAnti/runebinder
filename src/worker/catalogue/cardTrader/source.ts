@@ -6,6 +6,7 @@ import {
   FileSystem,
   Layer,
   Path,
+  Record,
   Schema,
   String,
 } from 'effect'
@@ -29,10 +30,10 @@ export class CardTraderCatalogue extends Context.Service<
       Readonly<Record<string, string>>,
       CatalogueSourceError
     >
-    readonly blueprintsBySet: Effect.Effect<
-      BlueprintsBySet,
-      CatalogueSourceError
-    >
+    /** The blueprints of the given sets (catalogue set codes, e.g. `OGN`). */
+    readonly blueprintsOf: (
+      sets: ReadonlyArray<string>,
+    ) => Effect.Effect<BlueprintsBySet, CatalogueSourceError>
   }
 >()('runebinder/worker/catalogue/CardTraderCatalogue') {}
 
@@ -48,9 +49,11 @@ export const RecordedCardTrader = Layer.effect(
       expansionCodes: readExpansionCodes(RECORDING_DIRECTORY).pipe(
         Effect.provide(services),
       ),
-      blueprintsBySet: readBlueprints(RECORDING_DIRECTORY).pipe(
-        Effect.provide(services),
-      ),
+      blueprintsOf: sets =>
+        readBlueprints(RECORDING_DIRECTORY).pipe(
+          Effect.map(Record.filter((_, set) => Array.contains(sets, set))),
+          Effect.provide(services),
+        ),
     })
   }),
 )
@@ -92,7 +95,10 @@ export const LiveCardTrader = Layer.effect(
 
     return CardTraderCatalogue.of({
       expansionCodes: Effect.flatMap(expansionsText, expansionCodesFrom),
-      blueprintsBySet: Effect.gen(function* () {
+      // Only the catalogue's sets: CardTrader also lists promo expansions
+      // whose exports carry fields from other games, and fetching them would
+      // only cost calls.
+      blueprintsOf: Effect.fn(function* (sets) {
         const expansions = yield* Effect.flatMap(
           expansionsText,
           Schema.decodeUnknownEffect(
@@ -102,7 +108,9 @@ export const LiveCardTrader = Layer.effect(
         const texts = yield* Effect.forEach(
           Array.filter(
             expansions,
-            ({ game_id }) => game_id === RIFTBOUND_GAME_ID,
+            ({ game_id, code }) =>
+              game_id === RIFTBOUND_GAME_ID &&
+              Array.contains(sets, String.toUpperCase(code)),
           ),
           ({ id, code }) =>
             text(`${API}/blueprints/export`, { expansion_id: `${id}` }).pipe(

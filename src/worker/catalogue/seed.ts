@@ -31,7 +31,16 @@ export const CatalogueSeed = Alchemy.Action(
       }
 
       const { catalogue, printingsNotOnCardTrader } =
-        yield* buildCatalogue.pipe(Effect.provide(LiveSources))
+        yield* buildCatalogue.pipe(
+          Effect.provide(LiveSources),
+          Effect.tapError(error =>
+            error._tag === 'RejectedRecords'
+              ? Console.error(
+                  `Rejected ${error.issues.length} record(s); nothing was uploaded:\n${error.issues.map(issue => JSON.stringify(issue)).join('\n')}`,
+                )
+              : Console.error(error.message),
+          ),
+        )
       // The catalogue goes last: its presence means the version is complete.
       yield* bucket.put(
         printingTypesKey(version),

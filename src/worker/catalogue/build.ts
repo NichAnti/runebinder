@@ -1,4 +1,4 @@
-import { Effect, Result } from 'effect'
+import { Array, Effect, Result } from 'effect'
 
 import { Catalogue, Printing } from '../../domain'
 import { withBlueprints } from './cardTrader/match'
@@ -14,7 +14,9 @@ export const buildCatalogue = Effect.gen(function* () {
   const source = yield* CatalogueSource
   const printings = yield* source.printings
   const cardTrader = yield* CardTraderCatalogue
-  const blueprintsBySet = yield* cardTrader.blueprintsBySet
+  const blueprintsBySet = yield* cardTrader.blueprintsOf(
+    Array.dedupe(Array.map(printings, ({ set }) => set)),
+  )
   const expansionCodes = yield* cardTrader.expansionCodes
 
   const report = yield* Result.match(
