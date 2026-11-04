@@ -27,7 +27,7 @@ const recipe = {
   root: 'group flex flex-col gap-2',
   frame: 'relative',
   image:
-    'aspect-[744/1039] w-full rounded-card bg-surface-raised object-cover shadow-raised transition-transform group-hover:-translate-y-0.5',
+    'aspect-[744/1039] w-full rounded-card bg-surface-raised object-contain shadow-raised transition-transform group-hover:-translate-y-0.5',
   text: 'flex min-w-0 flex-col',
   title: 'line-clamp-2 text-sm font-semibold text-fg',
   subtitle: 'truncate text-xs text-fg-muted',
