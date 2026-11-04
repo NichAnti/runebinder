@@ -22,11 +22,17 @@ const routeOf = (path: string) =>
   })
 
 describe('routes', () => {
-  test('/collection is gone; the collection is a view of /', () => {
+  test('/ is the home page and the cards live at /cards', () => {
+    expect(routeOf('/')).toStrictEqual(AppRoute.Home())
+    expect(routeOf('/cards')._tag).toBe('Catalogue')
+    expect(routeOf('/cards/jinx-rebel')._tag).toBe('Card')
+  })
+
+  test('/collection is gone; the collection is a view of /cards', () => {
     expect(routeOf('/collection')._tag).toBe('NotFound')
     expect(
       catalogueRouter({ ...CatalogueQuery.empty, ownership: 'Owned' }),
-    ).toBe('/?ownership=owned')
+    ).toBe('/cards?ownership=owned')
   })
 
   test('/decks lists decks and /decks/{id} opens one', () => {

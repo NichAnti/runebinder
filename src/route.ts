@@ -5,6 +5,7 @@ import { defineRouteUnion, literal, schemaSegment, slash } from 'foldkit/route'
 import { CatalogueQuery, Deck, Printing, Wishlist } from './domain'
 
 export const AppRoute = defineRouteUnion({
+  Home: {},
   SignIn: {},
   SignUp: {},
   Catalogue: CatalogueQuery.Query.fields,
@@ -26,7 +27,12 @@ export type CatalogueRoute = typeof AppRoute.Catalogue.Type
 export type CardRoute = typeof AppRoute.Card.Type
 export type DeckRoute = typeof AppRoute.Deck.Type
 
-export const LoggedOutRoute = AppRoute.subset(['SignIn', 'SignUp', 'NotFound'])
+export const LoggedOutRoute = AppRoute.subset([
+  'Home',
+  'SignIn',
+  'SignUp',
+  'NotFound',
+])
 export type LoggedOutRoute = typeof LoggedOutRoute.Type
 
 export const LoggedInRoute = AppRoute.subset([
@@ -59,6 +65,7 @@ const validParam = <A extends string>(schema: Schema.Codec<A, string>) => {
   )
 }
 
+export const homeRouter = pipe(Route.root, Route.mapTo(AppRoute.Home))
 export const signInRouter = pipe(
   literal('sign-in'),
   Route.mapTo(AppRoute.SignIn),
@@ -110,7 +117,7 @@ export const deckRouter = pipe(
   Route.mapTo(AppRoute.Deck),
 )
 export const catalogueRouter = pipe(
-  Route.root,
+  literal('cards'),
   Route.query(CatalogueQuery.QueryParams),
   Route.mapTo(AppRoute.Catalogue),
 )
@@ -135,6 +142,7 @@ const routeParser = Route.oneOf(
   deckWishlistRouter,
   wishlistsRouter,
   catalogueRouter,
+  homeRouter,
 )
 
 export const urlToAppRoute = Route.parseUrlWithFallback(

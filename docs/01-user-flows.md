@@ -43,9 +43,9 @@ flowchart TD
 
 ## In the MVP
 
-- Email and password accounts with a display name; the whole app is behind sign-in
+- A public home page at `/` explains the app; everything else is behind sign-in (email and password accounts with a display name)
 - Card catalogue: browse and search every printing
-- Collection: owned printings with quantities, changed from the card page or the card panel (hover or tap any card). The Cards page (`/`) is both the catalogue and the collection: a switch shows All cards, My collection (with a summary per set) or Wanted (what decks miss plus the custom wishlist); each card shows how many you own and how many you need
+- Collection: owned printings with quantities, changed from the card page or the card panel (hover or tap any card). The Cards page (`/cards`) is both the catalogue and the collection: a switch shows All cards, My collection (with a summary per set) or Wanted (what decks miss plus the custom wishlist); each card shows how many you own and how many you need
 - The catalogue, the collection and decks show one entry per card; every printing of a card is in its panel and page
 - Decks: create, import and export Piltover Archive deck codes, one line per card with printings in the detail view
 - Missing cards: what all decks need combined, minus what you own

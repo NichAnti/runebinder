@@ -8,6 +8,7 @@ import { CatalogueQuery } from './domain'
 import { Message } from './message'
 import { Model } from './model'
 import { LoggedIn, LoggedOut } from './page'
+import * as Home from './page/loggedOut/page/home'
 import * as SignIn from './page/loggedOut/page/signIn'
 import { AppRoute } from './route'
 import { ada } from './testing'
@@ -49,9 +50,34 @@ describe('ChangedUrl', () => {
     story(
       update,
       given(loggedOut),
-      message(Message.ChangedUrl({ url: urlOrThrow('http://localhost/') })),
+      message(
+        Message.ChangedUrl({ url: urlOrThrow('http://localhost/cards') }),
+      ),
       Command.expectExact(RedirectToSignIn),
       Command.resolve(RedirectToSignIn, Message.CompletedNavigateInternal()),
+    )
+  })
+
+  test('a signed-out user sees the home page at / and its cards load', () => {
+    story(
+      update,
+      given(loggedOut),
+      message(Message.ChangedUrl({ url: urlOrThrow('http://localhost/') })),
+      Command.expectExact(Home.LoadShowcase),
+      Command.resolve(Home.LoadShowcase, Home.Message.FailedLoadShowcase()),
+      model(next => {
+        expect(next.auth.route).toStrictEqual(AppRoute.Home())
+      }),
+    )
+  })
+
+  test('a signed-in user at / goes to the cards', () => {
+    story(
+      update,
+      given(loggedIn),
+      message(Message.ChangedUrl({ url: urlOrThrow('http://localhost/') })),
+      Command.expectExact(RedirectToCatalogue),
+      Command.resolve(RedirectToCatalogue, Message.CompletedNavigateInternal()),
     )
   })
 

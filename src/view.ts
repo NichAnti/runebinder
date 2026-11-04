@@ -10,12 +10,15 @@ import {
   cardTraderRouter,
   catalogueHome,
   decksRouter,
+  homeRouter,
+  signInRouter,
   wishlistsRouter,
 } from './route'
 import { Button, Icon, IconButton, Link } from './ui'
 
 const title = (route: AppRoute): string =>
   AppRoute.match(route, {
+    Home: () => APP_NAME,
     SignIn: () => `Sign in | ${APP_NAME}`,
     SignUp: () => `Create an account | ${APP_NAME}`,
     Catalogue: () => `Cards | ${APP_NAME}`,
@@ -182,11 +185,38 @@ const headerView = (model: Model, h: HtmlBuilder<Message>): Html =>
           ),
         ],
         [
-          h.span([h.Class('font-semibold')], [APP_NAME]),
+          h.a(
+            [
+              h.Href(
+                model.auth._tag === 'LoggedIn' ? catalogueHome() : homeRouter(),
+              ),
+              h.Class(
+                'rounded-control font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus',
+              ),
+            ],
+            [APP_NAME],
+          ),
           ...Match.value(model.auth).pipe(
             Match.tagsExhaustive({
-              LoggedOut: () => [
-                h.div([h.Class('ml-auto')], [themeToggleView(model, h)]),
+              LoggedOut: loggedOut => [
+                h.div(
+                  [h.Class('ml-auto flex items-center gap-2 sm:gap-3')],
+                  [
+                    ...(loggedOut.route._tag === 'SignIn'
+                      ? []
+                      : [
+                          Link.view(
+                            {
+                              href: signInRouter(),
+                              content: ['Sign in'],
+                              variant: 'Nav',
+                            },
+                            h,
+                          ),
+                        ]),
+                    themeToggleView(model, h),
+                  ],
+                ),
               ],
               LoggedIn: loggedIn => [
                 navView(loggedIn, h),

@@ -118,8 +118,7 @@ const foldLoggedOutOutMessage = LoggedOut.OutMessage.match<
     }),
 })
 
-const foldLoggedOut = Update.foldChild({
-  update: LoggedOut.update,
+const loggedOutSlot = {
   read: (model: Model) =>
     Match.value(model.auth).pipe(
       Match.tagsExhaustive({
@@ -127,9 +126,15 @@ const foldLoggedOut = Update.foldChild({
         LoggedIn: () => Option.none(),
       }),
     ),
-  write: (model, nextLoggedOut) =>
+  write: (model: Model, nextLoggedOut: LoggedOut.Model): Model =>
     modifyFields(model, { auth: () => nextLoggedOut }),
-  toParentMessage: message => Message.GotLoggedOutMessage({ message }),
+  toParentMessage: (message: LoggedOut.Message): Message =>
+    Message.GotLoggedOutMessage({ message }),
+}
+
+const foldLoggedOut = Update.foldChild({
+  update: LoggedOut.update,
+  ...loggedOutSlot,
   foldOutMessage: foldLoggedOutOutMessage,
 })
 
@@ -161,6 +166,11 @@ const openCardTraderConnect = Update.foldChildStep({
   toParentMessage: toLoggedInMessage,
 })
 
+const foldLoggedOutRoute = Update.foldChild({
+  update: LoggedOut.enterRoute,
+  ...loggedOutSlot,
+})
+
 const foldLoggedInRoute = Update.foldChild({
   update: LoggedIn.enterRoute,
   read: readLoggedIn,
@@ -180,14 +190,12 @@ export const enterRoute = (model: Model, route: AppRoute): UpdateReturn =>
   Match.value(model.auth).pipe(
     withUpdateReturn,
     Match.tagsExhaustive({
-      LoggedOut: loggedOut =>
+      LoggedOut: () =>
         Match.value(route).pipe(
           withUpdateReturn,
-          Match.tag('SignIn', 'SignUp', 'NotFound', route => ({
-            model: modifyFields(model, {
-              auth: () => modifyFields(loggedOut, { route: () => route }),
-            }),
-          })),
+          Match.tag('Home', 'SignIn', 'SignUp', 'NotFound', route =>
+            foldLoggedOutRoute(model, route),
+          ),
           Match.orElse(() => ({ model, commands: [RedirectToSignIn()] })),
         ),
       LoggedIn: () =>

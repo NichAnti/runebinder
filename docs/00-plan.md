@@ -81,6 +81,7 @@ Its structure is agreed before any code is written.
 - [x] 9.1b One Cards page at `/` replaces Catalogue and Collection: an All cards / My collection / Wanted switch at the top (Wanted: what decks miss plus the custom wishlist, with its own summary), the collection summary on My collection, Owned and Need badges on each card; `/collection` and Refresh removed (reloading the page reloads the collection)
 - [x] 9.1c Deck page: sticky progress bar per part; − / + on search results up to the copy limit; "only cards this legend allows" on by default; card actions in Grid too; main deck grouped by type and sorted by energy with an energy curve; split runes evenly; Need badges on deck cards
 - [x] 9.1d Deck page: deck stats and card search as tabs, a bottom sheet for them on phones, an identity header with an inline-editable name, one tile per version with capped Main / Side counters, Undo after a removal, Duplicate deck
+- [x] 9.1f Home page at `/` for signed-out visitors: what the app does, how it works in four steps, the four features with real cards, questions, sign-up and sign-in links. The Cards page moves to `/cards`; signed-in visitors at `/` go there
 - [ ] 9.1e Optionally, a way to start playing a second version of a card from its tile
 - [ ] 9.2 Polish and docs refresh
 - [x] 9.3 Riot "Legal Jibber Jabber" notice in the app (site footer, added in 4.3)

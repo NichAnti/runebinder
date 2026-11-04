@@ -1,10 +1,12 @@
 import { defineMessageUnion } from 'foldkit/message'
 
 import { User } from '../../domain'
+import * as Home from './page/home'
 import * as SignIn from './page/signIn'
 import * as SignUp from './page/signUp'
 
 export const Message = defineMessageUnion({
+  GotHomeMessage: { message: Home.Message },
   GotSignInMessage: { message: SignIn.Message },
   GotSignUpMessage: { message: SignUp.Message },
 })

@@ -10,6 +10,7 @@ export {
   CatalogueIndexResource,
   type CatalogueIndexService,
   loadCatalogueIndex,
+  loadPrintings,
 } from './catalogue'
 export * as CatalogueIndex from './catalogueIndex'
 export * as Clipboard from './clipboard'

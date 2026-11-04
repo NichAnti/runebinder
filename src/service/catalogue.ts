@@ -14,7 +14,7 @@ export type CatalogueIndexService = ManagedResource.ServiceOf<
 
 const decodeCatalogue = Schema.decodeEffect(Catalogue.CatalogueJson)
 
-export const loadCatalogueIndex = Effect.gen(function* () {
+export const loadPrintings = Effect.gen(function* () {
   const client = (yield* HttpClient.HttpClient).pipe(HttpClient.filterStatusOk)
   const url = yield* Effect.sync(
     () => new URL(catalogueUrl, window.location.origin),
@@ -22,5 +22,9 @@ export const loadCatalogueIndex = Effect.gen(function* () {
   const response = yield* client.get(url)
   const catalogue = yield* response.text.pipe(Effect.flatMap(decodeCatalogue))
 
-  return yield* CatalogueIndex.build(catalogue.printings)
+  return catalogue.printings
 }).pipe(Effect.provide(FetchHttpClient.layer))
+
+export const loadCatalogueIndex = loadPrintings.pipe(
+  Effect.flatMap(CatalogueIndex.build),
+)
