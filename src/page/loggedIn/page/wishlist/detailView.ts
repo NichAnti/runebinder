@@ -11,6 +11,7 @@ import { wishlistsRouter } from '../../../../route'
 import {
   Badge,
   Button,
+  CardTile,
   Checkbox,
   IconButton,
   Link,
@@ -142,25 +143,6 @@ const lineView = (
               }),
             ],
           ),
-          ...Option.match(
-            Option.flatMap(
-              maybePrinting,
-              ({ maybeCardTrader }) => maybeCardTrader,
-            ),
-            {
-              onNone: () => [],
-              onSome: blueprint => [
-                Link.view(
-                  {
-                    href: Wishlist.cardTraderCardUrl(blueprint.id),
-                    content: ['This version on CardTrader'],
-                    isExternal: true,
-                  },
-                  h,
-                ),
-              ],
-            },
-          ),
         ],
       ),
       h.div(
@@ -170,6 +152,28 @@ const lineView = (
           ),
         ],
         [
+          ...Option.match(
+            Option.flatMap(
+              maybePrinting,
+              ({ maybeCardTrader }) => maybeCardTrader,
+            ),
+            {
+              onNone: () => [],
+              onSome: blueprint => [
+                IconButton.view(
+                  {
+                    icon: 'ArrowTopRightOnSquare',
+                    label: `Open this version of ${label} on CardTrader`,
+                    action: {
+                      _tag: 'External',
+                      href: Wishlist.cardTraderCardUrl(blueprint.id),
+                    },
+                  },
+                  h,
+                ),
+              ],
+            },
+          ),
           ...Option.match(
             Option.filter(maybeCard, card => Array.length(card.printings) > 1),
             {
@@ -251,24 +255,35 @@ const searchResultView = (
 ): Html =>
   h.keyed('li')(
     card.id,
-    [h.Class('flex items-center justify-between gap-3')],
+    [h.Class('flex min-w-0 flex-col gap-2')],
     [
-      h.span(
-        [h.Class('text-sm')],
-        [
-          Option.match(card.maybeSubtitle, {
-            onNone: () => card.name,
-            onSome: subtitle => `${card.name}, ${subtitle}`,
-          }),
-        ],
-      ),
-      Button.view(
+      CardTile.view(
         {
-          content: ['Add'],
-          variant: 'Secondary',
-          onClick: Message.ClickedAddCard({ cardId: card.id }),
+          imageUrl: card.imageUrl,
+          imageAlt: Option.getOrElse(
+            card.maybeAccessibilityText,
+            () => card.name,
+          ),
+          title: card.name,
+          maybeSubtitle: card.maybeSubtitle,
+          domains: card.domains,
+          meta: '',
+          highlights: [],
         },
         h,
+      ),
+      h.div(
+        [h.Class('mt-auto')],
+        [
+          Button.view(
+            {
+              content: ['Add'],
+              variant: 'Secondary',
+              onClick: Message.ClickedAddCard({ cardId: card.id }),
+            },
+            h,
+          ),
+        ],
       ),
     ],
   )
@@ -292,8 +307,9 @@ const addView = (model: Model, h: HtmlBuilder<Message>): Html =>
         onNonEmpty: results =>
           h.ul(
             [
+              h.AriaLabel('Cards to add'),
               h.Class(
-                'flex flex-col gap-2 rounded-card border border-border bg-surface p-3',
+                'grid grid-cols-[repeat(auto-fill,minmax(8rem,1fr))] gap-3 rounded-card border border-border bg-surface p-3',
               ),
             ],
             Array.map(results, result => searchResultView(result, h)),
@@ -314,27 +330,42 @@ const markBoughtView = (
       () => false,
     ),
   )
+  const count = Array.length(selectedLines)
 
   return h.div(
-    [h.Class('flex flex-wrap gap-2')],
     [
-      ...Array.match(selectedLines, {
-        onEmpty: () => [],
-        onNonEmpty: selected => [
-          Button.view(
-            {
-              content: ['Mark selected as bought'],
-              variant: 'Secondary',
+      h.AriaLabel('Bought'),
+      h.Role('group'),
+      h.Class(
+        'sticky bottom-2 z-10 flex flex-wrap items-center gap-2 rounded-card border border-border bg-surface px-4 py-3 shadow-raised',
+      ),
+    ],
+    [
+      h.span(
+        [h.Role('status'), h.Class('mr-auto text-sm text-fg-muted')],
+        [
+          count === 0
+            ? 'Select the cards that arrived to mark them as bought.'
+            : `${count} selected`,
+        ],
+      ),
+      Button.view(
+        {
+          content: ['Mark selected as bought'],
+          isDisabled: count === 0,
+          ...Array.match(selectedLines, {
+            onEmpty: () => ({}),
+            onNonEmpty: selected => ({
               onClick: Message.ClickedBought({
                 purchases: Array.map(selected, line =>
                   purchaseOf(model, section, line),
                 ),
               }),
-            },
-            h,
-          ),
-        ],
-      }),
+            }),
+          }),
+        },
+        h,
+      ),
       Button.view(
         {
           content: ['Mark all as bought'],
@@ -395,7 +426,7 @@ export const detailView = (
       h.p(
         [h.Class('text-sm text-fg-muted')],
         [
-          'CardTrader wishlists keep the card and the set, not the version, so the Shop Optimizer may offer any version. Use the links beside each card for an exact version.',
+          'CardTrader wishlists keep the card and the set, not the version, so the Shop Optimizer may offer any version. Use the CardTrader icon beside each card for an exact version.',
         ],
       ),
       ...(section.isCustom ? [addView(model, h)] : []),

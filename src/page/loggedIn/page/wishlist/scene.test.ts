@@ -248,10 +248,11 @@ describe('wishlists page', () => {
       given(loaded),
       expect(role('heading', { name: /Vi aggro/ })).toExist(),
       expect(text('Need 2')).toExist(),
-      expect(role('link', { name: 'This version on CardTrader' })).toHaveAttr(
-        'href',
-        Wishlist.cardTraderCardUrl(blueprintId),
-      ),
+      expect(
+        role('link', {
+          name: 'Open this version of Test Unit, Tester on CardTrader',
+        }),
+      ).toHaveAttr('href', Wishlist.cardTraderCardUrl(blueprintId)),
       expect(role('button', { name: 'Add one' })).not.toExist(),
     )
   })
@@ -273,6 +274,19 @@ describe('wishlists page', () => {
       expect(text('Select Test Unit, Tester')).toHaveClass('sr-only'),
       click(role('button', { name: 'Remove Test Unit, Tester' })),
       expectOutMessage(OutMessage.RemovedAdded({ printingId: base })),
+    )
+  })
+
+  test('the bought bar counts the selected cards', () => {
+    scene(
+      { update: update(context), view: sceneView({ focus: customFocus }) },
+      given(loaded),
+      expect(
+        role('button', { name: 'Mark selected as bought' }),
+      ).toBeDisabled(),
+      click(role('checkbox', { name: 'Select Test Unit, Tester' })),
+      expect(role('group', { name: 'Bought' })).toContainText('1 selected'),
+      expect(role('button', { name: 'Mark selected as bought' })).toBeEnabled(),
     )
   })
 
