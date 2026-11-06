@@ -1,57 +1,88 @@
-import { click, expect, given, role, scene, text } from 'foldkit/scene'
+import { Option } from 'effect'
+import { expect, given, role, scene, text } from 'foldkit/scene'
 import { describe, test } from 'vitest'
 
-import { type Model, update, view } from './main'
+import { CatalogueQuery } from './domain'
+import { Model } from './model'
+import { LoggedIn, LoggedOut } from './page'
+import { AppRoute, type LoggedInRoute, type LoggedOutRoute } from './route'
+import { ada } from './testing'
+import { update } from './update'
+import { view } from './view'
 
-const initialModel: Model = { count: 0 }
+const loggedOutAt = (route: LoggedOutRoute) =>
+  Model.make({
+    auth: LoggedOut.init(route),
+    themePreference: 'System',
+    systemTheme: 'Light',
+  })
 
-describe('view', () => {
-  test('renders the initial count and three buttons', () => {
+const loggedInAt = (route: LoggedInRoute) =>
+  Model.make({
+    auth: LoggedIn.init(route, ada),
+    themePreference: 'Dark',
+    systemTheme: 'Light',
+  })
+
+describe('shell', () => {
+  test('the footer carries the Riot notice', () => {
     scene(
       { update, view },
-      given(initialModel),
-      expect(text('0')).toExist(),
-      expect(role('button', { name: '+' })).toExist(),
-      expect(role('button', { name: '-' })).toExist(),
-      expect(role('button', { name: 'Reset' })).toExist(),
+      given(loggedOutAt(AppRoute.SignIn())),
+      expect(role('contentinfo')).toContainText('Legal Jibber Jabber'),
     )
   })
 
-  test('clicking + increments the displayed count', () => {
+  test('signed out shows the sign-in form without the main nav', () => {
     scene(
       { update, view },
-      given(initialModel),
-      click(role('button', { name: '+' })),
-      expect(text('1')).toExist(),
-      click(role('button', { name: '+' })),
-      expect(text('2')).toExist(),
+      given(loggedOutAt(AppRoute.SignIn())),
+      expect(role('heading', { name: 'Sign in' })).toExist(),
+      expect(role('link', { name: 'Create one' })).toHaveAttr(
+        'href',
+        '/sign-up',
+      ),
+      expect(role('navigation', { name: 'Main' })).toBeAbsent(),
     )
   })
 
-  test('clicking - decrements the displayed count', () => {
+  test('the sign-up page links back to sign in', () => {
     scene(
       { update, view },
-      given({ count: 3 }),
-      click(role('button', { name: '-' })),
-      expect(text('2')).toExist(),
+      given(loggedOutAt(AppRoute.SignUp({ invite: Option.none() }))),
+      expect(role('heading', { name: 'Create an account' })).toExist(),
+      expect(role('link', { name: 'Sign in' })).toHaveAttr('href', '/sign-in'),
     )
   })
 
-  test('clicking - past zero produces a negative count', () => {
+  test('signed in loads the catalogue and shows the nav and the user', () => {
     scene(
       { update, view },
-      given(initialModel),
-      click(role('button', { name: '-' })),
-      expect(text('-1')).toExist(),
+      given(loggedInAt(AppRoute.Catalogue(CatalogueQuery.empty))),
+      expect(role('status')).toContainText('Loading the catalogue…'),
+      expect(role('link', { name: 'Cards' })).toHaveAttr(
+        'aria-current',
+        'page',
+      ),
+      expect(text('Ada')).toExist(),
+      expect(role('button', { name: 'Sign out' })).toExist(),
     )
   })
 
-  test('Reset returns the count to zero', () => {
+  test('the theme toggle shows the current preference', () => {
     scene(
       { update, view },
-      given({ count: 42 }),
-      click(role('button', { name: 'Reset' })),
-      expect(text('0')).toExist(),
+      given(loggedInAt(AppRoute.Catalogue(CatalogueQuery.empty))),
+      expect(role('button', { name: 'Theme: Dark' })).toExist(),
+    )
+  })
+
+  test('not found shows the path and a way back', () => {
+    scene(
+      { update, view },
+      given(loggedInAt(AppRoute.NotFound({ path: '/nope' }))),
+      expect(text('Nothing lives at /nope.')).toExist(),
+      expect(role('link', { name: 'Go to catalogue' })).toExist(),
     )
   })
 })

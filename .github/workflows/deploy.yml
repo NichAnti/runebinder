@@ -43,6 +43,9 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          INVITE_CODE: ${{ secrets.INVITE_CODE }}
+          # Only used when a deploy seeds a new catalogue version.
+          CARDTRADER_TOKEN: ${{ secrets.CARDTRADER_TOKEN }}
 
   cleanup:
     if: ${{ github.event_name == 'pull_request' && github.event.action == 'closed' }}
@@ -65,3 +68,4 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          INVITE_CODE: ${{ secrets.INVITE_CODE }}

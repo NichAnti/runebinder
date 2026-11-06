@@ -18,11 +18,16 @@
     "typescript/no-explicit-any": "error",
     "typescript/consistent-type-assertions": [
       "error",
-      { "assertionStyle": "never" }
+      {
+        "assertionStyle": "never"
+      }
     ],
     "sort-imports": [
       "error",
-      { "ignoreDeclarationSort": true, "ignoreCase": false }
+      {
+        "ignoreDeclarationSort": true,
+        "ignoreCase": false
+      }
     ]
   },
   "ignorePatterns": [
@@ -33,6 +38,7 @@
     "vite.config.ts",
     "vitest.config.ts",
     "**/*.config.js",
-    "**/*.config.mjs"
+    "**/*.config.mjs",
+    "src/worker/schema/auth.ts"
   ]
 }

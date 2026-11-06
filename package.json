@@ -1,5 +1,5 @@
 {
-  "name": "cardtrader",
+  "name": "runebinder",
   "version": "0.1.0",
   "type": "module",
   "scripts": {
@@ -16,8 +16,15 @@
     "prepare": "test -z \"$CI\" && simple-git-hooks || true"
   },
   "dependencies": {
+    "@alchemy.run/better-auth": "2.0.0-beta.83",
+    "@better-auth/drizzle-adapter": "1.7.5",
     "@effect/platform-browser": "4.0.0",
+    "@effect/sql-d1": "4.0.0",
     "@foldkit/ui": "0.169.0",
+    "@orama/orama": "3.1.18",
+    "@piltoverarchive/riftbound-deck-codes": "1.5.0",
+    "better-auth": "1.7.5",
+    "drizzle-orm": "1.0.0-rc.5-ab785fc",
     "effect": "4.0.0",
     "foldkit": "0.169.0"
   },
@@ -25,12 +32,14 @@
     "@effect/platform-bun": "4.0.0",
     "@effect/platform-node": "4.0.0",
     "@effect/tsgo": "0.50.0",
+    "@effect/vitest": "4.0.0",
     "@foldkit/devtools": "0.169.0",
     "@foldkit/devtools-mcp": "0.25.0",
     "@foldkit/oxlint-plugin": "0.15.3",
     "@foldkit/vite-plugin": "0.28.0",
     "@tailwindcss/vite": "^4.3.3",
     "alchemy": "2.0.0-beta.83",
+    "drizzle-kit": "1.0.0-rc.5-ab785fc",
     "happy-dom": "^20.14.5",
     "oxfmt": "^0.66.0",
     "oxlint": "1.85.0",
@@ -43,5 +52,9 @@
   },
   "simple-git-hooks": {
     "pre-push": "bun run check"
+  },
+  "overrides": {
+    "@effect/sql-d1": "4.0.0",
+    "@effect/sql-sqlite-do": "4.0.0"
   }
 }

@@ -1,71 +1,219 @@
+import { Option } from 'effect'
 import { Command, given, message, model, story } from 'foldkit/story'
+import { modifyFields } from 'foldkit/struct'
+import { fromString } from 'foldkit/url'
 import { describe, expect, test } from 'vitest'
 
-import { Message, type Model, update } from './main'
+import { CatalogueQuery } from './domain'
+import { Message } from './message'
+import { Model } from './model'
+import { LoggedIn, LoggedOut } from './page'
+import * as Home from './page/loggedOut/page/home'
+import * as SignIn from './page/loggedOut/page/signIn'
+import { AppRoute } from './route'
+import { ada } from './testing'
+import {
+  ApplyTheme,
+  RedirectToCatalogue,
+  RedirectToSignIn,
+  SaveThemePreference,
+  SignOut,
+  update,
+} from './update'
 
-const initialModel: Model = { count: 0 }
+const urlOrThrow = (raw: string) =>
+  Option.getOrThrowWith(fromString(raw), () => new Error(`Bad url: ${raw}`))
 
-describe('update', () => {
-  test('ClickedIncrement adds one to the count', () => {
+const loggedOut = Model.make({
+  auth: LoggedOut.init(AppRoute.SignIn()),
+  themePreference: 'System',
+  systemTheme: 'Light',
+})
+
+const loggedIn = Model.make({
+  auth: modifyFields(
+    LoggedIn.init(AppRoute.Catalogue(CatalogueQuery.empty), ada),
+    {
+      cardTrader: cardTrader =>
+        modifyFields(cardTrader, {
+          connection: () =>
+            LoggedIn.CardTraderConnection.Disconnected({ wasRejected: false }),
+        }),
+    },
+  ),
+  themePreference: 'System',
+  systemTheme: 'Light',
+})
+
+describe('ChangedUrl', () => {
+  test('a signed-out user on a signed-in route is redirected to sign in', () => {
     story(
       update,
-      given(initialModel),
-      message(Message.ClickedIncrement()),
+      given(loggedOut),
+      message(
+        Message.ChangedUrl({ url: urlOrThrow('http://localhost/cards') }),
+      ),
+      Command.expectExact(RedirectToSignIn),
+      Command.resolve(RedirectToSignIn, Message.CompletedNavigateInternal()),
+    )
+  })
+
+  test('a signed-out user sees the home page at / and its cards load', () => {
+    story(
+      update,
+      given(loggedOut),
+      message(Message.ChangedUrl({ url: urlOrThrow('http://localhost/') })),
+      Command.expectExact(Home.LoadShowcase),
+      Command.resolve(Home.LoadShowcase, Home.Message.FailedLoadShowcase()),
+      model(next => {
+        expect(next.auth.route).toStrictEqual(AppRoute.Home())
+      }),
+    )
+  })
+
+  test('a signed-in user at / goes to the cards', () => {
+    story(
+      update,
+      given(loggedIn),
+      message(Message.ChangedUrl({ url: urlOrThrow('http://localhost/') })),
+      Command.expectExact(RedirectToCatalogue),
+      Command.resolve(RedirectToCatalogue, Message.CompletedNavigateInternal()),
+    )
+  })
+
+  test('an invite link fills in the code and leaves the address bar', () => {
+    story(
+      update,
+      given(loggedOut),
+      message(
+        Message.ChangedUrl({
+          url: urlOrThrow('http://localhost/sign-up?invite=friends-2026'),
+        }),
+      ),
+      Command.expectExact(LoggedOut.ForgetInvite),
+      Command.resolve(
+        LoggedOut.ForgetInvite,
+        LoggedOut.Message.CompletedForgetInvite(),
+      ),
+      model(next => {
+        expect(
+          next.auth._tag === 'LoggedOut' && next.auth.signUp.inviteCode.value,
+        ).toBe('friends-2026')
+      }),
+    )
+  })
+
+  test('a signed-out user can open the sign-up page', () => {
+    story(
+      update,
+      given(loggedOut),
+      message(
+        Message.ChangedUrl({ url: urlOrThrow('http://localhost/sign-up') }),
+      ),
       Command.expectNone(),
-      model(model => {
-        expect(model.count).toBe(1)
+      model(next => {
+        expect(next.auth.route).toStrictEqual(
+          AppRoute.SignUp({ invite: Option.none() }),
+        )
       }),
     )
   })
 
-  test('ClickedDecrement subtracts one from the count', () => {
+  test('a signed-in user on the sign-in route is redirected to the catalogue', () => {
     story(
       update,
-      given({ count: 5 }),
-      message(Message.ClickedDecrement()),
-      model(model => {
-        expect(model.count).toBe(4)
-      }),
+      given(loggedIn),
+      message(
+        Message.ChangedUrl({ url: urlOrThrow('http://localhost/sign-in') }),
+      ),
+      Command.expectExact(RedirectToCatalogue),
+      Command.resolve(RedirectToCatalogue, Message.CompletedNavigateInternal()),
     )
   })
 
-  test('ClickedDecrement past zero produces a negative count', () => {
+  test('an unknown path becomes NotFound within the current area', () => {
     story(
       update,
-      given(initialModel),
-      message(Message.ClickedDecrement()),
-      model(model => {
-        expect(model.count).toBe(-1)
+      given(loggedIn),
+      message(Message.ChangedUrl({ url: urlOrThrow('http://localhost/nope') })),
+      Command.expectNone(),
+      model(next => {
+        expect(next.auth.route).toStrictEqual(
+          AppRoute.NotFound({ path: '/nope' }),
+        )
       }),
     )
   })
+})
 
-  test('ClickedReset sets the count back to zero', () => {
+describe('session', () => {
+  test('signing in switches to the signed-in area and opens the catalogue', () => {
     story(
       update,
-      given({ count: 99 }),
-      message(Message.ClickedReset()),
-      model(model => {
-        expect(model.count).toBe(0)
+      given(loggedOut),
+      message(
+        Message.GotLoggedOutMessage({
+          message: LoggedOut.Message.GotSignInMessage({
+            message: SignIn.Message.SucceededSignIn({ user: ada }),
+          }),
+        }),
+      ),
+      model(next => {
+        expect(next.auth).toStrictEqual(
+          LoggedIn.init(AppRoute.Catalogue(CatalogueQuery.empty), ada),
+        )
       }),
+      Command.expectExact(RedirectToCatalogue),
+      Command.resolve(RedirectToCatalogue, Message.CompletedNavigateInternal()),
     )
   })
 
-  test('successive Messages accumulate as expected', () => {
+  test('signing out returns to the sign-in page', () => {
     story(
       update,
-      given(initialModel),
-      message(Message.ClickedIncrement()),
-      message(Message.ClickedIncrement()),
-      message(Message.ClickedIncrement()),
-      message(Message.ClickedDecrement()),
-      model(model => {
-        expect(model.count).toBe(2)
+      given(loggedIn),
+      message(Message.ClickedSignOut()),
+      Command.expectExact(SignOut),
+      Command.resolve(SignOut, Message.SucceededSignOut()),
+      model(next => {
+        expect(next.auth).toStrictEqual(LoggedOut.init(AppRoute.SignIn()))
       }),
-      message(Message.ClickedReset()),
-      model(model => {
-        expect(model.count).toBe(0)
+      Command.expectExact(RedirectToSignIn),
+      Command.resolve(RedirectToSignIn, Message.CompletedNavigateInternal()),
+    )
+  })
+})
+
+describe('theme', () => {
+  test('the toggle moves to the next preference, applies and saves it', () => {
+    story(
+      update,
+      given(loggedOut),
+      message(Message.ClickedThemeToggle()),
+      model(next => {
+        expect(next.themePreference).toBe('Light')
       }),
+      Command.expectHas(
+        ApplyTheme({ theme: 'Light' }),
+        SaveThemePreference({ preference: 'Light' }),
+      ),
+      Command.resolveAll(
+        [ApplyTheme, Message.CompletedApplyTheme()],
+        [SaveThemePreference, Message.CompletedSaveThemePreference()],
+      ),
+    )
+  })
+
+  test('a system theme change is applied while the preference is System', () => {
+    story(
+      update,
+      given(loggedOut),
+      message(Message.ChangedSystemTheme({ theme: 'Dark' })),
+      model(next => {
+        expect(next.systemTheme).toBe('Dark')
+      }),
+      Command.expectHas(ApplyTheme({ theme: 'Dark' })),
+      Command.resolve(ApplyTheme, Message.CompletedApplyTheme()),
     )
   })
 })

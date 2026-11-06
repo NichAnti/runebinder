@@ -32,3 +32,10 @@ Thumbs.db
 
 # Nix / direnv
 .direnv/
+
+# Local caches (Riot API responses)
+.cache/
+
+# Card data is never committed: deploys seed it into R2. Local recordings of
+# the sources, if any, only feed the tests that check the real data.
+/catalogue/
